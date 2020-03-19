@@ -142,9 +142,11 @@ public class LinphoneManager implements SensorEventListener {
                                 Log.i("[Manager] Phone state is idle");
                                 setCallGsmON(false);
                                 // CLB
-                                Call[] calls = LinphoneManager.getCore().getCalls();
-                                if (calls != null && calls.length > 0) {
-                                    LinphoneManager.getCore().resumeCall(calls[0]);
+                                if (mCore != null && mCore.getCallsNb() > 0) {
+                                    Call[] calls = mCore.getCalls();
+                                    if (calls != null && calls.length > 0) {
+                                        mCore.resumeCall(calls[0]);
+                                    }
                                 }
                                 break;
                         }

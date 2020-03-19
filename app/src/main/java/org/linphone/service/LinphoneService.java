@@ -31,6 +31,7 @@ import org.linphone.call.views.LinphoneGL2JNIViewOverlay;
 import org.linphone.call.views.LinphoneOverlay;
 import org.linphone.call.views.LinphoneTextureViewOverlay;
 import org.linphone.clb.LinphonePreferencesCLB;
+import org.linphone.clb.RegisterCLB;
 import org.linphone.core.Call;
 import org.linphone.core.Core;
 import org.linphone.core.tools.Log;
@@ -44,6 +45,7 @@ public final class LinphoneService extends Service {
     private WindowManager mWindowManager;
     private Application.ActivityLifecycleCallbacks mActivityCallbacks;
     private boolean misLinphoneContextOwned;
+    private RegisterCLB mRegisterCLB;
 
     @Override
     public void onCreate() {
@@ -63,6 +65,8 @@ public final class LinphoneService extends Service {
         // CLB => Inspect Local Xml Configuration files (linphonerc.xml)
         LinphonePreferencesCLB.instance().CheckOnLocalXmlFile();
         LinphonePreferencesCLB.instance().LogSettingChanges();
+        mRegisterCLB = new RegisterCLB(this);
+        mRegisterCLB.RegisterReceivers();
 
         Log.i("[Service] Created");
 
@@ -129,6 +133,8 @@ public final class LinphoneService extends Service {
     @Override
     public synchronized void onDestroy() {
         Log.i("[Service] Destroying");
+
+        mRegisterCLB.UnRegisterReceivers();
 
         if (mActivityCallbacks != null) {
             getApplication().unregisterActivityLifecycleCallbacks(mActivityCallbacks);
