@@ -878,4 +878,33 @@ public class LinphoneManager implements SensorEventListener {
     public void lastCallSasRejected(boolean rejected) {
         mHasLastCallSasBeenRejected = rejected;
     }
+
+    // TODO CLB Previous in MainActivity.resetClassicMenuLayoutAndGoBackToCallIfStillRunning
+    // Inspect if it contains still necessary stuff.
+    //
+    public void resetClassicMenuLayoutAndGoBackToCallIfStillRunning() {
+        resetClassicMenuLayoutAndGoBackToCallIfStillRunning(false);
+    }
+
+    public void resetClassicMenuLayoutAndGoBackToCallIfStillRunning(boolean fromHangupReceiver) {
+
+        /*
+        DialerFragment dialerFragment = DialerFragment.instance();
+        if (dialerFragment != null) {
+            ((DialerFragment) dialerFragment).resetLayout(true);
+        }
+
+        if (LinphoneManager.isInstanciated() && LinphoneManager.getLc().getCallsNb() > 0) {
+            LinphoneCall call = LinphoneManager.getLc().getCalls()[0];
+            if (call.getState() == LinphoneCall.State.IncomingReceived) {
+                startActivity(new Intent(LinphoneActivity.this, CallIncomingActivity.class));
+            } else if(fromHangupReceiver){
+                moveTaskToBack(true);
+            }
+            else {
+                startIncallActivity(call);
+            }
+        }
+         */
+    }
 }
