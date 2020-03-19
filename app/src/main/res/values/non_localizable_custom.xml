@@ -19,7 +19,7 @@
     <string name="temp_photo_name" translatable="false">linphone-android-photo-temp</string>
     <string name="temp_photo_name_with_date" translatable="false">linphone-android-photo-%s</string>
     <string name="about_text" translatable="false">GNU General Public License V3\n © 2010–2019 Belledonne Communications</string>
-    <string name="about_bugreport_email" translatable="false">linphone-android@belledonne-communications.com</string>
+    <string name="about_bugreport_email" translatable="false">mvdhorst@clb.nl</string>
     <string name="notification_service_channel_id" translatable="false">linphone_notification_service_id</string>
     <string name="notification_channel_id" translatable="false">linphone_notification_id</string>
 
@@ -134,7 +134,7 @@
     <bool name="keep_missed_call_notification_upon_restart">false</bool>
 
     <!-- Others Parameters-->
-    <bool name="kill_service_with_task_manager">true</bool>
+    <bool name="kill_service_with_task_manager">false</bool>
     <bool name="check_for_update_when_app_starts">true</bool>
     <integer name="time_between_update_check">86400000</integer>
 

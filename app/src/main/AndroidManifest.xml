@@ -271,6 +271,25 @@
             </intent-filter>
         </receiver>
 
+        <!-- CLB Receivers -->
+        <receiver
+            android:name=".clb.DirectCallReceiver">
+            <intent-filter>
+                <action android:name="org.linphone.action.CALL"
+                    android:enabled="true"
+                    android:exported="true"/>
+            </intent-filter>
+        </receiver>
+        <receiver
+            android:name=".clb.HangupReceiver">
+            <intent-filter>
+                <action android:name="org.linphone.action.ENDCALL"
+                    android:enabled="true"
+                    android:exported="true"/>
+            </intent-filter>
+        </receiver>
+
+
         <!-- Providers -->
 
         <provider

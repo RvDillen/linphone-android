@@ -30,6 +30,7 @@ import org.linphone.R;
 import org.linphone.call.views.LinphoneGL2JNIViewOverlay;
 import org.linphone.call.views.LinphoneOverlay;
 import org.linphone.call.views.LinphoneTextureViewOverlay;
+import org.linphone.clb.LinphonePreferencesCLB;
 import org.linphone.core.Call;
 import org.linphone.core.Core;
 import org.linphone.core.tools.Log;
@@ -50,11 +51,19 @@ public final class LinphoneService extends Service {
 
         setupActivityMonitor();
 
+        // CLB => Inspect Local Configuration files (linphonerc)
+        LinphonePreferencesCLB.instance().CheckOnLocalIniFile(getBaseContext());
+
         misLinphoneContextOwned = false;
         if (!LinphoneContext.isReady()) {
             new LinphoneContext(getApplicationContext());
             misLinphoneContextOwned = true;
         }
+
+        // CLB => Inspect Local Xml Configuration files (linphonerc.xml)
+        LinphonePreferencesCLB.instance().CheckOnLocalXmlFile();
+        LinphonePreferencesCLB.instance().LogSettingChanges();
+
         Log.i("[Service] Created");
 
         mWindowManager = (WindowManager) getSystemService(WINDOW_SERVICE);

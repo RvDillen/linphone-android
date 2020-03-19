@@ -28,6 +28,7 @@ import org.linphone.LinphoneManager;
 import org.linphone.R;
 import org.linphone.assistant.MenuAssistantActivity;
 import org.linphone.chat.ChatActivity;
+import org.linphone.clb.LinphonePreferencesCLB;
 import org.linphone.contacts.ContactsActivity;
 import org.linphone.dialer.DialerActivity;
 import org.linphone.history.HistoryActivity;
@@ -49,6 +50,9 @@ public class LinphoneLauncherActivity extends Activity implements ServiceWaitThr
         if (!getResources().getBoolean(R.bool.use_full_screen_image_splashscreen)) {
             setContentView(R.layout.launch_screen);
         } // Otherwise use drawable/launch_screen layer list up until first activity starts
+
+        // CLB Preferences
+        LinphonePreferencesCLB.instance().CheckPermissions(this);
     }
 
     @Override

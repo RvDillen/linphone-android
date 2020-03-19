@@ -334,13 +334,13 @@
     <string name="warning_wrong_destination_address">Cannot build destination address from %s</string>
     <string name="error_unknown">Unknown error</string>
     <string name="error_call_declined">Call declined</string>
-    <string name="error_user_busy">User busy</string>
+    <string name="error_user_busy">User already in call. Line is busy</string>
     <string name="error_user_not_found">User not found</string>
     <string name="error_incompatible_media">Incompatible media parameters</string>
-    <string name="error_low_bandwidth">Your caller has low bandwidth, video cannot be started</string>
-    <string name="error_network_unreachable">Network is unreachable</string>
+    <string name="error_low_bandwidth">The destination uses a low bandwidth connection, video cannot be started</string>
+    <string name="error_network_unreachable">Network is unavailable</string>
     <string name="error_bad_credentials">Bad credentials</string>
-    <string name="error_unauthorized">Unauthorized</string>
+    <string name="error_unauthorized">User not authorized</string>
     <string name="error_io_error">Network error</string>
     <string name="download_image_failed">Download failed. Please check your network connection or try again later.</string>
     <string name="remote_provisioning_failure">Failed to download or apply remote provisioning profile…</string>

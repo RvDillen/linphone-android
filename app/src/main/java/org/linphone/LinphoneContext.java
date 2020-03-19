@@ -19,13 +19,12 @@
  */
 package org.linphone;
 
-import static android.content.Intent.ACTION_MAIN;
-
 import android.content.Context;
 import android.content.Intent;
 import android.os.Build;
+import android.os.Environment;
 import android.provider.ContactsContract;
-import java.util.ArrayList;
+
 import org.linphone.call.CallActivity;
 import org.linphone.call.CallIncomingActivity;
 import org.linphone.call.CallOutgoingActivity;
@@ -48,6 +47,10 @@ import org.linphone.settings.LinphonePreferences;
 import org.linphone.utils.DeviceUtils;
 import org.linphone.utils.LinphoneUtils;
 import org.linphone.utils.PushNotificationUtils;
+
+import java.util.ArrayList;
+
+import static android.content.Intent.ACTION_MAIN;
 
 public class LinphoneContext {
     private static LinphoneContext sInstance = null;
@@ -101,7 +104,13 @@ public class LinphoneContext {
         mCoreStartedListeners = new ArrayList<>();
 
         LinphonePreferences.instance().setContext(context);
-        Factory.instance().setLogCollectionPath(context.getFilesDir().getAbsolutePath());
+
+        String external =
+                context.getExternalFilesDir(Environment.getDataDirectory().getAbsolutePath())
+                        .getAbsolutePath(); // GET public dir
+        if (external == null) external = context.getFilesDir().getAbsolutePath();
+        Factory.instance().setLogCollectionPath(external);
+
         boolean isDebugEnabled = LinphonePreferences.instance().isDebugEnabled();
         LinphoneUtils.configureLoggingService(isDebugEnabled, context.getString(R.string.app_name));
 
@@ -175,7 +184,9 @@ public class LinphoneContext {
 
                             if (state == Call.State.Released
                                     && call.getCallLog().getStatus() == Call.Status.Missed) {
-                                mNotificationManager.displayMissedCallNotification(call);
+                                /* CLB exclusive!: Do NOT show 'missed call notification' and icon!! =>
+                                        mNotificationManager.displayMissedCallNotification(call);
+                                */
                             }
                         }
                     }

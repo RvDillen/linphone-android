@@ -39,11 +39,7 @@ import android.telephony.TelephonyManager;
 import android.view.View;
 import android.widget.Button;
 import android.widget.CheckBox;
-import java.io.File;
-import java.sql.Timestamp;
-import java.util.Date;
-import java.util.Timer;
-import java.util.TimerTask;
+
 import org.linphone.assistant.PhoneAccountLinkingAssistantActivity;
 import org.linphone.call.AndroidAudioManager;
 import org.linphone.call.CallManager;
@@ -72,8 +68,16 @@ import org.linphone.utils.LinphoneUtils;
 import org.linphone.utils.MediaScanner;
 import org.linphone.utils.PushNotificationUtils;
 
+import java.io.File;
+import java.sql.Timestamp;
+import java.util.Date;
+import java.util.Timer;
+import java.util.TimerTask;
+
 /** Handles Linphone's Core lifecycle */
 public class LinphoneManager implements SensorEventListener {
+
+    public static final String STATE_SIPSTATE = "org.linphone.state.SIPSTATE";
     private final String mBasePath;
     private final String mRingSoundFile;
     private final String mCallLogDatabaseFile;
@@ -137,6 +141,11 @@ public class LinphoneManager implements SensorEventListener {
                             case TelephonyManager.CALL_STATE_IDLE:
                                 Log.i("[Manager] Phone state is idle");
                                 setCallGsmON(false);
+                                // CLB
+                                Call[] calls = LinphoneManager.getCore().getCalls();
+                                if (calls != null && calls.length > 0) {
+                                    LinphoneManager.getCore().resumeCall(calls[0]);
+                                }
                                 break;
                         }
                     }
@@ -167,12 +176,14 @@ public class LinphoneManager implements SensorEventListener {
                             final State state,
                             final String message) {
                         Log.i("[Manager] Call state is [", state, "]");
+                        String newCallState = null;
                         if (state == State.IncomingReceived
                                 && !call.equals(core.getCurrentCall())) {
                             if (call.getReplacedCall() != null) {
                                 // attended transfer will be accepted automatically.
                                 return;
                             }
+                            newCallState = "ringing";
                         }
 
                         if ((state == State.IncomingReceived || state == State.IncomingEarlyMedia)
@@ -197,10 +208,22 @@ public class LinphoneManager implements SensorEventListener {
                                     };
                             mAutoAnswerTimer = new Timer("Auto answer");
                             mAutoAnswerTimer.schedule(lTask, mPrefs.getAutoAnswerTime());
+                            newCallState = "ringing";
                         } else if (state == State.End || state == State.Error) {
                             if (mCore.getCallsNb() == 0) {
                                 // Disabling proximity sensor
                                 enableProximitySensing(false);
+                                newCallState = "idle";
+                            } else {
+                                // CLB: Still first call in pause mode => Activate .
+                                Call[] calls = mCore.getCalls();
+                                if (calls != null && calls.length > 0) {
+                                    Call call1 = calls[0];
+                                    if (call1.getState() == State.Paused) {
+                                        mCore.resumeCall(call1);
+                                        newCallState = "connected";
+                                    }
+                                }
                             }
                         } else if (state == State.UpdatedByRemote) {
                             // If the correspondent proposes video while audio call
@@ -215,6 +238,16 @@ public class LinphoneManager implements SensorEventListener {
                                     && mCore.getConference() == null) {
                                 call.deferUpdate();
                             }
+                        } else if (state == State.OutgoingInit) {
+                            newCallState = "ringing";
+                        } else if (state == State.StreamsRunning) {
+                            newCallState = "connected";
+                        }
+
+                        if (newCallState != null) {
+                            Intent intentMessage = new Intent(STATE_SIPSTATE);
+                            intentMessage.putExtra("state", newCallState);
+                            mContext.sendBroadcast(intentMessage);
                         }
                     }
 

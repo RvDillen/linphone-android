@@ -111,14 +111,18 @@
   <!--Service-->
   <!--Errors-->
   <string name="error">Fout</string>
-  <string name="error_unknown">onbekend</string>
-  <string name="error_call_declined">oproep</string>
-  <string name="error_user_busy">gebruiker in gesprek</string>
-  <string name="error_user_not_found">gebruiker niet gevonden</string>
-  <string name="error_low_bandwidth">lage bandbreedte</string>
-  <string name="error_network_unreachable">netwerk niet bereikbaar</string>
-  <string name="error_unauthorized">niet toegestaan</string>
-  <string name="error_io_error">IO fout</string>
+  <string name="skipable_error_service_not_ready">Service niet beschikbaar</string>
+  <string name="warning_wrong_destination_address">Kan bestemming niet opmaken uit %s</string>
+  <string name="error_unknown">Onbekende fout</string>
+  <string name="error_call_declined">Oproep geweigerd</string>
+  <string name="error_user_busy">Gebruiker is in gesprek. De lijn is bezet.</string>
+  <string name="error_user_not_found">Gebruiker niet gevonden</string>
+  <string name="error_incompatible_media">Media parameters zijn niet bruikbaar</string>
+  <string name="error_low_bandwidth">Video kan niet worden gestart omdat de bestemming gebruikt maakt van een lage bandbreedte</string>
+  <string name="error_network_unreachable">Netwerk niet bereikbaar</string>
+  <string name="error_bad_credentials">Onjuiste inloggegevens</string>
+  <string name="error_unauthorized">Niet geautoriseerd</string>
+  <string name="error_io_error">Netwerkfout</string>
   <!--Account Settings-->
   <string name="pref_sipaccount">SIP-account</string>
   <string name="pref_manage_title">Beheren</string>
