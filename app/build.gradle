@@ -97,11 +97,12 @@ android {
         applicationId getPackageName()
         multiDexEnabled true
         signingConfig signingConfigs.debug
+        versionNameSuffix = 'clb-20200319'
     }
 
     applicationVariants.all { variant ->
         variant.outputs.all {
-            outputFileName = "linphone-android-${variant.buildType.name}-${project.version}.apk"
+            outputFileName = "linphone-android-${variant.buildType.name}_${variant.versionName}.apk"
         }
 
         if (variant.buildType.name.equals("release")) {

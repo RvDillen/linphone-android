@@ -6,14 +6,8 @@ import android.content.Context;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Environment;
-
-import org.linphone.core.Config;
-import org.linphone.mediastream.Log;
-import org.linphone.settings.LinphonePreferences;
-import org.xmlpull.v1.XmlPullParser;
-import org.xmlpull.v1.XmlPullParserException;
-import org.xmlpull.v1.XmlPullParserFactory;
-
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -22,9 +16,12 @@ import java.io.IOException;
 import java.nio.channels.FileChannel;
 import java.util.ArrayList;
 import java.util.List;
-
-import androidx.core.app.ActivityCompat;
-import androidx.core.content.ContextCompat;
+import org.linphone.core.Config;
+import org.linphone.mediastream.Log;
+import org.linphone.settings.LinphonePreferences;
+import org.xmlpull.v1.XmlPullParser;
+import org.xmlpull.v1.XmlPullParserException;
+import org.xmlpull.v1.XmlPullParserFactory;
 
 /**
  * LinphonePreferencesCLB: CLB class to overwrite settings when starting up app.<br>
