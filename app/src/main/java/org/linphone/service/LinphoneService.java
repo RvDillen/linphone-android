@@ -62,9 +62,6 @@ public final class LinphoneService extends Service {
             misLinphoneContextOwned = true;
         }
 
-        // CLB => Inspect Local Xml Configuration files (linphonerc.xml)
-        LinphonePreferencesCLB.instance().CheckOnLocalXmlFile();
-        LinphonePreferencesCLB.instance().LogSettingChanges();
         mRegisterCLB = new RegisterCLB(this);
         mRegisterCLB.RegisterReceivers();
 
@@ -103,6 +100,9 @@ public final class LinphoneService extends Service {
         } else {
             LinphoneContext.instance().updateContext(this);
         }
+
+        // CLB => Inspect Local Xml Configuration files (linphonerc.xml)
+        LinphonePreferencesCLB.instance().LogSettingChanges();
 
         Log.i("[Service] Started");
         return START_STICKY;

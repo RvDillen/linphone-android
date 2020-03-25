@@ -6,8 +6,13 @@ import android.content.Context;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Environment;
-import androidx.core.app.ActivityCompat;
-import androidx.core.content.ContextCompat;
+
+import org.linphone.core.Config;
+import org.linphone.mediastream.Log;
+import org.xmlpull.v1.XmlPullParser;
+import org.xmlpull.v1.XmlPullParserException;
+import org.xmlpull.v1.XmlPullParserFactory;
+
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -16,12 +21,9 @@ import java.io.IOException;
 import java.nio.channels.FileChannel;
 import java.util.ArrayList;
 import java.util.List;
-import org.linphone.core.Config;
-import org.linphone.mediastream.Log;
-import org.linphone.settings.LinphonePreferences;
-import org.xmlpull.v1.XmlPullParser;
-import org.xmlpull.v1.XmlPullParserException;
-import org.xmlpull.v1.XmlPullParserFactory;
+
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 
 /**
  * LinphonePreferencesCLB: CLB class to overwrite settings when starting up app.<br>
@@ -113,13 +115,13 @@ public class LinphonePreferencesCLB {
         //        }
     }
 
-    public void CheckOnLocalXmlFile() {
+    public void CheckOnLocalXmlFile(Config config) {
 
         for (String dataPath : dataPaths) {
             // Found local linphonerc.Xml? => Overwrite settings
             File linphoneXml = new File(dataPath + "/linphonerc.xml");
             if (linphoneXml.exists()) {
-                HandleLocalXmlFile(linphoneXml);
+                HandleLocalXmlFile(linphoneXml, config);
             }
         }
     }
@@ -159,11 +161,16 @@ public class LinphonePreferencesCLB {
     /* HandleLocalXmlFile
      * Found local linphonerc XML file, copy values over existing Config(ini)
      */
-    private void HandleLocalXmlFile(File linphoneXml) {
+    private void HandleLocalXmlFile(File linphoneXml, Config config) {
 
         Log("HandleLocalXmlFile for: " + linphoneXml.getAbsolutePath());
 
-        Config lpConfig = LinphonePreferences.instance().getConfig();
+        Config lpConfig = config; // LinphonePreferences.instance().getConfig();
+
+        if (lpConfig == null) {
+            Log("HandleLocalXmlFile failed: config is null");
+            return;
+        }
 
         // Read xml settings file
         FileInputStream stream = null;
