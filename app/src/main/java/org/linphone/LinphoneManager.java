@@ -517,6 +517,9 @@ public class LinphoneManager implements SensorEventListener {
         // mCore.setCallErrorTone(Reason.NotFound, mErrorToneFile);
         enableDeviceRingtone(mPrefs.isDeviceRingtoneEnabled());
 
+        // CLB, do not use Pause SoundFile (BG-4537)
+        mCore.setPlayFile(null);
+
         int availableCores = Runtime.getRuntime().availableProcessors();
         Log.w("[Manager] MediaStreamer : " + availableCores + " cores detected and configured");
 
