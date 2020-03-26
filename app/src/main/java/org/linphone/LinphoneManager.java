@@ -43,6 +43,7 @@ import android.widget.CheckBox;
 import org.linphone.assistant.PhoneAccountLinkingAssistantActivity;
 import org.linphone.call.AndroidAudioManager;
 import org.linphone.call.CallManager;
+import org.linphone.clb.CallStateCLB;
 import org.linphone.clb.LinphonePreferencesCLB;
 import org.linphone.contacts.ContactsManager;
 import org.linphone.core.AccountCreator;
@@ -248,6 +249,8 @@ public class LinphoneManager implements SensorEventListener {
                         }
 
                         if (newCallState != null) {
+                            CallStateCLB.instance().SetCallState(newCallState);
+
                             Intent intentMessage = new Intent(STATE_SIPSTATE);
                             intentMessage.putExtra("state", newCallState);
                             mContext.sendBroadcast(intentMessage);

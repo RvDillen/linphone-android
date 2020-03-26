@@ -12,11 +12,15 @@ import org.linphone.core.Call;
 import org.linphone.core.Core;
 
 /**
- * Created by mvdhorst on 18-12-17. Hangs up a call.
+ * HangupReceiver Hangs up a call. Created by mvdhorst on 18-12-17.
  *
- * <p>16-10-18 rvdillen tweaked hangup current call (BG-7267) 10-10-18 rvdillen Activate next 'in
- * pause call' after hangup 12-07-18 rvdillen Fix HangUp for listen only mode 01-02-18 rvdillen Add
- * hangUp uri to hangup selected call 18-12-17 mvdhorst Initial version
+ * <ul>
+ *   <li>16-10-18 rvdillen tweaked hangup current call (BG-7267)
+ *   <li>10-10-18 rvdillen Activate next 'in pause call' after hangup
+ *   <li>12-07-18 rvdillen Fix HangUp for listen only mode
+ *   <li>01-02-18 rvdillen Add hangUp uri to hangup selected call
+ *   <li>18-12-17 mvdhorst Initial version
+ * </ul>
  */
 public class HangupReceiver extends BroadcastReceiver {
     @Override

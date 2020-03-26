@@ -19,17 +19,16 @@
  */
 package org.linphone;
 
-import static android.content.Intent.ACTION_MAIN;
-
 import android.content.Context;
 import android.content.Intent;
 import android.os.Build;
 import android.os.Environment;
 import android.provider.ContactsContract;
-import java.util.ArrayList;
+
 import org.linphone.call.CallActivity;
 import org.linphone.call.CallIncomingActivity;
 import org.linphone.call.CallOutgoingActivity;
+import org.linphone.clb.CallStateCLB;
 import org.linphone.compatibility.Compatibility;
 import org.linphone.contacts.ContactsManager;
 import org.linphone.core.Call;
@@ -49,6 +48,10 @@ import org.linphone.settings.LinphonePreferences;
 import org.linphone.utils.DeviceUtils;
 import org.linphone.utils.LinphoneUtils;
 import org.linphone.utils.PushNotificationUtils;
+
+import java.util.ArrayList;
+
+import static android.content.Intent.ACTION_MAIN;
 
 public class LinphoneContext {
     private static LinphoneContext sInstance = null;
@@ -332,6 +335,13 @@ public class LinphoneContext {
     }
 
     private void onOutgoingStarted() {
+
+        // CLB => Not showing Activity on direct call
+        if (CallStateCLB.instance().IsCallFromCLB()) {
+            CallStateCLB.instance().CheckListener(mContext);
+            return;
+        }
+
         Intent intent = new Intent(mContext, CallOutgoingActivity.class);
         // This flag is required to start an Activity from a Service context
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
@@ -339,6 +349,13 @@ public class LinphoneContext {
     }
 
     private void onCallStarted() {
+
+        // CLB => Not showing Activity on direct call
+        if (CallStateCLB.instance().IsCallFromCLB()) {
+            CallStateCLB.instance().CheckListener(mContext);
+            return;
+        }
+
         Intent intent = new Intent(mContext, CallActivity.class);
         // This flag is required to start an Activity from a Service context
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
