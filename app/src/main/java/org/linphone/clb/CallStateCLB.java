@@ -1,8 +1,9 @@
 package org.linphone.clb;
 
+import static org.linphone.core.Reason.Declined;
+
 import android.content.Context;
 import android.widget.Toast;
-
 import org.linphone.LinphoneManager;
 import org.linphone.R;
 import org.linphone.core.Call;
@@ -10,14 +11,12 @@ import org.linphone.core.Core;
 import org.linphone.core.CoreListenerStub;
 import org.linphone.core.Reason;
 
-import static org.linphone.core.Reason.Declined;
-
 /**
  * CallStateCLB: CLB class to store call state from CLB. <br>
  * Used to Prevent Linphone activities to start when activated from CLB
  *
  * <ul>
- *   <li>26-03-2020. RvD Initial version </li>
+ *   <li>26-03-2020. RvD Initial version
  * </ul>
  */
 public class CallStateCLB {

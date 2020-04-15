@@ -1,24 +1,23 @@
 package org.linphone.clb;
 
+import static android.content.Intent.ACTION_MAIN;
+
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Handler;
 import android.util.Log;
-
 import org.linphone.LinphoneManager;
 import org.linphone.compatibility.Compatibility;
 import org.linphone.mediastream.Version;
 import org.linphone.service.LinphoneService;
 
-import static android.content.Intent.ACTION_MAIN;
-
 /**
  * DirectCallReceiver: Starts call from CLB Messenger. (without showing the UI)
  *
  * <ul>
- *   <li>26-03-20 rvdillen Added CallStateCLB  </li>
- *   <li>18-12-17 mvdhorst inital version </li>
+ *   <li>26-03-20 rvdillen Added CallStateCLB
+ *   <li>18-12-17 mvdhorst inital version
  * </ul>
  */
 /** Created by mvdhorst on 3-1-18. Starts a call without showing the UI. */

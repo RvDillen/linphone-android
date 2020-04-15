@@ -44,7 +44,6 @@ import org.linphone.assistant.PhoneAccountLinkingAssistantActivity;
 import org.linphone.call.AndroidAudioManager;
 import org.linphone.call.CallManager;
 import org.linphone.clb.CallStateCLB;
-import org.linphone.clb.LinphonePreferencesCLB;
 import org.linphone.contacts.ContactsManager;
 import org.linphone.core.AccountCreator;
 import org.linphone.core.AccountCreatorListenerStub;
@@ -448,9 +447,6 @@ public class LinphoneManager implements SensorEventListener {
                                     mPrefs.getLinphoneDefaultConfig(),
                                     mPrefs.getLinphoneFactoryConfig(),
                                     mContext);
-
-            // CLB => Inspect Local Xml Configuration files (linphonerc.xml)
-            LinphonePreferencesCLB.instance().CheckOnLocalXmlFile(mCore.getConfig());
 
             mCore.addListener(listener);
             mCore.addListener(mCoreListener);

@@ -53,8 +53,11 @@ public final class LinphoneService extends Service {
 
         setupActivityMonitor();
 
-        // CLB => Inspect Local Configuration files (linphonerc)
-        LinphonePreferencesCLB.instance().CheckOnLocalIniFile(getBaseContext());
+        // CLB => Inspect Local Configuration files (linphonerc && linphonerc.xml)
+        if (!LinphoneContext.isReady()) {
+            LinphonePreferencesCLB.instance().CheckOnLocalIniFile(getBaseContext());
+            LinphonePreferencesCLB.instance().CheckOnLocalXmlFile(getBaseContext());
+        }
 
         misLinphoneContextOwned = false;
         if (!LinphoneContext.isReady()) {
@@ -101,7 +104,7 @@ public final class LinphoneService extends Service {
             LinphoneContext.instance().updateContext(this);
         }
 
-        // CLB => Inspect Local Xml Configuration files (linphonerc.xml)
+        // CLB => Log changes made from external Configuration files (linphonerc / linphonerc.xml)
         LinphonePreferencesCLB.instance().LogSettingChanges();
 
         Log.i("[Service] Started");
