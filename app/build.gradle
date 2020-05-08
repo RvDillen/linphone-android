@@ -1,5 +1,10 @@
 apply plugin: 'com.android.application'
 
+// Used to set the package version name and version code
+ext.versionMajor = 4
+ext.versionMinor = 2
+ext.versionRelease = 3
+
 static def getPackageName() {
     return "nl.clb.linphone"
 }
@@ -23,8 +28,16 @@ static def isLocalAarAvailable() {
     return isLocalDebugAarAvailable() || isLocalReleaseAarAvailable()
 }
 
+// Will return 4230042 for Jenkins build #42
+def computeVersionCode() {
+    // Major + minor + Jenkins build number (where available)
+    return (versionMajor * 1000000) + (versionMinor * 100000) + (versionRelease * 10000) + Integer.valueOf(System.env.BUILD_NUMBER ?: 0)
+}
+
 task getGitVersion() {
-    def gitVersion = "4.2.3"
+    def versionBuild = Integer.valueOf(System.env.BUILD_NUMBER ?: 0)
+    project.version = String.format('%d.%d.%d.%d', versionMajor, versionMinor, versionRelease, versionBuild)
+ /*   def gitVersion = "4.2.3"
     def gitVersionStream = new ByteArrayOutputStream()
     def gitCommitsCount = new ByteArrayOutputStream()
     def gitCommitHash = new ByteArrayOutputStream()
@@ -52,7 +65,7 @@ task getGitVersion() {
     } catch (Exception e) {
         println("Git not found")
     }
-    project.version = gitVersion
+    project.version = gitVersion*/
 }
 
 ///// Exclude Files /////
@@ -92,7 +105,7 @@ android {
     defaultConfig {
         minSdkVersion 21
         targetSdkVersion 29
-        versionCode 4230
+        versionCode computeVersionCode()
         versionName "${project.version}"
         applicationId getPackageName()
         multiDexEnabled true
