@@ -1,7 +1,7 @@
 apply plugin: 'com.android.application'
 
 static def getPackageName() {
-    return "org.linphone"
+    return "nl.clb.linphone"
 }
 
 static def firebaseEnabled() {
@@ -121,9 +121,9 @@ android {
     signingConfigs {
         release {
             storeFile file(keystoreProperties['storeFile'])
-            storePassword keystoreProperties['storePassword']
-            keyAlias keystoreProperties['keyAlias']
-            keyPassword keystoreProperties['keyPassword']
+            storePassword project['storePassword']
+            keyAlias project['keyAlias']
+            keyPassword project['keyPassword']
         }
     }
 

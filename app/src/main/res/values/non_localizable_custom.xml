@@ -19,7 +19,7 @@
     <string name="temp_photo_name" translatable="false">linphone-android-photo-temp</string>
     <string name="temp_photo_name_with_date" translatable="false">linphone-android-photo-%s</string>
     <string name="about_text" translatable="false">GNU General Public License V3\n © 2010–2019 Belledonne Communications</string>
-    <string name="about_bugreport_email" translatable="false">mvdhorst@clb.nl</string>
+    <string name="about_bugreport_email" translatable="false">welcome@clb.nl</string>
     <string name="notification_service_channel_id" translatable="false">linphone_notification_service_id</string>
     <string name="notification_channel_id" translatable="false">linphone_notification_id</string>
 
