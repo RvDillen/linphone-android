@@ -65,18 +65,18 @@ public class HangupReceiver extends BroadcastReceiver {
     private Boolean TerminatePhoneCall(String uriExtra) {
 
         try {
-            uriExtra = FormatUri(uriExtra);
+            String session = uriExtra.toLowerCase();
+            int index = session.indexOf("clbsessionid");
+            if (index > 0) session = session.substring(index);
+
             Core lc = LinphoneManager.getCore();
 
             // Find if HangUp Nr is current call, if so terminate
             Call currentCall = LinphoneManager.getCore().getCurrentCall();
             if (currentCall != null) {
+
                 // Current call found
-                Address remoteAddress = currentCall.getRemoteAddress();
-                String remAddress = null;
-                if (remoteAddress != null) {
-                    remAddress = remoteAddress.asString();
-                }
+                String remAddress = GetAdressString(currentCall);
                 Log.i(
                         "HangupReceiver",
                         "TerminatePhoneCall started: Remote address: " + remAddress);
@@ -91,7 +91,7 @@ public class HangupReceiver extends BroadcastReceiver {
                 }
 
                 // Check if Current call has same uri as from hangup uri
-                if (remAddress != null && remAddress.contains(uriExtra) == true) {
+                if (remAddress != null && remAddress.contains(session) == true) {
 
                     // Current call is from hangup uri. => terminateCall now && if no calls in pause
                     LinphoneManager.getInstance()
@@ -126,15 +126,12 @@ public class HangupReceiver extends BroadcastReceiver {
             Call[] calls = lc.getCalls();
             for (Call call : calls) {
 
-                Address remoteAddress = call.getRemoteAddress();
-                String remAddress = null;
-                if (remoteAddress != null) {
-                    remAddress = remoteAddress.asString();
-                }
+                String remAddress = GetAdressString(call);
                 Log.i(
                         "HangupReceiver",
                         "TerminatePhoneCall: other call Remote address: " + remAddress);
-                if (remAddress != null && remAddress.contains(uriExtra) == true) {
+
+                if (remAddress != null && remAddress.contains(session) == true) {
                     lc.terminateCall(call);
                     TryTerminateActiveCall(true);
                     return true;
@@ -145,6 +142,16 @@ public class HangupReceiver extends BroadcastReceiver {
             Log.e("HangupReceiver", "Exception TerminatePhoneCall: " + e.getMessage());
         }
         return false; // uri not found
+    }
+
+    private String GetAdressString(Call call) {
+
+        Address remoteAddress = call.getRemoteAddress();
+        String remAddress = "";
+        if (remoteAddress != null) {
+            remAddress = remoteAddress.asString().toLowerCase();
+        }
+        return remAddress;
     }
 
     private Boolean TryTerminateActiveCall(Boolean fromHangupReceiver) {
