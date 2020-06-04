@@ -32,12 +32,15 @@ import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.TextView;
-import androidx.core.content.ContextCompat;
+
 import org.linphone.LinphoneManager;
 import org.linphone.R;
+import org.linphone.clb.LinphonePreferencesCLB;
 import org.linphone.core.Core;
 import org.linphone.core.CoreListenerStub;
 import org.linphone.settings.LinphonePreferences;
+
+import androidx.core.content.ContextCompat;
 
 public class AboutActivity extends MainActivity {
     private CoreListenerStub mListener;
@@ -112,6 +115,8 @@ public class AboutActivity extends MainActivity {
                 new View.OnClickListener() {
                     @Override
                     public void onClick(View v) {
+                        LinphonePreferencesCLB.instance().ExportLinphoneRcFile(getBaseContext());
+
                         Core core = LinphoneManager.getCore();
                         if (core != null) {
                             core.uploadLogCollection();

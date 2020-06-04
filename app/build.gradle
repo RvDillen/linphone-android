@@ -110,7 +110,7 @@ android {
         applicationId getPackageName()
         multiDexEnabled true
         signingConfig signingConfigs.debug
-        versionNameSuffix = 'clb-20200519'
+        versionNameSuffix = 'clb-20200604'
     }
 
     applicationVariants.all { variant ->

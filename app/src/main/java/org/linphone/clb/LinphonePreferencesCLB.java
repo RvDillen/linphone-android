@@ -6,22 +6,27 @@ import android.content.Context;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Environment;
-import androidx.core.app.ActivityCompat;
-import androidx.core.content.ContextCompat;
+
+import org.linphone.core.Config;
+import org.linphone.core.Factory;
+import org.linphone.core.tools.Log;
+import org.linphone.settings.LinphonePreferences;
+import org.xmlpull.v1.XmlPullParser;
+import org.xmlpull.v1.XmlPullParserException;
+import org.xmlpull.v1.XmlPullParserFactory;
+
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.PrintStream;
 import java.nio.channels.FileChannel;
 import java.util.ArrayList;
 import java.util.List;
-import org.linphone.core.Config;
-import org.linphone.core.Factory;
-import org.linphone.core.tools.Log;
-import org.xmlpull.v1.XmlPullParser;
-import org.xmlpull.v1.XmlPullParserException;
-import org.xmlpull.v1.XmlPullParserFactory;
+
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 
 /**
  * LinphonePreferencesCLB: CLB class to overwrite settings when starting up app.<br>
@@ -137,6 +142,36 @@ public class LinphonePreferencesCLB {
                 }
             }
         }
+    }
+
+    public void ExportLinphoneRcFile(Context context) {
+
+        Config config = LinphonePreferences.instance().getConfig();
+        String export = config.dump();
+
+        // Data folder on Android (=> Download folder!)
+        dataPaths = GetDataPaths(context);
+        for (String dataPath : dataPaths) {
+
+            String fileName = dataPath + "/linphonerc.bak";
+            LogLine("Export filename is: " + fileName);
+
+            // Found local linphonerc.bak => Delete
+            File linphonerc = new File(fileName);
+            if (linphonerc.exists()) {
+                TryDeleteFile(linphonerc);
+            }
+
+            // Write Linphone dump => linphonerc.bak
+            LogLine("Export Linphonerc to: " + fileName);
+            try (PrintStream out = new PrintStream(new FileOutputStream(fileName))) {
+                out.print(export);
+                LogLine("Export Linphonerc successfull");
+            } catch (Exception e) {
+                Log("Export LinphoneRc fails", e);
+            }
+        }
+        LogSettingChanges();
     }
 
     /* HandleLocalRcFile
@@ -320,7 +355,7 @@ public class LinphonePreferencesCLB {
         Log.i(tag, "** Local settings file (ini/xml):");
 
         for (String logLine : logLines) {
-            Log.i(tag, logLine); // => Linphone log
+            Log.i(tag, ' ' + logLine); // => Linphone log
         }
         logLines.clear();
     }
