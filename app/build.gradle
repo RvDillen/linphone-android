@@ -111,6 +111,7 @@ android {
         multiDexEnabled true
         signingConfig signingConfigs.debug
         versionNameSuffix = 'clb-20200604'
+		setProperty("archivesBaseName", applicationId + "-" + versionName)
     }
 
     applicationVariants.all { variant ->
