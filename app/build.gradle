@@ -9,6 +9,10 @@ static def getPackageName() {
     return "nl.clb.linphone"
 }
 
+static def getPackageNameOrg() {
+    return "org.linphone"
+}
+
 static def firebaseEnabled() {
     File googleFile = new File('app/google-services.json')
     return googleFile.exists()
@@ -112,11 +116,23 @@ android {
         signingConfig signingConfigs.debug
         versionNameSuffix = 'clb-20200604'
 		setProperty("archivesBaseName", applicationId + "-" + versionName)
+    } 
+	flavorDimensions "all"
+	
+	productFlavors {
+        clb {
+			dimension "all"
+            applicationId getPackageName()
+        }
+        linphone {
+			dimension "all"
+            applicationId getPackageNameOrg()
+        }
     }
 
     applicationVariants.all { variant ->
         variant.outputs.all {
-            outputFileName = "linphone-android-${variant.buildType.name}_${variant.versionName}.apk"
+            outputFileName = "linphone-android-${variant.getFlavorName()}-${variant.buildType.name}_${variant.versionName}.apk"
         }
 
         if (variant.buildType.name.equals("release")) {
