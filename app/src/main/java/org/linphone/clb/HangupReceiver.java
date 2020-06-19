@@ -15,6 +15,7 @@ import org.linphone.core.Core;
  * HangupReceiver Hangs up a call. Created by mvdhorst on 18-12-17.
  *
  * <ul>
+ *   <li>19-06-20 rvdillen incorrect audio connection is closed (BG-10842)
  *   <li>16-10-18 rvdillen tweaked hangup current call (BG-7267)
  *   <li>10-10-18 rvdillen Activate next 'in pause call' after hangup
  *   <li>12-07-18 rvdillen Fix HangUp for listen only mode
@@ -23,6 +24,9 @@ import org.linphone.core.Core;
  * </ul>
  */
 public class HangupReceiver extends BroadcastReceiver {
+
+    private String tag = "ClbHangUp";
+
     @Override
     public void onReceive(Context context, Intent intent) {
         if (isOrderedBroadcast()) abortBroadcast();
@@ -77,9 +81,7 @@ public class HangupReceiver extends BroadcastReceiver {
 
                 // Current call found
                 String remAddress = GetAdressString(currentCall);
-                Log.i(
-                        "HangupReceiver",
-                        "TerminatePhoneCall started: Remote address: " + remAddress);
+                Log.i(tag, "TerminatePhoneCall started: Remote address: " + remAddress);
 
                 // Check if any (other) calls in pause state
                 boolean anyCallInPause = false;
@@ -96,23 +98,29 @@ public class HangupReceiver extends BroadcastReceiver {
                     // Current call is from hangup uri. => terminateCall now && if no calls in pause
                     LinphoneManager.getInstance()
                             .resetClassicMenuLayoutAndGoBackToCallIfStillRunning();
-                    Log.i(
-                            "HangupReceiver",
-                            "TerminatePhoneCall: terminate currentCall Remote address: "
-                                    + remAddress);
+                    Log.i(tag,"TerminatePhoneCall: terminate currentCall Remote address: " + remAddress);
                     lc.terminateCall(currentCall);
                     if (anyCallInPause == false) TryTerminateActiveCall(true);
                     return true;
+
                 } else if (anyCallInPause == true) {
-                    Log.i(
-                            "HangupReceiver",
-                            "TerminatePhoneCall: terminate currentCall, cause calls in pause");
-                    lc.terminateCall(currentCall);
+                    // Call from uri is possibly in Pause,  => find and trminate terminateCall
+                    Log.i(tag, "TerminatePhoneCall: terminate call in pause");
+                    Call[] calls2 = lc.getCalls();
+                    if (calls2 == null || calls.length == 0) return true;
+
+                    for (Call call : calls) {
+                        String adress = GetAdressString(call);
+                        if (adress != null && adress.contains(session) == true) {
+                            Log.i(tag, "Terminate PhoneCall in pause: " + adress);
+                            lc.terminateCall(call);
+                            return true;
+                        }
+                    }
                     return true;
+
                 } else {
-                    Log.i(
-                            "HangupReceiver",
-                            "TerminatePhoneCall: terminate currentCall ignored, cause already gone");
+                    Log.i(tag, "TerminatePhoneCall: terminate currentCall ignored, cause already gone");
                     return true;
                 }
             }
@@ -127,9 +135,7 @@ public class HangupReceiver extends BroadcastReceiver {
             for (Call call : calls) {
 
                 String remAddress = GetAdressString(call);
-                Log.i(
-                        "HangupReceiver",
-                        "TerminatePhoneCall: other call Remote address: " + remAddress);
+                Log.i(tag, "TerminatePhoneCall: other call Remote address: " + remAddress);
 
                 if (remAddress != null && remAddress.contains(session) == true) {
                     lc.terminateCall(call);
@@ -139,7 +145,7 @@ public class HangupReceiver extends BroadcastReceiver {
             }
             TryTerminateActiveCall(true);
         } catch (Exception e) {
-            Log.e("HangupReceiver", "Exception TerminatePhoneCall: " + e.getMessage());
+            Log.e(tag, "Exception TerminatePhoneCall: " + e.getMessage());
         }
         return false; // uri not found
     }
@@ -165,7 +171,7 @@ public class HangupReceiver extends BroadcastReceiver {
             return true;
 
         } catch (Exception e) {
-            Log.e("HangupReceiver", "Exception TryTerminateActiveCall: " + e.getMessage());
+            Log.e(tag, "Exception TryTerminateActiveCall: " + e.getMessage());
         }
         return false;
     }
