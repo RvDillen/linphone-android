@@ -7,6 +7,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.os.Handler;
 import android.util.Log;
+import android.widget.Toast;
 import org.linphone.LinphoneManager;
 import org.linphone.compatibility.Compatibility;
 import org.linphone.mediastream.Version;
@@ -43,6 +44,16 @@ public class DirectCallReceiver extends BroadcastReceiver {
             if (addressToCall.startsWith("sip:")) {
                 addressToCall = addressToCall.substring("sip:".length());
             }
+        }
+
+        // CLB C-Serie Uri ? => Validate if transport is defined, if not Notify.
+        String adressLower = addressToCall.toLowerCase();
+        if (adressLower.contains("clbsessionid") && adressLower.contains("transport=?")) {
+            Toast.makeText(
+                            context,
+                            "Error: invalid Sip uri, transport (upd/tls/tcp) is empty.",
+                            Toast.LENGTH_LONG)
+                    .show();
         }
 
         CallStateCLB.instance().SetCallUri(addressToCall);

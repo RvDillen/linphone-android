@@ -114,7 +114,7 @@ android {
         applicationId getPackageName()
         multiDexEnabled true
         signingConfig signingConfigs.debug
-        versionNameSuffix = 'clb-20200619'
+        versionNameSuffix = 'clb-20200624'
 		setProperty("archivesBaseName", applicationId + "-" + versionName)
     } 
 	flavorDimensions "all"

@@ -7,6 +7,9 @@ sip_port=-1
 sip_tcp_port=-1
 sip_tls_port=-1
 media_encryption=none
+#CLB Defaults =>
+verify_server_certs=0
+verify_server_cn=0
 
 [net]
 #Because dynamic bitrate adaption can increase bitrate, we must allow "no limit"

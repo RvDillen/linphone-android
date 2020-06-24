@@ -317,6 +317,12 @@ public class CallManager {
             Log.d("[Call Manager] Low bandwidth enabled in call params");
         }
 
+        // CLB => Secure audio
+        String sipUri = address.asStringUriOnly().toLowerCase();
+        if (sipUri.contains("clbsessionid") && sipUri.contains("transport=tls")) {
+            params.setMediaEncryption(MediaEncryption.SRTP);
+        }
+
         if (forceZRTP) {
             params.setMediaEncryption(MediaEncryption.ZRTP);
         }

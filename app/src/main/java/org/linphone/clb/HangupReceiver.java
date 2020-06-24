@@ -98,7 +98,10 @@ public class HangupReceiver extends BroadcastReceiver {
                     // Current call is from hangup uri. => terminateCall now && if no calls in pause
                     LinphoneManager.getInstance()
                             .resetClassicMenuLayoutAndGoBackToCallIfStillRunning();
-                    Log.i(tag,"TerminatePhoneCall: terminate currentCall Remote address: " + remAddress);
+                    Log.i(
+                            tag,
+                            "TerminatePhoneCall: terminate currentCall Remote address: "
+                                    + remAddress);
                     lc.terminateCall(currentCall);
                     if (anyCallInPause == false) TryTerminateActiveCall(true);
                     return true;
@@ -120,7 +123,9 @@ public class HangupReceiver extends BroadcastReceiver {
                     return true;
 
                 } else {
-                    Log.i(tag, "TerminatePhoneCall: terminate currentCall ignored, cause already gone");
+                    Log.i(
+                            tag,
+                            "TerminatePhoneCall: terminate currentCall ignored, cause already gone");
                     return true;
                 }
             }
