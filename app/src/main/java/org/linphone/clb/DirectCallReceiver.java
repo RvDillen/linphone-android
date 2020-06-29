@@ -1,17 +1,17 @@
 package org.linphone.clb;
 
-import static android.content.Intent.ACTION_MAIN;
-
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Handler;
 import android.util.Log;
-import android.widget.Toast;
+
 import org.linphone.LinphoneManager;
 import org.linphone.compatibility.Compatibility;
 import org.linphone.mediastream.Version;
 import org.linphone.service.LinphoneService;
+
+import static android.content.Intent.ACTION_MAIN;
 
 /**
  * DirectCallReceiver: Starts call from CLB Messenger. (without showing the UI)
@@ -46,14 +46,10 @@ public class DirectCallReceiver extends BroadcastReceiver {
             }
         }
 
-        // CLB C-Serie Uri ? => Validate if transport is defined, if not Notify.
+        // CLB C-Serie Uri ? => Validate if transport is defined, if not set UDP.
         String adressLower = addressToCall.toLowerCase();
         if (adressLower.contains("clbsessionid") && adressLower.contains("transport=?")) {
-            Toast.makeText(
-                            context,
-                            "Error: invalid Sip uri, transport (upd/tls/tcp) is empty.",
-                            Toast.LENGTH_LONG)
-                    .show();
+            addressToCall = addressToCall.replace("transport=?", "transport=udp?");
         }
 
         CallStateCLB.instance().SetCallUri(addressToCall);

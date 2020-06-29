@@ -146,7 +146,7 @@ public class LinphonePreferencesCLB {
     public void ExportLinphoneRcFile(Context context) {
 
         Config config = LinphonePreferences.instance().getConfig();
-        String export = config.dump();
+        String export = "\n\n" + config.dump();
 
         LogLine(" ** export config Linphonerc **");
         largeLog(export);
