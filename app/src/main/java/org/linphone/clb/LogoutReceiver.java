@@ -1,16 +1,15 @@
 package org.linphone.clb;
 
+import static org.linphone.clb.RegisterCLB.STATE_CONNECTSTATE;
+
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
-
 import org.linphone.LinphoneContext;
 import org.linphone.LinphoneManager;
 import org.linphone.core.Address;
 import org.linphone.core.Core;
 import org.linphone.core.ProxyConfig;
-
-import static org.linphone.clb.RegisterCLB.STATE_CONNECTSTATE;
 
 /**
  * LogoutReceiver: Logout from CLB Messenger.
@@ -25,24 +24,27 @@ public class LogoutReceiver extends BroadcastReceiver {
     @Override
     public void onReceive(Context context, Intent intent) {
 
-        String sipUsername = "";
-        String sipPassword = "";
-
         Core lc = LinphoneManager.getCore();
         ProxyConfig proxyConfig = lc.getDefaultProxyConfig();
-        Address address = proxyConfig.getIdentityAddress();
 
         proxyConfig.edit();
+
+        // Kill current connection
         proxyConfig.setExpires(0);
         proxyConfig.setPublishExpires(0);
         proxyConfig.refreshRegister();
         lc.refreshRegisters();
 
+        // reset adress
+        String sipUsername = "";
+        String sipPassword = "";
+        Address address = proxyConfig.getIdentityAddress();
         address.setUsername(sipUsername);
+        address.setDisplayName(sipUsername);
         address.setPassword(sipPassword);
         proxyConfig.setIdentityAddress(address);
-        proxyConfig.done();
 
+        proxyConfig.done();
         lc.refreshRegisters();
 
         /* Remove all authentications
@@ -52,6 +54,8 @@ public class LogoutReceiver extends BroadcastReceiver {
                 }
                 lc.clearAllAuthInfo();
         */
+
+        // Publish logout state
         Intent intentMessage = new Intent(STATE_CONNECTSTATE);
         intentMessage.putExtra("connectstate", "LoggedOut");
 

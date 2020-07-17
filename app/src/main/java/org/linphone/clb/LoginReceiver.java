@@ -1,9 +1,10 @@
 package org.linphone.clb;
 
+import static org.linphone.clb.RegisterCLB.STATE_CONNECTSTATE;
+
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
-
 import org.linphone.LinphoneContext;
 import org.linphone.LinphoneManager;
 import org.linphone.core.Address;
@@ -11,8 +12,6 @@ import org.linphone.core.AuthInfo;
 import org.linphone.core.Core;
 import org.linphone.core.Factory;
 import org.linphone.core.ProxyConfig;
-
-import static org.linphone.clb.RegisterCLB.STATE_CONNECTSTATE;
 
 /**
  * LoginReceiver: Starts Login from CLB Messenger. (without showing the UI)
@@ -50,14 +49,15 @@ public class LoginReceiver extends BroadcastReceiver {
         try {
             proxyConfig.edit();
 
+            // Create new Adress
             String sipUri = "sip:" + sipUsername + "@" + mainAddress.getDomain();
-
             Address adress = Factory.instance().createAddress(sipUri);
             adress.setPassword(sipPassword);
             adress.setTransport(mainAddress.getTransport());
             adress.setDisplayName(sipUsername);
             proxyConfig.setIdentityAddress(adress);
 
+            // Create new Authentication
             AuthInfo authInfo1 =
                     Factory.instance()
                             .createAuthInfo(sipUsername, null, sipPassword, null, null, null);
@@ -71,8 +71,6 @@ public class LoginReceiver extends BroadcastReceiver {
 
             proxyConfig.enableRegister(true);
             proxyConfig.done();
-            lc.setDefaultProxyConfig((proxyConfig));
-
             proxyConfig.refreshRegister();
 
         } catch (Exception e) {
@@ -80,6 +78,7 @@ public class LoginReceiver extends BroadcastReceiver {
             e.printStackTrace();
         }
 
+        // Publish Login
         Intent intentMessage = new Intent(STATE_CONNECTSTATE);
         intentMessage.putExtra("connectstate", "LoggedIn");
 

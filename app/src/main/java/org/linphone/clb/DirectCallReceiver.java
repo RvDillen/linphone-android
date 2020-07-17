@@ -1,17 +1,16 @@
 package org.linphone.clb;
 
+import static android.content.Intent.ACTION_MAIN;
+
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Handler;
 import android.util.Log;
-
 import org.linphone.LinphoneManager;
 import org.linphone.compatibility.Compatibility;
 import org.linphone.mediastream.Version;
 import org.linphone.service.LinphoneService;
-
-import static android.content.Intent.ACTION_MAIN;
 
 // import org.linphone.mediastream.Version;
 
