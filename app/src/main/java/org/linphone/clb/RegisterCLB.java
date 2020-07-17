@@ -6,21 +6,33 @@ import android.content.IntentFilter;
 import org.linphone.core.tools.Log;
 
 /**
- * RegisterCLB: CLB class to register CLB receivers, unforunately the register in manifest does not
+ * RegisterCLB: CLB class to register CLB receivers, unfortunately the register in manifest does not
  * work
  *
- * <p>Created by user Robert on 29-1-19.
+ * <ul>
+ *   <li>13-07-20 rvdillen Add Login/Logourt receiver
+ *   <li>19-01-19 rvdillen Initial version
+ * </ul>
  */
 public class RegisterCLB {
 
+    public static final String STATE_SIPSTATE = "org.linphone.state.SIPSTATE";
     public static final String ACTION_CALL = "org.linphone.action.CALL";
     public static final String ACTION_ENDCALL = "org.linphone.action.ENDCALL";
-    public static final String STATE_SIPSTATE = "org.linphone.state.SIPSTATE";
+
+    public static final String STATE_CONNECTSTATE = "org.linphone.state.CONNECTSTATE";
+    public static final String ACTION_LOGIN = "org.linphone.action.LOGIN";
+    public static final String ACTION_LOGOUT = "org.linphone.action.LOGOUT";
 
     private BroadcastReceiver mHangupReceiver;
     private BroadcastReceiver mDirectCallReceiver;
+    private BroadcastReceiver mLoginReceiver;
+    private BroadcastReceiver mLogoutReceiver;
+
     private IntentFilter mHangupIntentFilter;
     private IntentFilter mDirectCallIntentFilter;
+    private IntentFilter mLoginIntentFilter;
+    private IntentFilter mLogoutIntentFilter;
 
     Context mContext;
 
@@ -29,35 +41,54 @@ public class RegisterCLB {
     }
 
     public void RegisterReceivers() {
+        // ACTION_ENDCALL
         mHangupIntentFilter = new IntentFilter(ACTION_ENDCALL);
-        mHangupIntentFilter.setPriority(99999999);
         mHangupReceiver = new HangupReceiver();
-        try {
-            mContext.registerReceiver(mHangupReceiver, mHangupIntentFilter);
-        } catch (IllegalArgumentException e) {
-            e.printStackTrace();
-        }
+        RegisterReceiver(mHangupIntentFilter, mHangupReceiver, "Register Hangup receiver");
 
+        // ACTION_CALL
         mDirectCallIntentFilter = new IntentFilter(ACTION_CALL);
-        mDirectCallIntentFilter.setPriority(99999999);
         mDirectCallReceiver = new DirectCallReceiver();
+        RegisterReceiver(
+                mDirectCallIntentFilter, mDirectCallReceiver, "Register Direct call receiver");
+
+        // ACTION_LOGIN
+        mLoginIntentFilter = new IntentFilter(ACTION_LOGIN);
+        mLoginReceiver = new LoginReceiver();
+        RegisterReceiver(mLoginIntentFilter, mLoginReceiver, "Register Login receiver");
+
+        // ACTION_LOGOUT
+        mLogoutIntentFilter = new IntentFilter(ACTION_LOGOUT);
+        mLogoutReceiver = new LogoutReceiver();
+        RegisterReceiver(mLogoutIntentFilter, mLogoutReceiver, "Register Logout receiver");
+    }
+
+    public void UnRegisterReceivers() {
+
+        UnRegisterReceiver(mHangupReceiver, "Unregister HangupReceiver");
+        UnRegisterReceiver(mDirectCallReceiver, "Unregister DirectCallReceiver");
+
+        UnRegisterReceiver(mLoginReceiver, "Unregister LoginReceiver");
+        UnRegisterReceiver(mLogoutReceiver, "Unregister LogoutReceiver");
+    }
+
+    private void RegisterReceiver(
+            IntentFilter ifilter, BroadcastReceiver bcReceiver, String message) {
+
         try {
-            Log.i("Register Direct call receiver");
-            mContext.registerReceiver(mDirectCallReceiver, mDirectCallIntentFilter);
+            ifilter.setPriority(99999999);
+            Log.i(message);
+            mContext.registerReceiver(bcReceiver, ifilter);
         } catch (IllegalArgumentException e) {
-            Log.i("Register Direct call receiver fail " + e.getMessage());
+            Log.i("Failure of " + message + ": " + e.getMessage());
             e.printStackTrace();
         }
     }
 
-    public void UnRegisterReceivers() {
+    public void UnRegisterReceiver(BroadcastReceiver brReceiver, String message) {
         try {
-            mContext.unregisterReceiver(mHangupReceiver);
-        } catch (Exception e) {
-            Log.e(e);
-        }
-        try {
-            mContext.unregisterReceiver(mDirectCallReceiver);
+            Log.i(message);
+            mContext.unregisterReceiver(brReceiver);
         } catch (Exception e) {
             Log.e(e);
         }
