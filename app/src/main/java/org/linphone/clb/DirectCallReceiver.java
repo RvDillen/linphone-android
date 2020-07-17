@@ -13,6 +13,8 @@ import org.linphone.service.LinphoneService;
 
 import static android.content.Intent.ACTION_MAIN;
 
+// import org.linphone.mediastream.Version;
+
 /**
  * DirectCallReceiver: Starts call from CLB Messenger. (without showing the UI)
  *
