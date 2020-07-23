@@ -135,7 +135,7 @@ android {
             outputFileName = "linphone-android-${variant.getFlavorName()}-${variant.buildType.name}_${variant.versionName}.apk"
         }
 
-        if (variant.buildType.name.equals("release")) {
+        if (variant.buildType.name == "release") {
             variant.getMergedFlavor().manifestPlaceholders = [linphone_address_mime_type: "vnd.android.cursor.item/vnd." + getPackageName() + ".provider.sip_address",
                                     linphone_file_provider: getPackageName() + ".provider"]
         } else {

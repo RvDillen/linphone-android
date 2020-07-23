@@ -12,6 +12,7 @@ import org.linphone.core.AuthInfo;
 import org.linphone.core.Core;
 import org.linphone.core.Factory;
 import org.linphone.core.ProxyConfig;
+import org.linphone.core.tools.Log;
 
 /**
  * LoginReceiver: Starts Login from CLB Messenger. (without showing the UI)
@@ -40,43 +41,59 @@ public class LoginReceiver extends BroadcastReceiver {
         // Default hangup behaviour (no uri or terminate uri failed)
         LinphoneContext lc2 = LinphoneContext.instance();
         Core lc = LinphoneManager.getCore();
-        ProxyConfig mainConfig = lc.getDefaultProxyConfig();
-        Address mainAddress = mainConfig.getIdentityAddress();
-        ProxyConfig proxyConfig = lc.getDefaultProxyConfig();
+        ProxyConfig mProxyConfig = lc.getDefaultProxyConfig();
+        if (mProxyConfig == null) {
+            Log.e("[Login Receiver] No proxy config !");
+            return;
+        }
+        AuthInfo mAuthInfo = mProxyConfig.findAuthInfo();
 
-        // New Proxy
-        String message = "";
-        try {
-            proxyConfig.edit();
-
-            // Create new Adress
-            String sipUri = "sip:" + sipUsername + "@" + mainAddress.getDomain();
-            Address adress = Factory.instance().createAddress(sipUri);
-            adress.setPassword(sipPassword);
-            adress.setTransport(mainAddress.getTransport());
-            adress.setDisplayName(sipUsername);
-            proxyConfig.setIdentityAddress(adress);
-
+        if (mAuthInfo == null) {
             // Create new Authentication
-            AuthInfo authInfo1 =
+            mAuthInfo =
                     Factory.instance()
                             .createAuthInfo(sipUsername, null, sipPassword, null, null, null);
-            authInfo1.setHa1(null);
-            authInfo1.setPassword(sipPassword);
-            authInfo1.setAlgorithm(null);
-            lc.addAuthInfo(authInfo1);
+        } else {
+            ProxyConfig proxyConfig = lc.getDefaultProxyConfig();
 
-            proxyConfig.setExpires(36000);
-            proxyConfig.setPublishExpires(3600);
+            proxyConfig.edit();
 
-            proxyConfig.enableRegister(true);
-            proxyConfig.done();
+            // Kill current connection
+            proxyConfig.setExpires(0);
+            proxyConfig.setPublishExpires(0);
             proxyConfig.refreshRegister();
+            lc.refreshRegisters();
 
-        } catch (Exception e) {
-            message = e.getMessage();
-            e.printStackTrace();
+            proxyConfig.done();
+            lc.refreshRegisters();
         }
+
+        mAuthInfo.setUserid(sipUsername);
+
+        mAuthInfo.setUsername(sipUsername);
+
+        mProxyConfig.edit();
+        mProxyConfig.setExpires(3600);
+        mProxyConfig.setPublishExpires(3600);
+
+        mProxyConfig.enableRegister(true);
+
+        Address identity = mProxyConfig.getIdentityAddress();
+        if (identity != null) {
+            identity.setUsername(sipUsername);
+            identity.setDisplayName(sipUsername);
+        }
+        mProxyConfig.setIdentityAddress(identity);
+        mProxyConfig.done();
+
+        mAuthInfo.setHa1(null);
+        mAuthInfo.setPassword(sipPassword);
+        // Reset algorithm to generate correct hash depending on
+        // algorithm set in next to come 401
+        mAuthInfo.setAlgorithm(null);
+
+        lc.addAuthInfo(mAuthInfo);
+        lc.refreshRegisters();
 
         // Publish Login
         Intent intentMessage = new Intent(STATE_CONNECTSTATE);

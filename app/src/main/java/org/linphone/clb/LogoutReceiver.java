@@ -7,7 +7,6 @@ import android.content.Context;
 import android.content.Intent;
 import org.linphone.LinphoneContext;
 import org.linphone.LinphoneManager;
-import org.linphone.core.Address;
 import org.linphone.core.Core;
 import org.linphone.core.ProxyConfig;
 
@@ -35,25 +34,8 @@ public class LogoutReceiver extends BroadcastReceiver {
         proxyConfig.refreshRegister();
         lc.refreshRegisters();
 
-        // reset adress
-        String sipUsername = "";
-        String sipPassword = "";
-        Address address = proxyConfig.getIdentityAddress();
-        address.setUsername(sipUsername);
-        address.setDisplayName(sipUsername);
-        address.setPassword(sipPassword);
-        proxyConfig.setIdentityAddress(address);
-
         proxyConfig.done();
         lc.refreshRegisters();
-
-        /* Remove all authentications
-                AuthInfo[] authInfos = lc.getAuthInfoList();
-                for (AuthInfo authInfo : authInfos) {
-                    lc.removeAuthInfo(authInfo);
-                }
-                lc.clearAllAuthInfo();
-        */
 
         // Publish logout state
         Intent intentMessage = new Intent(STATE_CONNECTSTATE);
