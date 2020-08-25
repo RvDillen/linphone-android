@@ -29,17 +29,13 @@ import android.widget.AdapterView;
 import android.widget.AdapterView.OnItemClickListener;
 import android.widget.ImageView;
 import android.widget.TextView;
-import androidx.recyclerview.widget.DividerItemDecoration;
-import androidx.recyclerview.widget.LinearLayoutManager;
-import androidx.recyclerview.widget.RecyclerView;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
+
 import org.linphone.LinphoneContext;
 import org.linphone.LinphoneManager;
 import org.linphone.R;
 import org.linphone.activities.MainActivity;
 import org.linphone.call.views.LinphoneLinearLayoutManager;
+import org.linphone.clb.CallFilter;
 import org.linphone.contacts.ContactsManager;
 import org.linphone.contacts.ContactsUpdatedListener;
 import org.linphone.core.Address;
@@ -48,6 +44,14 @@ import org.linphone.core.CallLog;
 import org.linphone.core.Core;
 import org.linphone.core.CoreListenerStub;
 import org.linphone.utils.SelectableHelper;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
+import androidx.recyclerview.widget.DividerItemDecoration;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 
 public class HistoryFragment extends Fragment
         implements OnClickListener,
@@ -179,7 +183,9 @@ public class HistoryFragment extends Fragment
             CallLog log = mLogs.get(position);
             Core core = LinphoneManager.getCore();
             core.removeCallLog(log);
+
             mLogs = Arrays.asList(core.getCallLogs());
+            mLogs = CallFilter.RemoveCallsFromHardware(mLogs);
         }
     }
 
@@ -224,6 +230,7 @@ public class HistoryFragment extends Fragment
 
     private void refresh() {
         mLogs = Arrays.asList(LinphoneManager.getCore().getCallLogs());
+        mLogs = CallFilter.RemoveCallsFromHardware(mLogs);
     }
 
     public void displayFirstLog() {
@@ -243,6 +250,8 @@ public class HistoryFragment extends Fragment
 
     private void reloadData() {
         mLogs = Arrays.asList(LinphoneManager.getCore().getCallLogs());
+        mLogs = CallFilter.RemoveCallsFromHardware(mLogs);
+
         hideHistoryListAndDisplayMessageIfEmpty();
         mHistoryAdapter =
                 new HistoryAdapter((HistoryActivity) getActivity(), mLogs, this, mSelectionHelper);
