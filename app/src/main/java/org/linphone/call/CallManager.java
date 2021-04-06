@@ -320,6 +320,7 @@ public class CallManager {
         // CLB => Secure audio
         String sipUri = address.asStringUriOnly().toLowerCase();
         if (sipUri.contains("clbsessionid") && sipUri.contains("transport=tls")) {
+            params.enableLowBandwidth(true);
             params.setMediaEncryption(MediaEncryption.SRTP);
         }
 
