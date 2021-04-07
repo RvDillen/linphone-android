@@ -1,16 +1,17 @@
 package org.linphone.clb;
 
-import static android.content.Intent.ACTION_MAIN;
-
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Handler;
 import android.util.Log;
+
 import org.linphone.LinphoneManager;
 import org.linphone.compatibility.Compatibility;
 import org.linphone.mediastream.Version;
 import org.linphone.service.LinphoneService;
+
+import static android.content.Intent.ACTION_MAIN;
 
 // import org.linphone.mediastream.Version;
 
@@ -27,6 +28,7 @@ public class DirectCallReceiver extends BroadcastReceiver {
     private static final String TAG = "DirectCallReceiver";
     private String addressToCall;
 
+    private boolean initialized = false;
     private Handler mHandler;
     private ServiceWaitThread mServiceThread;
 
@@ -54,6 +56,14 @@ public class DirectCallReceiver extends BroadcastReceiver {
         }
 
         CallStateCLB.instance().SetCallUri(addressToCall);
+
+        // Android 11: Need to initialize foregroundservice before first call, otherwise Mic fails (BG-12130)
+        if (initialized == false) {
+            initialized = true;
+            Log.i(TAG, "Start foregroundservice for intializing microphone.");
+            Compatibility.startService(
+                    context, new Intent(ACTION_MAIN).setClass(context, LinphoneService.class));
+        }
 
         mHandler = new Handler();
         if (LinphoneService.isReady()) {
