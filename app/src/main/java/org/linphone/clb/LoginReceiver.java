@@ -36,6 +36,8 @@ public class LoginReceiver extends BroadcastReceiver {
             sipPassword = intent.getStringExtra("sipPassword");
         }
 
+        android.util.Log.d(TAG, "Login request received from: " + sipUsername);
+
         if ((sipUsername == "") || (sipPassword == "")) return;
 
         // Default hangup behaviour (no uri or terminate uri failed)
@@ -44,6 +46,7 @@ public class LoginReceiver extends BroadcastReceiver {
         ProxyConfig mProxyConfig = lc.getDefaultProxyConfig();
         if (mProxyConfig == null) {
             Log.e("[Login Receiver] No proxy config !");
+            android.util.Log.w(TAG, "[Login Receiver] No proxy config !");
             return;
         }
         AuthInfo mAuthInfo = mProxyConfig.findAuthInfo();
@@ -98,6 +101,7 @@ public class LoginReceiver extends BroadcastReceiver {
         // Publish Login
         Intent intentMessage = new Intent(STATE_CONNECTSTATE);
         intentMessage.putExtra("connectstate", "LoggedIn");
+        android.util.Log.d(TAG, "Login request, send reponse 'LoggedIn'");
 
         Context appContext = LinphoneContext.instance().getApplicationContext();
         appContext.sendBroadcast(intentMessage);

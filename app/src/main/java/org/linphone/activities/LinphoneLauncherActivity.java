@@ -29,6 +29,7 @@ import org.linphone.R;
 import org.linphone.assistant.MenuAssistantActivity;
 import org.linphone.chat.ChatActivity;
 import org.linphone.clb.LinphonePreferencesCLB;
+import org.linphone.clb.LockHelper;
 import org.linphone.contacts.ContactsActivity;
 import org.linphone.dialer.DialerActivity;
 import org.linphone.history.HistoryActivity;
@@ -53,6 +54,15 @@ public class LinphoneLauncherActivity extends Activity implements ServiceWaitThr
 
         // CLB Preferences
         LinphonePreferencesCLB.instance().CheckPermissions(this);
+
+        LockHelper.LockScreen(this);
+    }
+
+    @Override
+    protected void onDestroy() {
+
+        LockHelper.UnlockScreen(this);
+        super.onDestroy();
     }
 
     @Override

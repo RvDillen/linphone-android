@@ -22,7 +22,9 @@ package org.linphone.receivers;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.os.Build;
 import org.linphone.compatibility.Compatibility;
+import org.linphone.mediastream.Version;
 import org.linphone.service.LinphoneService;
 import org.linphone.settings.LinphonePreferences;
 
@@ -41,6 +43,15 @@ public class BootReceiver extends BroadcastReceiver {
             boolean autostart = LinphonePreferences.instance().isAutoStartEnabled();
             android.util.Log.i(
                     "Linphone", "[Boot Receiver] Device is starting, auto_start is " + autostart);
+
+            // CLB -> prevent start from Boot, cause has Microphone issue (android security)
+            if (Build.VERSION.SDK_INT > Version.API29_ANDROID_10) {
+                android.util.Log.i(
+                        "Linphone",
+                        "[Boot Receiver] for this device will NOT start cause is prevented for this Android version (CLB)");
+                return;
+            }
+            // <-- CLB
 
             if (autostart && !LinphoneService.isReady()) {
                 startService(context);

@@ -71,7 +71,9 @@
 
         <activity
             android:name=".activities.LinphoneLauncherActivity"
-            android:noHistory="true">
+            android:noHistory="true"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 
