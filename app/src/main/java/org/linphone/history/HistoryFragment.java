@@ -29,7 +29,12 @@ import android.widget.AdapterView;
 import android.widget.AdapterView.OnItemClickListener;
 import android.widget.ImageView;
 import android.widget.TextView;
-
+import androidx.recyclerview.widget.DividerItemDecoration;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import org.linphone.LinphoneContext;
 import org.linphone.LinphoneManager;
 import org.linphone.R;
@@ -44,14 +49,6 @@ import org.linphone.core.CallLog;
 import org.linphone.core.Core;
 import org.linphone.core.CoreListenerStub;
 import org.linphone.utils.SelectableHelper;
-
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-
-import androidx.recyclerview.widget.DividerItemDecoration;
-import androidx.recyclerview.widget.LinearLayoutManager;
-import androidx.recyclerview.widget.RecyclerView;
 
 public class HistoryFragment extends Fragment
         implements OnClickListener,

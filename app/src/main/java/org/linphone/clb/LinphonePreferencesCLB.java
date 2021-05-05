@@ -1,13 +1,7 @@
 package org.linphone.clb;
 
-import android.Manifest;
-import android.app.Activity;
 import android.content.Context;
-import android.content.pm.PackageManager;
-import android.os.Build;
 import android.os.Environment;
-import androidx.core.app.ActivityCompat;
-import androidx.core.content.ContextCompat;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -58,24 +52,6 @@ public class LinphonePreferencesCLB {
     }
 
     private LinphonePreferencesCLB() {}
-
-    public void CheckPermissions(Activity context) {
-
-        List<String> permissions = new ArrayList<String>();
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-
-            // WRITE_EXTERNAL_STORAGE
-            if (ContextCompat.checkSelfPermission(
-                            context, Manifest.permission.WRITE_EXTERNAL_STORAGE)
-                    != PackageManager.PERMISSION_GRANTED) {
-                permissions.add(Manifest.permission.WRITE_EXTERNAL_STORAGE);
-            }
-        }
-
-        if (permissions.size() > 0)
-            ActivityCompat.requestPermissions(context, permissions.toArray(new String[0]), 0);
-    }
 
     public void CheckOnLocalIniFile(Context context) {
 

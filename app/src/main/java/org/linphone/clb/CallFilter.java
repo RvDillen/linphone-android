@@ -1,15 +1,13 @@
 package org.linphone.clb;
 
 import android.util.Log;
-
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import org.linphone.LinphoneManager;
 import org.linphone.core.Address;
 import org.linphone.core.Call;
 import org.linphone.core.CallLog;
-
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
 
 /**
  * CallFilter: CLB class to filter calls from CLB Hardware out of History. <br>

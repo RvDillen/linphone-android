@@ -20,16 +20,19 @@
 package org.linphone.activities;
 
 import android.app.Activity;
+import android.app.KeyguardManager;
 import android.content.Intent;
 import android.content.pm.ActivityInfo;
+import android.os.Build;
 import android.os.Bundle;
+import android.os.PowerManager;
 import android.util.Log;
 import org.linphone.LinphoneManager;
 import org.linphone.R;
 import org.linphone.assistant.MenuAssistantActivity;
 import org.linphone.chat.ChatActivity;
-import org.linphone.clb.LinphonePreferencesCLB;
 import org.linphone.clb.LockHelper;
+import org.linphone.clb.PermissionHelper;
 import org.linphone.contacts.ContactsActivity;
 import org.linphone.dialer.DialerActivity;
 import org.linphone.history.HistoryActivity;
@@ -52,9 +55,6 @@ public class LinphoneLauncherActivity extends Activity implements ServiceWaitThr
             setContentView(R.layout.launch_screen);
         } // Otherwise use drawable/launch_screen layer list up until first activity starts
 
-        // CLB Preferences
-        LinphonePreferencesCLB.instance().CheckPermissions(this);
-
         LockHelper.LockScreen(this);
     }
 
@@ -62,12 +62,39 @@ public class LinphoneLauncherActivity extends Activity implements ServiceWaitThr
     protected void onDestroy() {
 
         LockHelper.UnlockScreen(this);
+        if (wakeLock != null) {
+            LockHelper.ReleaseWakeLock(wakeLock);
+        }
+        if (keyguardLock != null) {
+            LockHelper.ReleaseKeyLock(keyguardLock);
+        }
+
         super.onDestroy();
     }
+
+    boolean unlock = false;
+
+    KeyguardManager.KeyguardLock keyguardLock = null;
+    PowerManager.WakeLock wakeLock = null;
 
     @Override
     protected void onStart() {
         super.onStart();
+
+        // CLB startUp A11
+        if (Build.VERSION.SDK_INT > Build.VERSION_CODES.Q) {
+
+            if (LockHelper.IsScreenOn(this) == false) {
+                wakeLock = LockHelper.SetWakeLock(this);
+            }
+            if (LockHelper.IsDeviceLocked(this)) {
+                keyguardLock = LockHelper.SetKeyLock(this);
+            }
+        }
+
+        // CLB Preferences
+        PermissionHelper.instance().CheckPermissions(this);
+        PermissionHelper.instance().CheckOverlayPermission(this);
 
         if (LinphoneService.isReady()) {
             onServiceReady();

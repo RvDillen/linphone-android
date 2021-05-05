@@ -39,6 +39,8 @@ import org.linphone.LinphoneManager;
 import org.linphone.R;
 import org.linphone.activities.MainActivity;
 import org.linphone.call.views.CallButton;
+import org.linphone.clb.LockHelper;
+import org.linphone.clb.PermissionHelper;
 import org.linphone.contacts.ContactsActivity;
 import org.linphone.contacts.ContactsManager;
 import org.linphone.core.Call;
@@ -122,6 +124,8 @@ public class DialerActivity extends MainActivity implements AddressText.AddressC
         }
 
         handleIntentParams(getIntent());
+
+        LockHelper.LockScreen(this);
     }
 
     @Override
@@ -141,6 +145,10 @@ public class DialerActivity extends MainActivity implements AddressText.AddressC
     @Override
     protected void onResume() {
         super.onResume();
+
+        // CLB Preferences
+        PermissionHelper.instance().CheckPermissions(this);
+        PermissionHelper.instance().CheckOverlayPermission(this);
 
         mDialerSelected.setVisibility(View.VISIBLE);
 
@@ -177,6 +185,8 @@ public class DialerActivity extends MainActivity implements AddressText.AddressC
             mBackToCall = null;
         }
         if (mListener != null) mListener = null;
+
+        LockHelper.UnlockScreen(this);
 
         super.onDestroy();
     }
