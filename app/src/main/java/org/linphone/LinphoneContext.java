@@ -19,14 +19,13 @@
  */
 package org.linphone;
 
-import static android.content.Intent.ACTION_MAIN;
-
 import android.content.Context;
 import android.content.Intent;
 import android.os.Build;
 import android.os.Environment;
 import android.provider.ContactsContract;
-import java.util.ArrayList;
+
+import org.linphone.activities.LinphoneLauncherActivity;
 import org.linphone.call.CallActivity;
 import org.linphone.call.CallIncomingActivity;
 import org.linphone.call.CallOutgoingActivity;
@@ -50,6 +49,10 @@ import org.linphone.settings.LinphonePreferences;
 import org.linphone.utils.DeviceUtils;
 import org.linphone.utils.LinphoneUtils;
 import org.linphone.utils.PushNotificationUtils;
+
+import java.util.ArrayList;
+
+import static android.content.Intent.ACTION_MAIN;
 
 public class LinphoneContext {
     private static LinphoneContext sInstance = null;
@@ -334,8 +337,26 @@ public class LinphoneContext {
 
     private void onOutgoingStarted() {
 
-        // CLB => Not showing Activity on direct call
+        // CLB =>
         if (CallStateCLB.instance().IsCallFromCLB()) {
+
+            // A11(+): Show notification before
+            if (Build.VERSION.SDK_INT > Version.API29_ANDROID_10) {
+                LinphonePreferences.instance().setServiceNotificationVisibility(true);
+                LinphoneContext.instance().getNotificationManager().startForeground();
+            }
+
+            // A11(+): Show activity briefly, otherwise microphone is blocked by android (BG-12130).
+            if (Build.VERSION.SDK_INT > Version.API29_ANDROID_10) {
+                Intent intent = new Intent(mContext, LinphoneLauncherActivity.class);
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                intent.addFlags(Intent.FLAG_ACTIVITY_NO_USER_ACTION);
+                intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                intent.addFlags(Intent.FLAG_FROM_BACKGROUND);
+                mContext.startActivity(intent);
+            }
+
+            // Not showing Activity on direct call (A11)
             CallStateCLB.instance().CheckListener(mContext);
             return;
         }

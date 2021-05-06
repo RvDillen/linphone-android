@@ -28,18 +28,11 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
-import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
-import androidx.asynclayoutinflater.view.AsyncLayoutInflater;
-import java.io.UnsupportedEncodingException;
-import java.net.URLDecoder;
-import java.util.ArrayList;
-import java.util.Collection;
+
 import org.linphone.LinphoneManager;
 import org.linphone.R;
 import org.linphone.activities.MainActivity;
 import org.linphone.call.views.CallButton;
-import org.linphone.clb.LockHelper;
 import org.linphone.clb.PermissionHelper;
 import org.linphone.contacts.ContactsActivity;
 import org.linphone.contacts.ContactsManager;
@@ -51,6 +44,15 @@ import org.linphone.dialer.views.AddressText;
 import org.linphone.dialer.views.Digit;
 import org.linphone.dialer.views.EraseButton;
 import org.linphone.settings.LinphonePreferences;
+
+import java.io.UnsupportedEncodingException;
+import java.net.URLDecoder;
+import java.util.ArrayList;
+import java.util.Collection;
+
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.asynclayoutinflater.view.AsyncLayoutInflater;
 
 public class DialerActivity extends MainActivity implements AddressText.AddressChangedListener {
     private static final String ACTION_CALL_LINPHONE = "org.linphone.intent.action.CallLaunched";
@@ -125,7 +127,7 @@ public class DialerActivity extends MainActivity implements AddressText.AddressC
 
         handleIntentParams(getIntent());
 
-        LockHelper.LockScreen(this);
+        //     LockHelper.LockScreen(this);
     }
 
     @Override
@@ -186,7 +188,7 @@ public class DialerActivity extends MainActivity implements AddressText.AddressC
         }
         if (mListener != null) mListener = null;
 
-        LockHelper.UnlockScreen(this);
+        //      LockHelper.UnlockScreen(this);
 
         super.onDestroy();
     }

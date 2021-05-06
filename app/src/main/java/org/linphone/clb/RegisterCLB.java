@@ -24,6 +24,10 @@ public class RegisterCLB {
     public static final String ACTION_LOGIN = "org.linphone.action.LOGIN";
     public static final String ACTION_LOGOUT = "org.linphone.action.LOGOUT";
 
+    private static String TAG = "RegisterCLB";
+
+    private static boolean isRegistered = false;
+
     private BroadcastReceiver mHangupReceiver;
     private BroadcastReceiver mDirectCallReceiver;
     private BroadcastReceiver mLoginReceiver;
@@ -41,6 +45,9 @@ public class RegisterCLB {
     }
 
     public void RegisterReceivers() {
+
+        if (isRegistered) return;
+
         // ACTION_ENDCALL
         mHangupIntentFilter = new IntentFilter(ACTION_ENDCALL);
         mHangupReceiver = new HangupReceiver();
@@ -61,6 +68,8 @@ public class RegisterCLB {
         mLogoutIntentFilter = new IntentFilter(ACTION_LOGOUT);
         mLogoutReceiver = new LogoutReceiver();
         RegisterReceiver(mLogoutIntentFilter, mLogoutReceiver, "Register Logout receiver");
+
+        isRegistered = true;
     }
 
     public void UnRegisterReceivers() {
@@ -77,10 +86,10 @@ public class RegisterCLB {
 
         try {
             ifilter.setPriority(99999999);
-            Log.i(message);
+            android.util.Log.i(TAG, message);
             mContext.registerReceiver(bcReceiver, ifilter);
         } catch (IllegalArgumentException e) {
-            Log.i("Failure of " + message + ": " + e.getMessage());
+            android.util.Log.e(TAG, "Failure of " + message + ": " + e.getMessage());
             e.printStackTrace();
         }
     }

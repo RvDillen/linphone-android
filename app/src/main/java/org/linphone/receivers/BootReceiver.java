@@ -22,10 +22,7 @@ package org.linphone.receivers;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
-import android.os.Build;
-import org.linphone.activities.LinphoneLauncherActivity;
 import org.linphone.compatibility.Compatibility;
-import org.linphone.mediastream.Version;
 import org.linphone.service.LinphoneService;
 import org.linphone.settings.LinphonePreferences;
 
@@ -33,6 +30,7 @@ public class BootReceiver extends BroadcastReceiver {
 
     @Override
     public void onReceive(Context context, Intent intent) {
+
         if (intent.getAction().equalsIgnoreCase(Intent.ACTION_SHUTDOWN)) {
             android.util.Log.d(
                     "Linphone",
@@ -45,23 +43,10 @@ public class BootReceiver extends BroadcastReceiver {
             android.util.Log.i(
                     "Linphone", "[Boot Receiver] Device is starting, auto_start is " + autostart);
 
-            // CLB -> prevent start from Boot, cause has Microphone issue (android security)
-            if (Build.VERSION.SDK_INT > Version.API29_ANDROID_10) {
-                android.util.Log.i(
-                        "Linphone",
-                        "[Boot Receiver] for this device will NOT start cause is prevented for this Android version (CLB)");
-                // return;
-            }
-            // <-- CLB
-
             if (autostart && !LinphoneService.isReady()) {
                 startService(context);
-
-                android.util.Log.i("Linphone", "[Boot Receiver] Start UI (CLB)");
-                //                if (Build.VERSION.SDK_INT > Version.API29_ANDROID_10) {
-                //                    startUI(context);
-                //                }
             }
+
         } else if (intent.getAction().equalsIgnoreCase(Intent.ACTION_MY_PACKAGE_REPLACED)) {
             LinphonePreferences.instance().setContext(context);
             boolean foregroundService =
@@ -82,26 +67,5 @@ public class BootReceiver extends BroadcastReceiver {
         serviceIntent.setClass(context, LinphoneService.class);
         serviceIntent.putExtra("ForceStartForeground", true);
         Compatibility.startService(context, serviceIntent);
-    }
-
-    private void startUI(Context context) {
-        Intent intent = new Intent(context, LinphoneLauncherActivity.class);
-        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        intent.addFlags(Intent.FLAG_ACTIVITY_NO_USER_ACTION);
-        intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
-        intent.addFlags(Intent.FLAG_FROM_BACKGROUND);
-        /*
-                Intent intent = new Intent();
-                intent.setClass(LinphoneLauncherActivity.class, classToStart);
-                if (getIntent() != null && getIntent().getExtras() != null) {
-                    intent.putExtras(getIntent().getExtras());
-                }
-                intent.setAction(getIntent().getAction());
-                intent.setType(getIntent().getType());
-                intent.setData(getIntent().getData());
-                startActivity(intent);
-        */
-
-        context.startActivity(intent);
     }
 }
