@@ -74,6 +74,9 @@ public class RegisterCLB {
 
     public void UnRegisterReceivers() {
 
+        // Skipped unregister (BG-12261)
+        // https://stackoverflow.com/questions/45728334/register-and-unregister-the-broadcastreceiver-in-application-class
+
         UnRegisterReceiver(mHangupReceiver, "Unregister HangupReceiver");
         UnRegisterReceiver(mDirectCallReceiver, "Unregister DirectCallReceiver");
 

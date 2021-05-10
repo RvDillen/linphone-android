@@ -65,7 +65,7 @@ public final class LinphoneService extends Service {
             misLinphoneContextOwned = true;
         }
 
-        mRegisterCLB = new RegisterCLB(this);
+        mRegisterCLB = new RegisterCLB(this.getApplicationContext());
         mRegisterCLB.RegisterReceivers();
 
         Log.i("[Service] Created");
@@ -137,7 +137,7 @@ public final class LinphoneService extends Service {
     public synchronized void onDestroy() {
         Log.i("[Service] Destroying");
 
-        mRegisterCLB.UnRegisterReceivers();
+        //       mRegisterCLB.UnRegisterReceivers(); (BG-12261)
 
         if (mActivityCallbacks != null) {
             getApplication().unregisterActivityLifecycleCallbacks(mActivityCallbacks);
