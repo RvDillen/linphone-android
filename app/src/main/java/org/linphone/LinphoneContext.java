@@ -326,6 +326,12 @@ public class LinphoneContext {
         Log.i("SDK BRANCH=" + mContext.getString(R.string.linphone_sdk_branch));
     }
 
+    public void DisplayCall(Call call) {
+        if (mContext.getResources().getBoolean(R.bool.enable_call_notification)) {
+            mNotificationManager.displayCallNotification(call);
+        }
+    }
+
     /* Call activities */
 
     private void onIncomingReceived() {

@@ -98,12 +98,14 @@ public class HangupReceiver extends BroadcastReceiver {
                     // Current call is from hangup uri. => terminateCall now && if no calls in pause
                     LinphoneManager.getInstance()
                             .resetClassicMenuLayoutAndGoBackToCallIfStillRunning();
-                    Log.i(
-                            tag,
+                    String msg =
                             "TerminatePhoneCall: terminate currentCall Remote address: "
-                                    + remAddress);
+                                    + remAddress;
+                    Log.i(tag, msg);
                     lc.terminateCall(currentCall);
-                    if (anyCallInPause == false) TryTerminateActiveCall(true);
+
+                    if (anyCallInPause) DisplayPausedCall();
+                    else TryTerminateActiveCall(true);
                     return true;
 
                 } else if (anyCallInPause == true) {
@@ -117,6 +119,7 @@ public class HangupReceiver extends BroadcastReceiver {
                         if (adress != null && adress.contains(session) == true) {
                             Log.i(tag, "Terminate PhoneCall in pause: " + adress);
                             lc.terminateCall(call);
+                            DisplayPausedCall();
                             return true;
                         }
                     }
@@ -153,6 +156,16 @@ public class HangupReceiver extends BroadcastReceiver {
             Log.e(tag, "Exception TerminatePhoneCall: " + e.getMessage());
         }
         return false; // uri not found
+    }
+
+    private void DisplayPausedCall() {
+
+        Core lc = LinphoneManager.getCore();
+        Call[] calls = lc.getCalls();
+        if (calls == null || calls.length == 0) return;
+
+        Call nextcall = calls[0];
+        LinphoneContext.instance().DisplayCall(nextcall);
     }
 
     private String GetAdressString(Call call) {
