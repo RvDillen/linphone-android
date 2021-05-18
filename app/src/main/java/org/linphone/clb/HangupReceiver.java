@@ -39,6 +39,9 @@ public class HangupReceiver extends BroadcastReceiver {
                 uriExtra = extras.getString("uri");
             }
         }
+
+        CallStateCLB.instance().RegisterHangUpTime();
+
         // Sip Found, try hangup this number
         if (uriExtra != null) {
             TerminatePhoneCall(uriExtra);

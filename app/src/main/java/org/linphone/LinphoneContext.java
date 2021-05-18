@@ -353,7 +353,8 @@ public class LinphoneContext {
             }
 
             // A11(+): Show activity briefly, otherwise microphone is blocked by android (BG-12130).
-            if (Build.VERSION.SDK_INT > Version.API29_ANDROID_10) {
+            if (Build.VERSION.SDK_INT > Version.API29_ANDROID_10
+                    && CallStateCLB.instance().IsJustHangUp() == false) {
                 Intent intent = new Intent(mContext, LinphoneLauncherActivity.class);
                 intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                 intent.addFlags(Intent.FLAG_ACTIVITY_NO_USER_ACTION);

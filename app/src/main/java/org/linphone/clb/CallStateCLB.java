@@ -1,15 +1,16 @@
 package org.linphone.clb;
 
-import static org.linphone.core.Reason.Declined;
-
 import android.content.Context;
 import android.widget.Toast;
+
 import org.linphone.LinphoneManager;
 import org.linphone.R;
 import org.linphone.core.Call;
 import org.linphone.core.Core;
 import org.linphone.core.CoreListenerStub;
 import org.linphone.core.Reason;
+
+import static org.linphone.core.Reason.Declined;
 
 /**
  * CallStateCLB: CLB class to store call state from CLB. <br>
@@ -28,6 +29,7 @@ public class CallStateCLB {
     private String callState = null;
     private CoreListenerStub mListener = null;
     private Context mContext = null;
+    private long lastHanugUp = 0;
 
     public static final synchronized CallStateCLB instance() {
         if (instance == null) {
@@ -58,6 +60,18 @@ public class CallStateCLB {
                 mListener = null;
             }
         }
+    }
+
+    public void RegisterHangUpTime() {
+        lastHanugUp = System.currentTimeMillis();
+    }
+
+    public boolean IsJustHangUp() {
+        long now = System.currentTimeMillis();
+        long period = now - lastHanugUp;
+        //        android.util.Log.i(tag, "Periode is: " + period);
+        boolean result = (period) < 5000; // (< 5 sec ago)
+        return result;
     }
 
     public void CheckListener(Context context) {
