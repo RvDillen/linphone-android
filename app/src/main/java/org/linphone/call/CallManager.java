@@ -58,8 +58,7 @@ public class CallManager {
 
     public void terminateCurrentCallOrConferenceOrAll() {
         Core core = LinphoneManager.getCore();
-        if(core == null)
-            return;
+        if (core == null) return;
         Call call = core.getCurrentCall();
         if (call != null) {
             call.terminate();
@@ -175,10 +174,9 @@ public class CallManager {
         Core core = LinphoneManager.getCore();
         String[] tos = to.split(";");
         Address address;
+        to = tos[0];
         // If to is only a username, try to find the contact to get an alias if existing
         if (!to.startsWith("sip:") || !to.contains("@")) {
-
-            to = tos[0];
             LinphoneContact contact = ContactsManager.getInstance().findContactFromPhoneNumber(to);
             if (contact != null) {
                 String alias = contact.getContactFromPresenceModelForUriOrTel(to);
