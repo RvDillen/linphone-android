@@ -58,6 +58,8 @@ public class CallManager {
 
     public void terminateCurrentCallOrConferenceOrAll() {
         Core core = LinphoneManager.getCore();
+        if(core == null)
+            return;
         Call call = core.getCurrentCall();
         if (call != null) {
             call.terminate();
@@ -169,8 +171,14 @@ public class CallManager {
     public void newOutgoingCall(String to, String displayName) {
         if (to == null) return;
 
+        LinphonePreferences preferences = LinphonePreferences.instance();
+        Core core = LinphoneManager.getCore();
+        String[] tos = to.split(";");
+        Address address;
         // If to is only a username, try to find the contact to get an alias if existing
         if (!to.startsWith("sip:") || !to.contains("@")) {
+
+            to = tos[0];
             LinphoneContact contact = ContactsManager.getInstance().findContactFromPhoneNumber(to);
             if (contact != null) {
                 String alias = contact.getContactFromPresenceModelForUriOrTel(to);
@@ -180,10 +188,20 @@ public class CallManager {
             }
         }
 
-        LinphonePreferences preferences = LinphonePreferences.instance();
-        Core core = LinphoneManager.getCore();
-        Address address;
         address = core.interpretUrl(to); // InterpretUrl does normalizePhoneNumber
+
+        if (address == null) {
+            Log.e("[Call Manager] Couldn't convert to String to Address : " + to);
+            return;
+        }
+        if (tos.length > 1) {
+            to = address.asString();
+            for (int i = 1; i < tos.length; i++) {
+                to = to + ";" + tos[i];
+            }
+            address = core.interpretUrl(to);
+        }
+
         if (address == null) {
             Log.e("[Call Manager] Couldn't convert to String to Address : " + to);
             return;

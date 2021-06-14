@@ -25,16 +25,16 @@ public class CallFilter {
         try {
             int size = logs.size();
             for (int i = 0; i < size; i++) {
-                Boolean fromHardWare = false;
+                boolean fromHardWare = false;
                 CallLog log = logs.get(i);
                 if (log.getDir() == Call.Dir.Outgoing) {
                     Address toAdress = log.getToAddress();
                     String sipUri = toAdress.asStringUriOnly().toLowerCase();
-                    if (sipUri.contains("clbinfo")) {
+                    if (sipUri.contains("clbinfo") || sipUri.contains(("clbsessionid"))) {
                         fromHardWare = true;
                     }
                 }
-                if (fromHardWare == false) {
+                if (!fromHardWare) {
                     nonHardwareCalls.add(log);
                 }
             }
@@ -44,23 +44,5 @@ public class CallFilter {
         }
 
         return nonHardwareCalls;
-    }
-
-    public static void RemoveCallFromLog(String callUri) {
-
-        List<CallLog> logs = Arrays.asList(LinphoneManager.getCore().getCallLogs());
-        int size = logs.size();
-        for (int i = 0; i < size; i++) {
-
-            CallLog log = logs.get(i);
-            if (log.getDir() == Call.Dir.Outgoing) {
-                Address toAdress = log.getToAddress();
-                String sipUri = toAdress.asStringUriOnly();
-                Boolean found = toAdress.asStringUriOnly().indexOf(callUri) >= 0;
-                if (found) {
-                    LinphoneManager.getCore().removeCallLog(log);
-                }
-            }
-        }
     }
 }
