@@ -54,6 +54,8 @@ import org.linphone.R
 import org.linphone.activities.call.CallActivity
 import org.linphone.activities.call.IncomingCallActivity
 import org.linphone.activities.call.OutgoingCallActivity
+import org.linphone.clb.CallStateCLB
+import org.linphone.clb.kt.CoreContextExt
 import org.linphone.compatibility.Compatibility
 import org.linphone.contact.Contact
 import org.linphone.contact.ContactsManager
@@ -288,6 +290,11 @@ class CoreContext(val context: Context, coreConfig: Config) {
         core = Factory.instance().createCoreWithConfig(coreConfig, context)
 
         stopped = false
+
+        // CLB register services
+        val registerCLB = org.linphone.clb.RegisterCLB(context.applicationContext)
+        registerCLB.RegisterReceivers()
+
         Log.i("[Context] Ready")
     }
 
@@ -724,6 +731,15 @@ class CoreContext(val context: Context, coreConfig: Config) {
     }
 
     private fun onOutgoingStarted() {
+
+        if (CallStateCLB.instance().IsCallFromCLB()) {
+
+            val coreExt = org.linphone.clb.kt.CoreContextExt()
+            val isJustHangUp = CallStateCLB.instance().IsJustHangUp()
+            coreExt.OnOutgoingStarted(isJustHangUp)
+            return
+        }
+
         if (corePreferences.preventInterfaceFromShowingUp) {
             Log.w("[Context] We were asked to not show the outgoing call screen")
             return
@@ -737,6 +753,12 @@ class CoreContext(val context: Context, coreConfig: Config) {
     }
 
     fun onCallStarted() {
+
+        // CLB => Not showing Activity on direct call
+        if (CallStateCLB.instance().IsCallFromCLB()) {
+            return
+        }
+
         if (corePreferences.preventInterfaceFromShowingUp) {
             Log.w("[Context] We were asked to not show the call screen")
             return

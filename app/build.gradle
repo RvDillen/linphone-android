@@ -6,8 +6,16 @@ apply plugin: 'kotlin-kapt'
 
 apply plugin: "org.jlleitschuh.gradle.ktlint"
 
+// Used to set the package version name and version code
+ext.versionMajor = 4
+ext.versionMinor = 2
+ext.versionRelease = 5
 
 static def getPackageName() {
+    return "nl.clb.linphone"
+}
+
+static def getPackageNameOrg() {
     return "org.linphone"
 }
 
@@ -27,9 +35,20 @@ if (crashlyticsEnabled()) {
     apply plugin: 'com.google.firebase.crashlytics'
 }
 
+// Will return 4230042 for Jenkins build #42
+def computeVersionCode() {
+    // Major + minor + Jenkins build number (where available)
+    return (versionMajor * 1000000) + (versionMinor * 100000) + (versionRelease * 10000) + Integer.valueOf(System.env.BUILD_NUMBER ?: 0)
+}
+
+
+
+
 def gitBranch = new ByteArrayOutputStream()
 task getGitVersion() {
-    def gitVersion = "4.5.2"
+    def versionBuild = Integer.valueOf(System.env.BUILD_NUMBER ?: 0)
+    project.version = String.format('%d.%d.%d.%d', versionMajor, versionMinor, versionRelease, versionBuild)
+/*  def gitVersion = "4.5.2"
     def gitVersionStream = new ByteArrayOutputStream()
     def gitCommitsCount = new ByteArrayOutputStream()
     def gitCommitHash = new ByteArrayOutputStream()
@@ -61,7 +80,7 @@ task getGitVersion() {
     } catch (ignored) {
         println("Git not found")
     }
-    project.version = gitVersion
+    project.version = gitVersion */
 }
 
 configurations {
@@ -89,9 +108,25 @@ android {
     defaultConfig {
         minSdkVersion 23
         targetSdkVersion 30
-        versionCode 4520
+        versionCode computeVersionCode()
         versionName "${project.version}"
-        applicationId getPackageName()
+        multiDexEnabled true
+        signingConfig signingConfigs.debug
+        versionNameSuffix = 'clb-20210511'
+        setProperty("archivesBaseName", applicationId + "-" + versionName)
+    }
+
+    flavorDimensions "all"
+
+    productFlavors {
+        clb {
+            dimension "all"
+            applicationId getPackageName()
+        }
+        linphone {
+            dimension "all"
+            applicationId getPackageNameOrg()
+        }
     }
 
     // Required to be able to generate app bundle with native libraries symbols, see releaseAppBundle below
@@ -104,7 +139,7 @@ android {
 
     applicationVariants.all { variant ->
         variant.outputs.all {
-            outputFileName = "linphone-android-${variant.buildType.name}-${project.version}.apk"
+            outputFileName = "linphone-android-${variant.getFlavorName()}-${variant.buildType.name}_${variant.versionName}.apk"
         }
 
         // See https://developer.android.com/studio/releases/gradle-plugin#3-6-0-behavior for why extractNativeLibs is set to true in debug flavor
@@ -125,12 +160,24 @@ android {
     def keystoreProperties = new Properties()
     keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
 
-    signingConfigs {
-        release {
-            storeFile file(keystoreProperties['storeFile'])
-            storePassword keystoreProperties['storePassword']
-            keyAlias keystoreProperties['keyAlias']
-            keyPassword keystoreProperties['keyPassword']
+    if (project.hasProperty('storePassword')) {
+        signingConfigs {
+            release {
+                storeFile file(keystoreProperties['storeFile'])
+                storePassword project['storePassword']
+                keyAlias project['keyAlias']
+                keyPassword project['keyPassword']
+            }
+        }
+    }
+    else {
+        signingConfigs {
+            release {
+                storeFile file(keystoreProperties['storeFile'])
+                storePassword keystoreProperties['storePassword']
+                keyAlias keystoreProperties['keyAlias']
+                keyPassword keystoreProperties['keyPassword']
+            }
         }
     }
 

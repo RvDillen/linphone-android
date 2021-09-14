@@ -1,0 +1,50 @@
+package org.linphone.clb.kt
+
+import android.content.Context
+import android.content.Intent
+import android.os.Build
+import androidx.core.content.ContextCompat
+import org.linphone.LinphoneApplication
+import org.linphone.LinphoneApplication.Companion.coreContext
+import org.linphone.activities.launcher.LauncherActivity
+import org.linphone.core.CoreService
+import org.linphone.mediastream.Version
+
+class CoreContextExt() {
+
+    fun StartCoreService(context: Context) {
+        val serviceIntent = Intent(Intent.ACTION_MAIN).setClass(context, CoreService::class.java)
+        serviceIntent.putExtra("StartForeground", true)
+        ContextCompat.startForegroundService(context, serviceIntent)
+    }
+
+    fun RegisterCLBServices() {
+
+        // CLB register services
+        // val mRegisterCLB = RegisterCLB(context.applicationContext)
+        // mRegisterCLB.RegisterReceivers()
+    }
+
+    fun OnOutgoingStarted(isJustHangup: Boolean) {
+        // A11(+): Show notification before
+        if (Build.VERSION.SDK_INT > Version.API29_ANDROID_10) {
+            // LinphonePreferences.instance().setServiceNotificationVisibility(true);
+            LinphoneApplication.coreContext.notificationsManager.startForeground()
+        }
+
+        // A11(+): Show activity briefly, otherwise microphone is blocked by android (BG-12130).
+        if (Build.VERSION.SDK_INT > Version.API29_ANDROID_10 && isJustHangup == false) {
+
+            val intent = Intent(LinphoneApplication.coreContext.context, LauncherActivity::class.java)
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            intent.addFlags(Intent.FLAG_ACTIVITY_NO_USER_ACTION)
+            intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
+            intent.addFlags(Intent.FLAG_FROM_BACKGROUND)
+            LinphoneApplication.coreContext.context.startActivity(intent)
+        }
+    }
+
+    fun IsServiceReady(): Boolean {
+        return LinphoneApplication.coreContext.notificationsManager.service != null
+    }
+}

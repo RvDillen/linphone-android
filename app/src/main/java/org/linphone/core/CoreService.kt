@@ -30,7 +30,13 @@ class CoreService : CoreService() {
         super.onCreate()
 
         coreContext.notificationsManager.service = this
+
         Log.i("[Service] Created")
+    }
+
+    fun IsCoreServiceReady(): Boolean {
+        val result: Boolean = (coreContext.notificationsManager.service != null)
+        return result
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {

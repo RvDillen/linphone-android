@@ -26,3 +26,4 @@ app/release
 app/releaseAppBundle
 keystore.properties
 app/src/main/res/xml/contacts.xml
+linphone-android-release\.apk

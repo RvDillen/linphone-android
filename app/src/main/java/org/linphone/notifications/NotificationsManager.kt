@@ -123,7 +123,9 @@ class NotificationsManager(private val context: Context) {
                 Call.State.End, Call.State.Error -> dismissCallNotification(call)
                 Call.State.Released -> {
                     if (LinphoneUtils.isCallLogMissed(call.callLog)) {
+                        /* CLB exclusive!: Do NOT show 'missed call notification' and icon!! =>
                         displayMissedCallNotification(call.remoteAddress)
+                        */
                     }
                 }
                 else -> displayCallNotification(call)
