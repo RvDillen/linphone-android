@@ -27,6 +27,7 @@ import org.linphone.R
 import org.linphone.activities.GenericActivity
 import org.linphone.activities.main.MainActivity
 import org.linphone.clb.LockHelperExt
+import org.linphone.clb.PermissionHelper
 import org.linphone.core.tools.Log
 
 class LauncherActivity : GenericActivity() {
@@ -44,6 +45,10 @@ class LauncherActivity : GenericActivity() {
     override fun onStart() {
         super.onStart()
         lockHelper.setWakeLocks()
+
+        // CLB Preferences
+        PermissionHelper.instance().CheckPermissions(this)
+        PermissionHelper.instance().CheckOverlayPermission(this)
 
         coreContext.handler.postDelayed({ onReady() }, 500)
     }
