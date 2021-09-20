@@ -22,6 +22,8 @@ package org.linphone
 import android.annotation.SuppressLint
 import android.app.Application
 import android.content.Context
+import org.linphone.clb.CallStateCLB
+import org.linphone.clb.RegisterCLB
 import org.linphone.core.*
 import org.linphone.core.tools.Log
 
@@ -61,6 +63,13 @@ class LinphoneApplication : Application() {
             Log.i("[Application] Core context created ${if (pushReceived) "from push" else ""}")
             coreContext = CoreContext(context, config)
             coreContext.start()
+
+            // CLB Registration
+            var registerCLB: RegisterCLB = org.linphone.clb.RegisterCLB(coreContext.context.applicationContext)
+            registerCLB.RegisterReceivers()
+
+            // CLB Forcing init of Callstate
+            CallStateCLB.instance().IsCallFromCLB()
         }
     }
 

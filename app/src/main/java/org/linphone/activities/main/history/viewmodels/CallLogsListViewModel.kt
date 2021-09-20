@@ -148,7 +148,11 @@ class CallLogsListViewModel : ViewModel() {
             missedList.add(previousMissedCallLogGroup)
         }
 
-        callLogs.value = list
-        missedCallLogs.value = missedList
+        // CLB: Remove calls from CLB Hardware out of History
+        val list_NoCSerie = org.linphone.clb.CallFilter.RemoveCallsFromHardware(list)
+        val missedList_NoCSerie = org.linphone.clb.CallFilter.RemoveCallsFromHardware(missedList)
+
+        callLogs.value = ArrayList(list_NoCSerie)
+        missedCallLogs.value = ArrayList(missedList_NoCSerie)
     }
 }

@@ -148,6 +148,15 @@ class DialerFragment : SecureFragment<DialerFragmentBinding>() {
         uploadLogsInitiatedByUs = false
 
         viewModel.enteredUri.value = sharedViewModel.dialerUri
+
+        /* CLB Preferences
+        try {
+            PermissionHelper.instance().CheckPermissions(this.activity)
+            PermissionHelper.instance().CheckOverlayPermission(this.activity)
+        } catch (e: Exception) {
+            Log.e("PermissionHelper exception : $e.message") // handlerma
+        }
+         */
     }
 
     private fun displayDebugPopup() {

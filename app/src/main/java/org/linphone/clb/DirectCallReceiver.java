@@ -32,11 +32,7 @@ public class DirectCallReceiver extends BroadcastReceiver {
     @Override
     public void onReceive(Context context, Intent intent) {
         if (isOrderedBroadcast()) abortBroadcast();
-        Log.i(TAG, "onReceive DirectCallReceiver ");
-        /*
-        LinphoneCore lc = LinphoneManager.getLc();
-        LinphoneCall currentCall = lc.getCurrentCall();
-        */
+
         if (intent.hasExtra(("uri"))) {
             addressToCall = intent.getStringExtra("uri");
             addressToCall = addressToCall.replace("%40", "@");
@@ -45,13 +41,17 @@ public class DirectCallReceiver extends BroadcastReceiver {
                 addressToCall = addressToCall.substring("sip:".length());
             }
         }
-        // Forcing init of Callstate
-        CallStateCLB.instance().IsCallFromCLB();
+        Log.i(TAG, "onReceive DirectCallReceiver for: " + addressToCall);
 
         // CLB C-Serie Uri ? => Validate if transport is defined, if not set UDP.
         String adressLower = addressToCall.toLowerCase();
         if (adressLower.contains("clbsessionid") && adressLower.contains("transport=?")) {
             addressToCall = addressToCall.replace("transport=?", "transport=udp?");
+        }
+
+        // Prevent double calls, when Linphone has slow connection
+        if (CallStateCLB.instance().IsBusyWithCall(addressToCall)){
+            return;
         }
 
         CallStateCLB.instance().SetCallUri(addressToCall);
@@ -75,13 +75,11 @@ public class DirectCallReceiver extends BroadcastReceiver {
     }
 
     protected void onServiceReady() {
-        // We need LinphoneService to start bluetoothManager
-        if (Version.sdkAboveOrEqual(Version.API11_HONEYCOMB_30)) {
-            Log.i(TAG, "We need LinphoneService to start bluetoothManager");
 
-            // Audiomanager will instatiate bluetooth.
-           // LinphoneManager.getAudioManager();
-            // BluetoothManager.getInstance().initBluetooth();
+        if (Version.sdkAboveOrEqual(Version.API11_HONEYCOMB_30)) {
+            Log.i(TAG, "onServiceReady");
+
+            // Previous call to BluetoothManager
         }
 
         mHandler.postDelayed(

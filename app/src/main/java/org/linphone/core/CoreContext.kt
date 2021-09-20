@@ -291,11 +291,10 @@ class CoreContext(val context: Context, coreConfig: Config) {
 
         stopped = false
 
-        // CLB register services
-        val registerCLB = org.linphone.clb.RegisterCLB(context.applicationContext)
-        registerCLB.RegisterReceivers()
-
         Log.i("[Context] Ready")
+
+        // CLB, do not use Pause SoundFile (BG-4537)
+        core.playFile = null
     }
 
     fun start(isPush: Boolean = false) {

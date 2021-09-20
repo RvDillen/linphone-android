@@ -25,6 +25,7 @@ import org.linphone.LinphoneApplication.Companion.corePreferences
 import org.linphone.R
 import org.linphone.activities.main.settings.SettingListenerStub
 import org.linphone.activities.main.viewmodels.LogsUploadViewModel
+import org.linphone.clb.LinphonePreferencesCLB
 import org.linphone.core.CoreContext
 import org.linphone.core.Factory
 import org.linphone.core.LogLevel
@@ -53,6 +54,10 @@ class AdvancedSettingsViewModel : LogsUploadViewModel() {
 
     val sendDebugLogsListener = object : SettingListenerStub() {
         override fun onClicked() {
+
+            // CLB : Add Linphone RC configuration to logfile
+            LinphonePreferencesCLB.instance().ExportLinphoneRcFile(coreContext.context)
+            //
             uploadLogs()
         }
     }

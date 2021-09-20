@@ -66,6 +66,15 @@ public class CallStateCLB {
         }
     }
 
+    public boolean IsBusyWithCall(String uri){
+
+        // TODO make more stable implementaton
+        if (callState == null)
+            return false;
+
+        return  (callState.equals("ringing") || callState.equals("connected")) &&  (uri.equals(callUri));
+    }
+
     public void OnOutgoingStarted(){
         // A11(+): Show notification before
         if (Build.VERSION.SDK_INT > Version.API29_ANDROID_10) {

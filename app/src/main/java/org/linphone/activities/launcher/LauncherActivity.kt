@@ -26,19 +26,31 @@ import org.linphone.LinphoneApplication.Companion.corePreferences
 import org.linphone.R
 import org.linphone.activities.GenericActivity
 import org.linphone.activities.main.MainActivity
+import org.linphone.clb.LockHelperExt
 import org.linphone.core.tools.Log
 
 class LauncherActivity : GenericActivity() {
+
+    var lockHelper = LockHelperExt(this)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         setContentView(R.layout.launcher_activity)
+
+        lockHelper.lockScreen()
     }
 
     override fun onStart() {
         super.onStart()
+        lockHelper.setWakeLocks()
+
         coreContext.handler.postDelayed({ onReady() }, 500)
+    }
+
+    override fun onDestroy() {
+        lockHelper.unlockScreen()
+        super.onDestroy()
     }
 
     private fun onReady() {
