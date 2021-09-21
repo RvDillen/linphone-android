@@ -128,7 +128,8 @@ class DialerFragment : SecureFragment<DialerFragmentBinding>() {
         Log.i("[Dialer] Pending call transfer mode = ${sharedViewModel.pendingCallTransfer}")
         viewModel.transferVisibility.value = sharedViewModel.pendingCallTransfer
 
-        checkForUpdate()
+        // CLB: no check for update
+        // checkForUpdate()
     }
 
     override fun onPause() {

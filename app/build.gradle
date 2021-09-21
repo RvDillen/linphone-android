@@ -110,6 +110,7 @@ android {
         targetSdkVersion 30
         versionCode computeVersionCode()
         versionName "${project.version}"
+        applicationId getPackageName()
         multiDexEnabled true
         signingConfig signingConfigs.debug
         versionNameSuffix = 'clb-20210511'

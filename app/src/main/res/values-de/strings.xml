@@ -1,0 +1,142 @@
+<?xml version='1.0' encoding='UTF-8'?>
+
+<!DOCTYPE resources [
+    <!ENTITY appName "Linphone">
+    ]>
+
+<resources xmlns:tools="http://schemas.android.com/tools">
+<!--          https://asrt.gluege.boerde.de             -->
+    <string name="service_auto_start_description">Linphone startete automatisch</string>
+    <string name="service_description">Dies ist erforderlich, um Anrufe im Hintergrund zu empfangen</string>
+    <string name="sync_account_name">Linphone-Kontakte</string>
+    <string name="about_privacy_policy">Sehen Sie sich unsere Datenschutzerklärung an</string>
+    <string name="logs_url_copied_to_clipboard">Protokoll-URL in Zwischenablage kopiert</string>
+    <string name="error">Falsch</string>
+    <string name="phone_number">Telefonnummer</string>
+    <string name="phone_numbers">Telefonnummern</string>
+    <string name="select_your_country">Wähle dein Land</string>
+    <string name="international_prefix">Präfix</string>
+    <string name="assistant_choose_country">Wähle ein Land</string>
+    <string name="assistant_choose_country_title">Ländervorwahl oder Vorwahl</string>
+    <string name="username">Nutzername</string>
+    <string name="password">Passwort</string>
+    <string name="domain">Domain</string>
+    <string name="sip_address">SIP-Adresse</string>
+    <string name="cancel">Abbrechen</string>
+    <plurals name="days">
+        <item quantity="one">%d Tag</item>
+        <item quantity="other">%d Tagen</item>
+    </plurals>
+    <string name="share_uploaded_logs_link">Link zur Protokolldatei teilen mit…</string>
+    <string name="invalid_email">Ungültige E-Mail-Adresse</string>
+    <string name="today">Heute</string>
+    <string name="yesterday">Gestern</string>
+    <string name="transport">Transport</string>
+    <string name="app_description">das<i> kostenlos</i> SIP-Client</string>
+    <string name="status_connected">In Verbindung gebracht</string>
+    <string name="status_not_connected">Nicht verbunden</string>
+    <string name="status_in_progress">Anschließen</string>
+    <string name="status_error">Verbindung fehlgeschlagen</string>
+    <string name="no_account_configured">Kein Konto konfiguriert</string>
+    <string name="about">Über</string>
+    <string name="assistant">Assistent</string>
+    <string name="recordings">Aufnahmen</string>
+    <string name="settings">Institutionen</string>
+    <string name="quit">Blockieren</string>
+    <string name="history_calls_list">Zum Handeln aufrufen</string>
+    <string name="no_call_history">Keine Anrufe im Verlauf</string>
+    <string name="no_missed_call_history">Kein verpasster Anruf in Ihrem Verlauf</string>
+    <string name="history_delete_one_dialog">Möchten Sie diesen Datensatz wirklich löschen\?</string>
+    <string name="history_delete_many_dialog">Möchten Sie diese Datensätze wirklich löschen\?</string>
+    <string name="contact_invite_friend">Einladen</string>
+    <string name="no_contact">Keine Kontakte in Ihrem Adressbuch</string>
+    <string name="no_sip_contact">Kein SIP-Kontakt in Ihrem Adressbuch</string>
+    <string name="contact_filter_hint">Kontakt finden</string>
+    <string name="contact_last_name">Nachname</string>
+    <string name="contact_first_name">Vorname</string>
+    <string name="contact_organization">Organisation</string>
+    <string name="contact_choose_existing_or_new_to_add_number">Wählen Sie einen Kontakt aus oder erstellen Sie einen neuen</string>
+    <string name="contact_editor_write_permission_denied">Autorisierung zum Schreiben von Kontakten verweigert, kann diesen Kontakt nicht bearbeiten</string>
+    <string name="contact_delete_one_dialog">Möchten Sie diesen Kontakt löschen\?
+\nEs wird auch aus dem Adressbuch deines Geräts entfernt</string>
+    <string name="contact_delete_many_dialog">Möchten Sie diese Kontakte wirklich löschen\?
+\nDiese werden auch aus dem Adressbuch deines Geräts entfernt</string>
+    <string name="contact_new_choose_sync_account">Wählen Sie aus, wo der Kontakt gespeichert werden soll</string>
+    <string name="contact_local_sync_account">Lokal speichern</string>
+    <string name="dialer_address_bar_hint">Geben Sie eine Nummer oder Adresse ein</string>
+    <string name="debug_popup_title">Debuggen</string>
+    <string name="debug_popup_enable_logs">Protokolle aktivieren</string>
+    <string name="debug_popup_disable_logs">Protokolle deaktivieren</string>
+    <string name="debug_popup_send_logs">Protokolle senden</string>
+    <string name="debug_popup_show_config_file">Konfigurationsdatei anzeigen</string>
+    <string name="no_chat_history">Keine Gespräche</string>
+    <string name="chat_remote_is_composing">Gegner schreibt…</string>
+    <string name="chat_event_conference_created">Sie sind der Gruppe beigetreten</string>
+    <string name="chat_event_conference_destroyed">Sie haben die Gruppe verlassen</string>
+    <string name="chat_event_participant_added">%s hat teilgenommen</string>
+    <string name="chat_event_participant_removed">%s ist gegangen</string>
+    <string name="chat_event_device_added">neues Gerät für %s</string>
+    <string name="chat_event_device_removed">Gerät für %s entfernt</string>
+    <string name="chat_event_subject_changed">neues Thema: %s</string>
+    <string name="chat_event_admin_set">%s ist Administrator</string>
+    <string name="chat_event_admin_unset">%s ist kein Administrator mehr</string>
+    <string name="chat_security_event_participant_max_count_exceeded">Maximale Teilnehmerzahl um %s überschritten</string>
+    <string name="chat_message_pick_file_dialog">Quelle auswählen</string>
+    <string name="chat_room_group_info_title">Die Info</string>
+    <string name="chat_room_group_info_participants">Teilnehmer</string>
+    <string name="chat_room_group_info_admin">Administrator</string>
+    <string name="chat_room_group_info_leave">Gruppe verlassen</string>
+    <string name="chat_room_group_info_leave_dialog_button">Verlassen</string>
+    <string name="chat_room_group_info_leave_dialog_message">Möchten Sie diese Unterhaltung verlassen\?</string>
+    <string name="chat_room_group_info_you_are_now_admin">Sie sind jetzt Administrator</string>
+    <string name="chat_room_group_info_you_are_no_longer_admin">Sie sind kein Administrator mehr</string>
+    <string name="chat_message_imdn_info">Lieferstatus</string>
+    <string name="chat_message_imdn_displayed">Lesen</string>
+    <string name="chat_message_imdn_delivered">Geliefert</string>
+    <string name="chat_message_imdn_undelivered">Nicht zugestellt</string>
+    <string name="chat_message_imdn_sent">Gesendet</string>
+    <string name="chat_message_forwarded">Weitergeleitet</string>
+    <string name="chat_message_context_menu_resend">Erneut senden</string>
+    <string name="chat_message_context_menu_copy_text">Text kopieren</string>
+    <string name="chat_message_context_menu_add_to_contacts">Zu den Kontakten hinzufügen</string>
+    <string name="chat_message_forward_confirmation_dialog">Möchten Sie die Nachricht in diesem Chatroom weiterleiten\?</string>
+    <string name="chat_room_toast_choose_for_sharing">Wählen Sie eine Konversation aus oder starten Sie eine neue</string>
+    <string name="chat_room_cant_open_file_no_app_found">Datei kann nicht geöffnet werden, keine Anwendung für dieses Format verfügbar.</string>
+    <string name="chat_room_file_not_found">Datei nicht gefunden</string>
+    <string name="chat_room_ephemeral_message_one_minute">1 Minute</string>
+    <string name="chat_room_ephemeral_message_one_hour">1 Stunde</string>
+    <string name="chat_room_ephemeral_message_one_day">1 Tag</string>
+    <string name="chat_room_ephemeral_message_three_days">3 Tage</string>
+    <string name="chat_room_ephemeral_message_one_week">1 Woche</string>
+    <plurals name="chat_room_remote_composing">
+        <item quantity="one">%s schreibt…</item>
+        <item quantity="other">%s schreiben…</item>
+    </plurals>
+    <string name="call_incoming_title">Eingehender Anruf</string>
+    <string name="call_outgoing_title">Ausgehender Anruf</string>
+    <string name="call_paused_by_remote">Gespräch wurde von der Gegenpartei unterbrochen</string>
+    <string name="call_notification_paused">Angehaltener Anruf</string>
+    <string name="call_notification_outgoing">Ausgehender Anruf</string>
+    <string name="call_notification_active">In Konversation</string>
+    <string name="call_conference_title">Konferenz</string>
+    <string name="call_error_declined">Anruf wurde abgelehnt</string>
+    <string name="call_error_user_busy">Benutzer ist beschäftigt</string>
+    <string name="call_error_user_not_found">Benutzer wurde nicht gefunden</string>
+    <string name="call_error_incompatible_media_params">Inkompatible Medienparameter</string>
+    <string name="call_error_network_unreachable">Netzwerk ist nicht erreichbar</string>
+    <string name="call_error_io_error">Netzwerkfehler</string>
+
+
+
+    <string name="call_video_update_requested_dialog">Gegenpartei möchte, dass Sie Video aktivieren</string>
+    <string name="call_stats_audio">Audio-</string>
+    <string name="call_stats_video">Video</string>
+    <string name="content_description_menu_history">Gesprächsverlauf</string>
+    <string name="content_description_show_all_calls">Alle Anrufe anzeigen</string>
+    <string name="content_description_missed_call">Verpasster Anruf</string>
+    <string name="content_description_incoming_call">Eingehender Anruf</string>
+    <string name="content_description_outgoing_call">Ausgehender Anruf</string>
+    <string name="content_description_security_level_encrypted">Verschlüsselt</string>
+<!-- Generated by Automatic String Resource Translation -->
+<!--          https://asrt.gluege.boerde.de             -->
+</resources>
