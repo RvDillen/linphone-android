@@ -113,7 +113,7 @@ android {
         applicationId getPackageName()
         multiDexEnabled true
         signingConfig signingConfigs.debug
-        versionNameSuffix = 'clb-20210511'
+        versionNameSuffix = 'clb'
         setProperty("archivesBaseName", applicationId + "-" + versionName)
     }
 
@@ -123,13 +123,13 @@ android {
         clb {
             dimension "all"
             applicationId getPackageName()
-            ndk {
-                abiFilters "armeabi-v7a", "armeabi"
-            }
         }
         linphone {
             dimension "all"
             applicationId getPackageNameOrg()
+            ndk {
+                abiFilters "armeabi-v7a", "armeabi"
+            }
         }
     }
 
