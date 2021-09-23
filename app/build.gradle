@@ -123,6 +123,9 @@ android {
         clb {
             dimension "all"
             applicationId getPackageName()
+            ndk {
+                abiFilters "armeabi-v7a", "armeabi"
+            }
         }
         linphone {
             dimension "all"
