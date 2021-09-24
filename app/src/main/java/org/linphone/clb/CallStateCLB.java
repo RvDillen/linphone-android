@@ -147,7 +147,10 @@ public class CallStateCLB {
                                 if (core != null && core.getCallsNb() > 0) {
                                     Call[] calls = core.getCalls();
                                     if (calls != null && calls.length > 0) {
-                                        calls[0].resume();
+                                        // New 4.5.2  getCallsNb can return values of failed calls
+                                        if (calls[0].getState() == Call.State.Paused) {
+                                            calls[0].resume();
+                                        }
                                     }
                                 }
                                 break;
@@ -220,9 +223,12 @@ public class CallStateCLB {
                 Call[] calls = core.getCalls();
                 if (calls != null && calls.length > 0) {
                     Call call1 = calls[0];
-                    if (call1.getState() == Call.State.Paused) {
+                    Call.State call1State = call1.getState();
+                    if (call1State == Call.State.Paused) {
                         call1.resume();
                         newCallState = "connected";
+                    } else if (call1State == Call.State.End || call1State == Call.State.Error) {
+                        newCallState = "idle";    // New: 4.5.2:  when call fails, nr of callNB == 1 (was 0);
                     }
                 }
             }
@@ -233,6 +239,8 @@ public class CallStateCLB {
         } else if (state == Call.State.StreamsRunning) {
             newCallState = "connected";
         }
+
+        android.util.Log.i("CLBState", "state: " + state + " clb: " + newCallState);
 
         // Callstate changed? => Broadcast
         if (newCallState != null) {
