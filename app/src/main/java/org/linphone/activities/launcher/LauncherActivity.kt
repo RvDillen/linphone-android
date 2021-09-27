@@ -66,6 +66,10 @@ class LauncherActivity : GenericActivity() {
             return
         }
 
+        // CLB : OnOutgoingStarted => just display launch screen so microphone keeps enabled (on A11)
+        if (getIntent() != null && getIntent().getStringExtra("CLB") == "OnOutgoingStarted")
+            return
+
         val intent = Intent()
         intent.setClass(this, MainActivity::class.java)
 

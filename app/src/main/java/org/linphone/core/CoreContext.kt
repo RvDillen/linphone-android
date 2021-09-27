@@ -734,8 +734,8 @@ class CoreContext(val context: Context, coreConfig: Config) {
         if (CallStateCLB.instance().IsCallFromCLB()) {
 
             val coreExt = org.linphone.clb.kt.CoreContextExt()
-            val isJustHangUp = CallStateCLB.instance().IsJustHangUp()
-            coreExt.OnOutgoingStarted(isJustHangUp)
+            // val isJustHangUp = CallStateCLB.instance().IsJustHangUp()
+            coreExt.OnOutgoingStarted(false) // Just hangup fails on 4.5.2
             return
         }
 
