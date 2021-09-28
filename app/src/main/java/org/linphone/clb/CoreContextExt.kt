@@ -27,16 +27,15 @@ class CoreContextExt() {
     }
 
     fun OnOutgoingStarted(isJustHangup: Boolean) {
-        // A11(+): Show notification before
-        if (Build.VERSION.SDK_INT > Version.API29_ANDROID_10) {
-            // LinphonePreferences.instance().setServiceNotificationVisibility(true);
-            LinphoneApplication.coreContext.notificationsManager.startForeground()
+
+        if (Build.VERSION.SDK_INT > Version.API28_PIE_90) {
+            coreContext.notificationsManager.startForeground()
         }
 
         // A11(+): Show activity briefly, otherwise microphone is blocked by android (BG-12130).
         if (Build.VERSION.SDK_INT > Version.API29_ANDROID_10) {
 
-            val intent = Intent(LinphoneApplication.coreContext.context, LauncherActivity::class.java)
+            val intent = Intent(coreContext.context, LauncherActivity::class.java)
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             intent.addFlags(Intent.FLAG_ACTIVITY_NO_USER_ACTION)
             intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
@@ -46,7 +45,7 @@ class CoreContextExt() {
             if (isDeviceLocked(coreContext.context) == false)
                 intent.putExtra("CLB", "OnOutgoingStarted")
 
-            LinphoneApplication.coreContext.context.startActivity(intent)
+            coreContext.context.startActivity(intent)
         }
     }
 

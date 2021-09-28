@@ -6,7 +6,7 @@
 
 <resources xmlns:tools="http://schemas.android.com/tools">
 <!--          https://asrt.gluege.boerde.de             -->
-    <string name="service_auto_start_description">Linphone startete automatisch</string>
+    <string name="service_auto_start_description">Linphone wurde automatisch gestartet</string>
     <string name="service_description">Dies ist erforderlich, um Anrufe im Hintergrund zu empfangen</string>
     <string name="sync_account_name">Linphone-Kontakte</string>
     <string name="about_privacy_policy">Sehen Sie sich unsere Datenschutzerklärung an</string>
@@ -64,13 +64,13 @@
     <string name="contact_new_choose_sync_account">Wählen Sie aus, wo der Kontakt gespeichert werden soll</string>
     <string name="contact_local_sync_account">Lokal speichern</string>
     <string name="dialer_address_bar_hint">Geben Sie eine Nummer oder Adresse ein</string>
-    <string name="debug_popup_title">Debuggen</string>
+    <string name="debug_popup_title">Fehlersuchen</string>
     <string name="debug_popup_enable_logs">Protokolle aktivieren</string>
     <string name="debug_popup_disable_logs">Protokolle deaktivieren</string>
     <string name="debug_popup_send_logs">Protokolle senden</string>
     <string name="debug_popup_show_config_file">Konfigurationsdatei anzeigen</string>
     <string name="no_chat_history">Keine Gespräche</string>
-    <string name="chat_remote_is_composing">Gegner schreibt…</string>
+    <string name="chat_remote_is_composing">Gegenseite schreibt…</string>
     <string name="chat_event_conference_created">Sie sind der Gruppe beigetreten</string>
     <string name="chat_event_conference_destroyed">Sie haben die Gruppe verlassen</string>
     <string name="chat_event_participant_added">%s hat teilgenommen</string>
@@ -128,7 +128,7 @@
 
 
 
-    <string name="call_video_update_requested_dialog">Gegenpartei möchte, dass Sie Video aktivieren</string>
+    <string name="call_video_update_requested_dialog">Gesprächspartner möchte, dass Sie Video aktivieren</string>
     <string name="call_stats_audio">Audio-</string>
     <string name="call_stats_video">Video</string>
     <string name="content_description_menu_history">Gesprächsverlauf</string>
