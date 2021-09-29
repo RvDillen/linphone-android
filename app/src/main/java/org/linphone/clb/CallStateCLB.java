@@ -2,19 +2,16 @@ package org.linphone.clb;
 
 import android.content.Context;
 import android.content.Intent;
-import android.os.Build;
 import android.telephony.PhoneStateListener;
 import android.telephony.TelephonyManager;
 import android.widget.Toast;
 
 import org.linphone.R;
-import org.linphone.activities.launcher.LauncherActivity;
 import org.linphone.core.Call;
 import org.linphone.core.Core;
 import org.linphone.core.CoreListenerStub;
 import org.linphone.core.Reason;
 import org.linphone.core.tools.Log;
-import org.linphone.mediastream.Version;
 
 import static org.linphone.LinphoneApplication.coreContext;
 import static org.linphone.core.Reason.Declined;
@@ -73,24 +70,6 @@ public class CallStateCLB {
             return false;
 
         return  (callState.equals("ringing") || callState.equals("connected")) &&  (uri.equals(callUri));
-    }
-
-    public void OnOutgoingStarted(){
-        // A11(+): Show notification before
-        if (Build.VERSION.SDK_INT > Version.API29_ANDROID_10) {
-            // LinphonePreferences.instance().setServiceNotificationVisibility(true);
-            coreContext.getNotificationsManager().startForeground();
-        }
-
-        // A11(+): Show activity briefly, otherwise microphone is blocked by android (BG-12130).
-        if (Build.VERSION.SDK_INT > Version.API29_ANDROID_10 && IsJustHangUp() == false) {
-            Intent intent = new Intent(mContext, LauncherActivity.class);
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            intent.addFlags(Intent.FLAG_ACTIVITY_NO_USER_ACTION);
-            intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
-            intent.addFlags(Intent.FLAG_FROM_BACKGROUND);
-            mContext.startActivity(intent);
-        }
     }
 
     public void RegisterHangUpTime() {

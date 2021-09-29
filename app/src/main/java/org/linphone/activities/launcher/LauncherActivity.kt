@@ -33,11 +33,19 @@ import org.linphone.core.tools.Log
 class LauncherActivity : GenericActivity() {
 
     var lockHelper = LockHelperExt(this)
+    var clbCall: Boolean = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        setContentView(R.layout.launcher_activity)
+        // Call from CLB Messenger? => show clb waiting screen
+        if (getIntent() != null && getIntent().getStringExtra("CLB") == "OnOutgoingStarted")
+            clbCall = true
+
+        if (clbCall)
+            setContentView(R.layout.clb_launcher_activity)
+        else
+            setContentView(R.layout.launcher_activity)
 
         lockHelper.lockScreen()
     }
@@ -67,7 +75,7 @@ class LauncherActivity : GenericActivity() {
         }
 
         // CLB : OnOutgoingStarted => just display launch screen so microphone keeps enabled (on A11)
-        if (getIntent() != null && getIntent().getStringExtra("CLB") == "OnOutgoingStarted")
+        if (clbCall)
             return
 
         val intent = Intent()

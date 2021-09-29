@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/white_color">
+
+    <!-- Logo -->
+    <ImageView
+        android:layout_width="64dp"
+        android:layout_height="68dp"
+        android:layout_gravity="right|top"
+        android:layout_marginTop="25dp"
+        android:layout_marginRight="25dp"
+        android:adjustViewBounds="true"
+        android:contentDescription="@null"
+        android:src="@drawable/clb_icon" />
+
+    <!-- Progress with text -->
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:orientation="vertical">
+
+        <ProgressBar
+            android:layout_width="80dp"
+            android:layout_height="80dp"
+            android:layout_gravity="center_horizontal|center_vertical"
+            android:layout_marginBottom="25dp"
+            android:indeterminateTint="#CCCCCC"
+            android:progressTint="#0098D1" />
+
+        <TextView
+            android:textColor="#003C87"
+            android:textSize="25sp"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:text="@string/clb_status_connecting"
+            />
+
+     </LinearLayout>
+
+ </FrameLayout>

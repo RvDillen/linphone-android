@@ -713,4 +713,5 @@
     <string name="content_description_export">Open file in third-party app</string>
     <string name="content_description_cancel_forward">Cancel message forward</string>
     <string name="content_description_cancel_sharing">Cancel sharing</string>
+    <string name="clb_status_connecting">Connecting...</string>
 </resources>
