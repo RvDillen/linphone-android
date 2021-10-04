@@ -15,14 +15,13 @@ import static org.linphone.LinphoneApplication.coreContext;
 /**
  * HangupReceiver Hangs up a call. Created by mvdhorst on 18-12-17.
  *
- * <ul>
- *   <li>19-06-20 rvdillen incorrect audio connection is closed (BG-10842)
- *   <li>16-10-18 rvdillen tweaked hangup current call (BG-7267)
- *   <li>10-10-18 rvdillen Activate next 'in pause call' after hangup
- *   <li>12-07-18 rvdillen Fix HangUp for listen only mode
- *   <li>01-02-18 rvdillen Add hangUp uri to hangup selected call
- *   <li>18-12-17 mvdhorst Initial version
- * </ul>
+ * 19-06-20 rvdillen incorrect audio connection is closed (BG-10842)
+ * 16-10-18 rvdillen tweaked hangup current call (BG-7267)
+ * 10-10-18 rvdillen Activate next 'in pause call' after hangup
+ * 12-07-18 rvdillen Fix HangUp for listen only mode
+ * 01-02-18 rvdillen Add hangUp uri to hangup selected call
+ * 18-12-17 mvdhorst Initial version
+ *
  */
 public class HangupReceiver extends BroadcastReceiver {
 
@@ -184,9 +183,6 @@ public class HangupReceiver extends BroadcastReceiver {
 
         try {
             if (! IsCoreServiceReady()) return false;
-
-//            LinphoneManager.getInstance()
-//                    .resetClassicMenuLayoutAndGoBackToCallIfStillRunning(fromHangupReceiver);
 
             return true;
 

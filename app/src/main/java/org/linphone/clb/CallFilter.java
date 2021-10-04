@@ -13,9 +13,8 @@ import java.util.List;
 /**
  * CallFilter: CLB class to filter calls from CLB Hardware out of History. <br>
  *
- * <ul>
- *   <li>25-08-2020. RvD Initial version
- * </ul>
+ * 04-10-2021 RvD Upgrade to 4.5.2
+ * 25-08-2020 RvD Initial version
  */
 public class CallFilter {
 
@@ -48,34 +47,4 @@ public class CallFilter {
 
         return nonHardwareCalls;
     }
-
-
-    // RemoveCallsFromHardware (4.2.3 implementation)
-    public static List<CallLog> RemoveCallsFromHardware(List<CallLog> logs) {
-
-        List<CallLog> nonHardwareCalls = new ArrayList<>();
-
-        try {
-            int size = logs.size();
-            for (int i = 0; i < size; i++) {
-                boolean fromHardWare = false;
-                CallLog log = logs.get(i);
-                if (log.getDir() == Call.Dir.Outgoing) {
-                    Address toAdress = log.getToAddress();
-                    String sipUri = toAdress.asStringUriOnly().toLowerCase();
-                    if (sipUri.contains("clbinfo") || sipUri.contains(("clbsessionid"))) {
-                        fromHardWare = true;
-                    }
-                }
-                if (!fromHardWare) {
-                    nonHardwareCalls.add(log);
-                }
-            }
-        } catch (Exception e) {
-            String messgae = e.getMessage();
-            Log.e("tag", "Exception RemoveCallsFromHardware: " + e.getMessage());
-        }
-
-        return nonHardwareCalls;
-     }
 }

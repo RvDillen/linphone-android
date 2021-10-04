@@ -16,6 +16,7 @@ public class LockHelper {
 
         if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.Q) return;
 
+        // Android R(+) => Add lockscreen behaviour
         android.util.Log.i(TAG, "Start over lockscreen");
 
         KeyguardManager kgm = (KeyguardManager) activity.getSystemService(Context.KEYGUARD_SERVICE);
@@ -29,6 +30,7 @@ public class LockHelper {
 
         if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.Q) return;
 
+        // Android R(+) => Add lockscreen behaviour
         android.util.Log.i(TAG, "Start over unlockscreen");
 
         activity.setShowWhenLocked(false);

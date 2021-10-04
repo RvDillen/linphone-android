@@ -20,9 +20,8 @@ import static org.linphone.core.Reason.Declined;
  * CallStateCLB: CLB class to store call state from CLB. <br>
  * Used to Prevent Linphone activities to start when activated from CLB
  *
- * <ul>
- *   <li>26-03-2020. RvD Initial version
- * </ul>
+ *  04-10-2021 RvD Upgrade to 4.5.2
+ *  26-03-2020 RvD Initial version
  */
 public class CallStateCLB {
 
@@ -63,15 +62,6 @@ public class CallStateCLB {
         }
     }
 
-    public boolean IsBusyWithCall(String uri){
-
-        // TODO make more stable implementaton
-        if (callState == null)
-            return false;
-
-        return  (callState.equals("ringing") || callState.equals("connected")) &&  (uri.equals(callUri));
-    }
-
     public void RegisterHangUpTime() {
         lastHanugUp = System.currentTimeMillis();
     }
@@ -96,12 +86,12 @@ public class CallStateCLB {
 
         mContext = coreContext.getContext().getApplicationContext();
 
-        AddGsmListerner();
+        AddGsmListener();
 
-        AddCoreListerner();
+        AddCoreListener();
     }
 
-    private void AddGsmListerner() {
+    private void AddGsmListener() {
 
         mTelephonyManager = (TelephonyManager) mContext.getSystemService(Context.TELEPHONY_SERVICE);
         mPhoneStateListener =
@@ -126,9 +116,13 @@ public class CallStateCLB {
                                 if (core != null && core.getCallsNb() > 0) {
                                     Call[] calls = core.getCalls();
                                     if (calls != null && calls.length > 0) {
+
                                         // New 4.5.2  getCallsNb can return values of failed calls
-                                        if (calls[0].getState() == Call.State.Paused) {
-                                            calls[0].resume();
+                                        for (Call call : calls) {
+                                            if (call.getState() == Call.State.Paused) {
+                                                call.resume();
+                                                return;
+                                            }
                                         }
                                     }
                                 }
@@ -142,7 +136,7 @@ public class CallStateCLB {
     }
 
 
-    private void AddCoreListerner(){
+    private void AddCoreListener(){
 
         mListener =
                 new CoreListenerStub() {

@@ -38,15 +38,6 @@ public class PermissionHelperCLB {
             Log.i(tag, "Overlay permission not granted");
             Toast.makeText(context, "Linphone: Overlay permission not granted", Toast.LENGTH_LONG).show();
         }
-
-        /* WRITE_EXTERNAL_STORAGE
-            if (ContextCompat.checkSelfPermission(
-                            context, Manifest.permission.WRITE_EXTERNAL_STORAGE)
-                    != PackageManager.PERMISSION_GRANTED) {
-                permissions.add(Manifest.permission.WRITE_EXTERNAL_STORAGE);
-            }
-        }
-        */
     }
 
     public boolean CheckOverlayPermission(Activity context) {

@@ -19,13 +19,6 @@ class CoreContextExt() {
         ContextCompat.startForegroundService(context, serviceIntent)
     }
 
-    fun RegisterCLBServices() {
-
-        // CLB register services
-        // val mRegisterCLB = RegisterCLB(context.applicationContext)
-        // mRegisterCLB.RegisterReceivers()
-    }
-
     fun OnOutgoingStarted(isJustHangup: Boolean) {
 
         if (Build.VERSION.SDK_INT > Version.API28_PIE_90) {

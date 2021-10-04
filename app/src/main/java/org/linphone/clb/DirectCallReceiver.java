@@ -5,9 +5,8 @@ import android.content.Context;
 import android.content.Intent;
 import android.os.Handler;
 import android.util.Log;
-import org.linphone.clb.kt.CoreContextExt;
 
-import org.linphone.mediastream.Version;
+import org.linphone.clb.kt.CoreContextExt;
 
 import static org.linphone.LinphoneApplication.coreContext;
 
@@ -16,12 +15,12 @@ import static org.linphone.LinphoneApplication.coreContext;
 /**
  * DirectCallReceiver: Starts call from CLB Messenger. (without showing the UI)
  *
- * <ul>
- *   <li>26-03-20 rvdillen Added CallStateCLB
- *   <li>18-12-17 mvdhorst inital version
- * </ul>
+ * 04-10-21 rvdillen Linphone 4.5.2
+ * 26-03-20 rvdillen Added CallStateCLB
+ * 18-12-17 mvdhorst inital version
+ * 03-01-18 mvdhorst Starts a call without showing the UI.
  */
-/** Created by mvdhorst on 3-1-18. Starts a call without showing the UI. */
+
 public class DirectCallReceiver extends BroadcastReceiver {
     private static final String TAG = "DirectCallReceiver";
     private String addressToCall;
@@ -49,11 +48,6 @@ public class DirectCallReceiver extends BroadcastReceiver {
             addressToCall = addressToCall.replace("transport=?", "transport=udp?");
         }
 
-        // Prevent double calls, when Linphone has slow connection
-        if (CallStateCLB.instance().IsBusyWithCall(addressToCall)){
-            return;
-        }
-
         CallStateCLB.instance().SetCallUri(addressToCall);
 
         mHandler = new Handler();
@@ -67,7 +61,6 @@ public class DirectCallReceiver extends BroadcastReceiver {
             // start linphone as foreground service
             coreExt.StartCoreService(context);
 
-
             mServiceThread = new ServiceWaitThread();
             mServiceThread.start();
 
@@ -76,19 +69,12 @@ public class DirectCallReceiver extends BroadcastReceiver {
 
     protected void onServiceReady() {
 
-        if (Version.sdkAboveOrEqual(Version.API11_HONEYCOMB_30)) {
-            Log.i(TAG, "onServiceReady");
-
-            // Previous call to BluetoothManager
-        }
-
         mHandler.postDelayed(
                 new Runnable() {
                     @Override
                     public void run() {
                         Log.i(TAG, "Start call to " + addressToCall);
                         coreContext.startCall(addressToCall);
-                        //LinphoneManager.getCallManager().newOutgoingCall(addressToCall, null);
                     }
                 },
                 100);
