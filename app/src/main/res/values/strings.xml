@@ -239,7 +239,10 @@
 
     <!-- CLB -->
     <string name="call_error_unauthorized">User not authorized</string>
-
+    <string name="restrictions_linphonerc_title">Linphonerc</string>
+    <string name="restrictions_linphonerc_description">Linphonerc configuration data</string>
+    <string name="restrictions_linphonercxml_title">Linphonerc Xml</string>
+    <string name="restrictions_linphonercxml_description">Linphonerc XML formatted configuration data</string>
 
     <!-- Call stats -->
     <string name="call_stats_audio">Audio</string>
