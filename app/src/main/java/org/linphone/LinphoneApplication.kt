@@ -22,6 +22,7 @@ package org.linphone
 import android.annotation.SuppressLint
 import android.app.Application
 import android.content.Context
+import org.linphone.clb.AppConfigHelper
 import org.linphone.clb.CallStateCLB
 import org.linphone.clb.RegisterCLB
 import org.linphone.core.*
@@ -50,8 +51,33 @@ class LinphoneApplication : Application() {
                 CoreContext.activateVFS()
             }
 
+            // Get restrictions data (AppConfigHelper)
+            var acf = AppConfigHelper(context, corePreferences)
+
+            // Init (checkAppConfig) and handle changes in LinphoneRc
+            if (acf.checkAppConfig() && acf.linphoneRcHasChanges()) {
+                var linphoneRc = acf.linphoneRc
+
+                // TODO: Do your RC magic
+                Log.d("test", "LinphoneRc: " + linphoneRc)
+
+                // TODO: IF successfully applied:
+                acf.storeRcHash()
+            }
+
             val config = Factory.instance().createConfigWithFactory(corePreferences.configPath, corePreferences.factoryConfigPath)
             corePreferences.config = config
+
+            // Parse/execute RC XML
+            if (acf.linphoneRcXmlHasChanges()) {
+                var linphoneRcXml = acf.linphoneRcXml
+
+                // TODO: Do more RC XML magic
+                Log.d("test", "LinphoneRcXml: " + linphoneRcXml)
+
+                // TODO: IF settings are applied successfully:
+                acf.storeRcXmlHash()
+            }
 
             val appName = context.getString(R.string.app_name)
             Factory.instance().setLoggerDomain(appName)

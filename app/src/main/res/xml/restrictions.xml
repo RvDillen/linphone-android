@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<restrictions xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <restriction
+        android:key="Linphonerc"
+        android:title="@string/restrictions_linphonerc_title"
+        android:description="@string/restrictions_linphonerc_description"
+        android:restrictionType="string" />
+
+    <restriction
+        android:key="LinphonercXml"
+        android:title="@string/restrictions_linphonercxml_title"
+        android:description="@string/restrictions_linphonercxml_description"
+        android:restrictionType="string"/>
+
+</restrictions>

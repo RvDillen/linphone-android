@@ -45,10 +45,12 @@ public class AppConfigHelper {
         _bundle = rm.getApplicationRestrictions();
 
         // For testing!!!
+        /*
         if (_bundle.isEmpty() && true) {
             _bundle.putString(linphoneRc_key, "test value for linphone rc");
             _bundle.putString(linphoneRcXml_key, "some test value for linphone rc xml");
         }
+        */
 
         // Do parse, even if bundle is empty so internal variables get correct values
         parseConfiguration(_bundle);
@@ -60,7 +62,7 @@ public class AppConfigHelper {
         // Compare stored hash against calculated hash
         try {
             String storedHash = getHash(linphoneRc_key);
-            return _rcHash != storedHash;
+            return _rcHash.equals(storedHash);
         } catch (Exception ex) {
             Log.e(tag, "Exception: " + ex.getMessage());
         }
@@ -72,7 +74,7 @@ public class AppConfigHelper {
             String storedHash = getHash(linphoneRcXml_key);
 
             if (!_rcXmlString.isEmpty())
-                return _rcXmlHash != storedHash;
+                return _rcXmlHash.equals(storedHash);
         } catch (Exception ex) {
             Log.e(tag, "Exception: " + ex.getMessage());
         }
@@ -89,10 +91,12 @@ public class AppConfigHelper {
         return "";
     }
 
-    public void storeHashes() {
+    public void storeRcHash() {
         if (linphoneRcHasChanges())
             storeHash(linphoneRc_key);
+    }
 
+    public void storeRcXmlHash() {
         if (linphoneRcXmlHasChanges())
             storeHash(linphoneRcXml_key);
     }
@@ -145,19 +149,19 @@ public class AppConfigHelper {
     }
 
     private void storeHash(String key) {
-        if (key == linphoneRc_key) {
+        if (key.equals(linphoneRc_key)) {
             _corePreferences.setLinphoneRcHash(_rcHash);
         }
-        if (key == linphoneRcXml_key) {
+        if (key.equals(linphoneRcXml_key)) {
             _corePreferences.setLinphoneRcXmlHash(_rcXmlHash);
         }
     }
 
     private String getHash(String key) {
         String hash = null;
-        if (key == linphoneRc_key)
+        if (key.equals(linphoneRc_key))
             hash = _corePreferences.getLinphoneRcHash();
-        else if (key == linphoneRcXml_key)
+        else if (key.equals(linphoneRcXml_key))
             hash = _corePreferences.getLinphoneRcXmlHash();
 
         return hash == null ? "" : hash;
