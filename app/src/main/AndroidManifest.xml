@@ -39,6 +39,9 @@
         android:theme="@style/AppTheme"
         android:allowNativeHeapPointerTagging="false">
 
+        <!-- Restrictions/AppConfig -->
+        <meta-data android:name="android.content.APP_RESTRICTIONS" android:resource="@xml/restrictions" />
+
         <activity
             android:name=".activities.launcher.LauncherActivity"
             android:noHistory="true"
