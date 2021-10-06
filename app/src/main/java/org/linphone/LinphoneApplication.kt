@@ -23,6 +23,7 @@ import android.annotation.SuppressLint
 import android.app.Application
 import android.content.Context
 import org.linphone.clb.CallStateCLB
+import org.linphone.clb.LinphonePreferencesCLB
 import org.linphone.clb.RegisterCLB
 import org.linphone.core.*
 import org.linphone.core.tools.Log
@@ -50,7 +51,8 @@ class LinphoneApplication : Application() {
                 CoreContext.activateVFS()
             }
 
-            val config = Factory.instance().createConfigWithFactory(corePreferences.configPath, corePreferences.factoryConfigPath)
+            // CLB CreateConfigCLB replaces: val config = Factory.instance().createConfigWithFactory(
+            val config = CreateConfigCLB()
             corePreferences.config = config
 
             val appName = context.getString(R.string.app_name)
@@ -59,6 +61,10 @@ class LinphoneApplication : Application() {
             if (corePreferences.debugLogs) {
                 Factory.instance().loggingService.setLogLevel(LogLevel.Message)
             }
+
+            // CLB Config changed ? => write to log (log is available now)
+            if (LinphonePreferencesCLB.instance().HasLogInfo())
+                LinphonePreferencesCLB.instance().WriteLogLines()
 
             Log.i("[Application] Core context created ${if (pushReceived) "from push" else ""}")
             coreContext = CoreContext(context, config)
@@ -70,6 +76,30 @@ class LinphoneApplication : Application() {
 
             // CLB Forcing init of Callstate
             CallStateCLB.instance().IsCallFromCLB()
+        }
+
+        private fun CreateConfigCLB(): Config {
+
+            // CLB LinphoneRC changes? => Update
+            val linphonercData =
+                this::class.java.classLoader.getResource("assets/clb_linphonerc_test").readText()
+            if (LinphonePreferencesCLB.instance().UpdateFromLinphoneRcData(linphonercData, corePreferences.configPath)) {
+                // TODO Update hash
+            }
+
+            val config = Factory.instance().createConfigWithFactory(
+                corePreferences.configPath,
+                corePreferences.factoryConfigPath
+            )
+
+            // CLB LinphoneRC XML changes? => Update
+            val linphonercXmlData =
+                this::class.java.classLoader.getResource("assets/clb_linphonerc_xml_test")
+                    .readText()
+            if (LinphonePreferencesCLB.instance().UpdateFromLinphoneXmlData(linphonercXmlData, config)) {
+                // TODO Update hash
+            }
+            return config
         }
     }
 

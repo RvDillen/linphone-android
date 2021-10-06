@@ -1,22 +1,22 @@
 package org.linphone.clb;
 
 import android.content.Context;
-import android.os.Environment;
+import android.os.Build;
 
 import org.linphone.LinphoneApplication;
 import org.linphone.core.Config;
-import org.linphone.core.Factory;
 import org.linphone.core.tools.Log;
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
 import org.xmlpull.v1.XmlPullParserFactory;
 
+import java.io.ByteArrayInputStream;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.nio.channels.FileChannel;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -55,67 +55,17 @@ public class LinphonePreferencesCLB {
 
     private LinphonePreferencesCLB() {}
 
-    public void CheckOnLocalIniFile(Context context) {
+    public boolean UpdateFromLinphoneRcData(String linphonercText, String configPath) {
 
-        // BasePath => Where Linphone is
-        basePath = context.getFilesDir().getAbsolutePath();
+        LogLine(" ** Start linphonerc changed => update settings **");
 
-        // Data folder on Android (=> Download folder!)
-        dataPaths = GetDataPaths(context);
-        for (String dataPath : dataPaths) {
+        // Not found local linphonerc? => Notify
+        File linphonerc = new File(configPath);
+        if (linphonerc.exists() == false)
+            LogLine("linphonerc file not present: " + configPath);
 
-            // Found local linphonerc? => Overwrite settings
-            File linphonerc = new File(dataPath + "/linphonerc");
-            if (linphonerc.exists()) {
-                HandleLocalRcFile(linphonerc);
-            }
-        }
-    }
-
-    private List<String> GetDataPaths(Context context) {
-
-        List<String> paths = new ArrayList<String>();
-
-        // Now Download folder
-        String path =
-                Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-                        .getAbsolutePath();
-        paths.add(path);
-        return paths;
-
-        //      Old way  => /sdcard
-        //        if (Environment.getExternalStorageState() != null){
-        //            path = Environment.getExternalStorageDirectory().getAbsolutePath();
-        //            paths.add(path);
-
-        //            path =
-        // Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).getAbsolutePath();
-        //            paths.add(path);
-
-        //            String result = System.getenv("EXTERNAL_STORAGE");
-        //            if(result != null)
-        //                paths.add(result);
-        //        }
-    }
-
-    public void CheckOnLocalXmlFile(Context context) {
-        //    public void CheckOnLocalXmlFile(Config config) {
-
-        for (String dataPath : dataPaths) {
-            // Found local linphonerc.Xml? => Overwrite settings
-            File linphoneXml = new File(dataPath + "/linphonerc.xml");
-            if (linphoneXml.exists()) {
-
-                try {
-                    String origin = basePath + "/.linphonerc";
-                    Config config = Factory.instance().createConfig(origin);
-
-                    HandleLocalXmlFile(linphoneXml, config);
-                } catch (Exception ex) {
-                    LogLine("CheckOnLocalXmlFile failed: " + ex.getMessage());
-                }
-            }
-        }
+        // Overwrite settings
+        return HandleRcChanges(linphonercText, linphonerc);
     }
 
     /* ExportLinphoneRcFile
@@ -129,94 +79,99 @@ public class LinphonePreferencesCLB {
         LogLine(" ** export config Linphonerc **");
         largeLog(export);
 
-        LogSettingChanges();
+        WriteLogLines();
     }
 
     /* HandleLocalRcFile
      * Found local linphonerc file, copy over existing (in app files location)
-     * use 'classic' copy cause linphone supports api 16
      */
-    private void HandleLocalRcFile(File linphonerc) {
+    private boolean HandleRcChanges(String linphonercText, File linphonerc) {
 
-        String local = linphonerc.getAbsolutePath();
-        String origin = basePath + "/.linphonerc";
-        Log("HandleLocalRcFile for: " + local);
+        String origin = linphonerc.getAbsolutePath();
+        LogLine("Linphone RC data:");
+        largeLog(linphonercText);
 
-        FileChannel sourceChannel = null;
-        FileChannel destChannel = null;
+        boolean result = false;
+
         try {
-            sourceChannel = new FileInputStream(local).getChannel();
-            destChannel = new FileOutputStream(origin).getChannel();
-            destChannel.transferFrom(sourceChannel, 0, sourceChannel.size());
-            sourceChannel.close();
-            sourceChannel = null;
-            destChannel.close();
+            byte[] buffer = linphonercText.getBytes();
 
-            TryDeleteFile(linphonerc);
+            File targetFile = new File(linphonerc.getAbsolutePath());
+            OutputStream outStream = new FileOutputStream(targetFile);
+            outStream.write(buffer);
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q)   {
+                android.os.FileUtils.closeQuietly(outStream);
+            }
+
+            LogLine("Linphone RC data succesfull imported");
+            LogLine("");
+            result = true;
 
         } catch (FileNotFoundException e) {
-            Log("HandleLocalRcFile failed, not found: ", e);
+            LogException("Error: Import Linphone RC data failed, not found: ", e);
         } catch (IOException e) {
-            Log("HandleLocalRcFile failed, IO: ", e);
+            LogException("Error: Import Linphone RC data failed, IO: ", e);
         } catch (Exception e) {
-            Log("HandleLocalRcFile failed: ", e);
+            LogException("Error: Import Linphone RC data failed: ", e);
         } finally {
         }
+        return result;
     }
+
+
+    public boolean UpdateFromLinphoneXmlData(String linphonercXml, Config config) {
+
+        LogLine(" ** Start linphonerc Xml changed => update settings **");
+
+        // Overwrite settings
+        return HandleXmlChanges(linphonercXml, config);
+    }
+
 
     /* HandleLocalXmlFile
      * Found local linphonerc XML file, copy values over existing Config(ini)
      */
-    private void HandleLocalXmlFile(File linphoneXml, Config config) {
+    private boolean HandleXmlChanges(String linphoneXml, Config config) {
 
-        LogLine("HandleLocalXmlFile for: " + linphoneXml.getAbsolutePath());
-
-        Config lpConfig = config; // LinphonePreferences.instance().getConfig();
-
-        if (lpConfig == null) {
-            LogLine("HandleLocalXmlFile failed: config is null");
-            return;
+        LogLine("Update Linphonerd from XML");
+        boolean result = false;
+        if (config == null) {
+            LogLine("HandleLocal Xml data: config is null");
+            return result;
         }
 
-        // Read xml settings file
-        FileInputStream stream = null;
+        // Read xml data
+        InputStream stream = null;
         XmlPullParserFactory xmlFactoryObject = null;
         try {
-            /*
-                       CLB: lpConfig.loadFromXmlFile ....
-                       Yes, that's what we want, but ..... doesn't work yet.....(grr)
-
-                        Log.e("CLB loadfrom xml start");
-                        String fileName = linphoneXml.getAbsolutePath();
-                        lpConfig.loadFromXmlFile(fileName);
-                        lpConfig.sync();
-            */
 
             // Open Xml Parser from file
-            stream = new FileInputStream(linphoneXml.getAbsolutePath());
+            stream = new ByteArrayInputStream(linphoneXml.getBytes());
             xmlFactoryObject = XmlPullParserFactory.newInstance();
             XmlPullParser myParser = xmlFactoryObject.newPullParser();
             myParser.setInput(stream, null);
 
             // Proces
             LogLine("processParsing XML");
-            processParsing(myParser, lpConfig);
-            lpConfig.sync();
+            processParsing(myParser, config);
+            config.sync();
 
             // Close & delete
             if (stream != null) stream.close();
             stream = null;
 
-            TryDeleteFile(linphoneXml);
-
-            LogLine("Validate Xml settings dump: ");
-            String dump = lpConfig.dumpAsXml();
+            LogLine("Linphonerc Xml import succeeded. Settings are: ");
+            String dump = config.dumpAsXml();
             largeLog(dump);
+            result = true;
 
         } catch (Exception e) {
-            LogLine("clb HandleLocalXmlFile failed: " + e.getMessage());
+            LogLine("Error Import Linphonerc Xml Data failed: " + e.getMessage());
         }
+        return result;
     }
+
 
     private String sectionKey = "section";
     private String entryKey = "entry";
@@ -243,21 +198,29 @@ public class LinphonePreferencesCLB {
                         if (entryKey.equals(eltName)) {
                             current.entry = parser.getAttributeValue(null, "name");
                             overwrite = parser.getAttributeValue(null, "overwrite");
-                            current.value = parser.nextText();
 
+                            // Try Get entry value
+                            try {
+                                    current.value = parser.nextText();
+                            } catch (Exception e) {
+                                String message = String.format("Error entry: %s-%s, Reading value: %s", current.section, current.entry, e.getMessage());
+                                LogLine(message);
+                            }
+
+                            // Try Store entry value
                             try {
                                 // Attrib "overwrite" = true ?  => Overwrite value in config file.
                                 if ("true".equalsIgnoreCase(overwrite)) {
-                                    lpConfig.setString(
-                                            current.section, current.entry, current.value);
+                                    lpConfig.setString(current.section, current.entry, current.value);
                                     String message =
                                             String.format(
-                                                    "- write: %s, %s, %s",
+                                                    "- write: %s - %s = %s",
                                                     current.section, current.entry, current.value);
                                     LogLine(message);
                                 }
                             } catch (Exception e) {
-                                LogLine("Parsing exception: " + e.getMessage());
+                                String message = String.format("Error entry: %s - %s, Parsing value: %s", current.section, current.entry, e.getMessage());
+                                LogLine(message);
                             }
                         }
                     }
@@ -286,19 +249,19 @@ public class LinphonePreferencesCLB {
         }
     }
 
-    private void Log(String message, Exception... e) {
+    private void LogException(String message, Exception... e) {
         if (e == null) LogLine(message);
         else LogLine(message + e.toString());
     }
 
-    private void TryDeleteFile(File linphonerc) {
 
-        String path = linphonerc.getAbsolutePath();
-        if (linphonerc.delete()) Log("Successfull removed file: " + path);
-        else Log("Failed Remove file: " + path);
+
+    public boolean HasLogInfo(){
+
+        return logLines.isEmpty() == false;
     }
 
-    public void LogSettingChanges() {
+    public void WriteLogLines() {
         // Logging of ini/xml file is postponed ,cause on start of proces, Linphone logging is not
         // active.
 
@@ -310,7 +273,7 @@ public class LinphonePreferencesCLB {
         }
 
         // Yes found files => log proces
-        Log.i(tag, "** Local settings file (ini/xml):");
+        Log.i(tag, "  ** Linphone rc: Setting changed: **");
 
         for (String logLine : logLines) {
             Log.i(tag, ' ' + logLine); // => Linphone log
@@ -320,7 +283,7 @@ public class LinphonePreferencesCLB {
 
     private void LogLine(String logLine) {
         logLines.add(logLine); // => Linphone log
-        android.util.Log.i(tag, logLine); // => android log
+       // android.util.Log.i(tag, logLine); // => android log
     }
 
     class SettingClb {
