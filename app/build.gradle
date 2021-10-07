@@ -180,6 +180,11 @@ android {
                 keyAlias project['keyAlias']
                 keyPassword project['keyPassword']
             }
+            releaseAppBundle {
+                initWith release
+                storeFile file(keystoreProperties['storeFileGooglePlay'])
+            }
+
         }
     }
     else {
@@ -189,6 +194,11 @@ android {
                 storePassword keystoreProperties['storePassword']
                 keyAlias keystoreProperties['keyAlias']
                 keyPassword keystoreProperties['keyPassword']
+            }
+
+            releaseAppBundle {
+                initWith release
+                storeFile file(keystoreProperties['storeFileGooglePlay'])
             }
         }
     }
@@ -213,6 +223,7 @@ android {
 
         releaseAppBundle {
             initWith release
+            signingConfig signingConfigs.releaseAppBundle
             ndk.debugSymbolLevel = 'FULL'
 
             if (crashlyticsEnabled()) {
