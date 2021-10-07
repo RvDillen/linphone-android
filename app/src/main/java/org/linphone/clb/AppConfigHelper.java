@@ -39,7 +39,7 @@ public class AppConfigHelper {
         _corePreferences = corePreferences;
     }
 
-    public boolean checkAppConfig() {
+    public void checkAppConfig() {
 
         RestrictionsManager rm = (RestrictionsManager)_context.getSystemService(Context.RESTRICTIONS_SERVICE);
         _bundle = rm.getApplicationRestrictions();
@@ -54,8 +54,6 @@ public class AppConfigHelper {
 
         // Do parse, even if bundle is empty so internal variables get correct values
         parseConfiguration(_bundle);
-
-        return linphoneRcHasChanges() || linphoneRcXmlHasChanges();
     }
 
     public boolean linphoneRcHasChanges() {
