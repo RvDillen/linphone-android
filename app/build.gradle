@@ -42,7 +42,7 @@ if (crashlyticsEnabled()) {
 // Will return 4230042 for Jenkins build #42
 def computeVersionCode() {
     // Major + minor + Jenkins build number (where available)
-    return (versionMajor * 1000000) + (versionMinor * 100000) + (versionRelease * 10000) + Integer.valueOf(System.env.BUILD_NUMBER ?: 0)
+    return (versionMajor * 1000000) + (versionMinor * 100000) + (versionRelease * 10000) + 20 // Integer.valueOf(System.env.BUILD_NUMBER ?: 0)
 }
 
 
@@ -175,16 +175,11 @@ android {
     if (project.hasProperty('storePassword')) {
         signingConfigs {
             release {
-                storeFile file(keystoreProperties['storeFile'])
+                storeFile file(project['storeFile'])
                 storePassword project['storePassword']
                 keyAlias project['keyAlias']
                 keyPassword project['keyPassword']
             }
-            releaseAppBundle {
-                initWith release
-                storeFile file(keystoreProperties['storeFileGooglePlay'])
-            }
-
         }
     }
     else {
@@ -194,11 +189,6 @@ android {
                 storePassword keystoreProperties['storePassword']
                 keyAlias keystoreProperties['keyAlias']
                 keyPassword keystoreProperties['keyPassword']
-            }
-
-            releaseAppBundle {
-                initWith release
-                storeFile file(keystoreProperties['storeFileGooglePlay'])
             }
         }
     }
@@ -223,7 +213,6 @@ android {
 
         releaseAppBundle {
             initWith release
-            signingConfig signingConfigs.releaseAppBundle
             ndk.debugSymbolLevel = 'FULL'
 
             if (crashlyticsEnabled()) {
@@ -266,6 +255,7 @@ android {
             }
         }
     }
+
 
     buildFeatures {
         dataBinding = true
