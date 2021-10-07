@@ -53,7 +53,7 @@ class LinphoneApplication : Application() {
             }
 
             // CLB CreateConfigCLB replaces: val config = Factory.instance().createConfigWithFactory(
-            val config = CreateConfigCLB()
+            val config = CreateConfigCLB(context)
             corePreferences.config = config
 
             val appName = context.getString(R.string.app_name)
@@ -79,10 +79,10 @@ class LinphoneApplication : Application() {
             CallStateCLB.instance().IsCallFromCLB()
         }
 
-        private fun CreateConfigCLB(): Config {
+        private fun CreateConfigCLB(context: Context): Config {
 
             // Get restrictions data (AppConfigHelper)
-            var acf = AppConfigHelper(coreContext.context, corePreferences)
+            var acf = AppConfigHelper(context, corePreferences)
 
             // Init
             acf.checkAppConfig()
@@ -98,7 +98,7 @@ class LinphoneApplication : Application() {
            	    	acf.storeRcHash()
             	}
             }
-	    
+
             val config = Factory.instance().createConfigWithFactory(
                 corePreferences.configPath,
                 corePreferences.factoryConfigPath

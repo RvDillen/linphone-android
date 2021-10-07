@@ -42,7 +42,7 @@ if (crashlyticsEnabled()) {
 // Will return 4230042 for Jenkins build #42
 def computeVersionCode() {
     // Major + minor + Jenkins build number (where available)
-    return (versionMajor * 1000000) + (versionMinor * 100000) + (versionRelease * 10000) + 20 // Integer.valueOf(System.env.BUILD_NUMBER ?: 0)
+    return (versionMajor * 1000000) + (versionMinor * 100000) + (versionRelease * 10000) + Integer.valueOf(System.env.BUILD_NUMBER ?: 0)
 }
 
 
