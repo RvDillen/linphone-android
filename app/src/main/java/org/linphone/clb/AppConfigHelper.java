@@ -37,9 +37,16 @@ public class AppConfigHelper {
     public AppConfigHelper(Context context, CorePreferences corePreferences) {
         _context = context;
         _corePreferences = corePreferences;
+
+        _rcString = "";
+        _rcHash = "";
+        _rcXmlString = "";
+        _rcXmlHash = "";
     }
 
     public void checkAppConfig() {
+
+        Log.i(tag, "Checking RestrictionsManager for settings.");
 
         RestrictionsManager rm = (RestrictionsManager)_context.getSystemService(Context.RESTRICTIONS_SERVICE);
         _bundle = rm.getApplicationRestrictions();
@@ -52,7 +59,7 @@ public class AppConfigHelper {
         }
         */
 
-        // Do parse, even if bundle is empty so internal variables get correct values
+        // Do parse! Even when bundle is empty, so internal variables get correct values
         parseConfiguration(_bundle);
     }
 
@@ -84,9 +91,7 @@ public class AppConfigHelper {
     }
 
     public String getLinphoneRcXml() {
-        if (linphoneRcXmlHasChanges())
-            return _rcXmlString;
-        return "";
+        return _rcXmlString;
     }
 
     public void storeRcHash() {
@@ -131,14 +136,16 @@ public class AppConfigHelper {
 
         // Intended use: Full configuration, missing values will NOT be configured
         if (bundle.containsKey(linphoneRc_key)) {
+            Log.i(tag, "parsing linphoneRc config");
             _rcString = bundle.getString(linphoneRc_key);
         } else {
             _rcString = "";
         }
         _rcHash = calculateHash(linphoneRc_key, _rcString);
 
-        // Partial configuration, missing values will fall back to defaults
+        // Intended use: Partial configuration, missing values will fall back to defaults
         if (bundle.containsKey(linphoneRcXml_key)) {
+            Log.i(tag, "parsing linphoneRc XML config");
             _rcXmlString = bundle.getString(linphoneRcXml_key);
         } else {
             _rcXmlString = "";
@@ -162,6 +169,7 @@ public class AppConfigHelper {
         else if (key.equals(linphoneRcXml_key))
             hash = _corePreferences.getLinphoneRcXmlHash();
 
+        Log.i(tag, "Return hash for ("+key+"): " + hash);
         return hash == null ? "" : hash;
     }
 
