@@ -13,6 +13,7 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.Set;
 
 public class AppConfigHelper {
 
@@ -67,7 +68,7 @@ public class AppConfigHelper {
         // Compare stored hash against calculated hash
         try {
             String storedHash = getHash(linphoneRc_key);
-            return _rcHash.equals(storedHash);
+            return !_rcHash.equals(storedHash);
         } catch (Exception ex) {
             Log.e(tag, "Exception: " + ex.getMessage());
         }
@@ -79,7 +80,7 @@ public class AppConfigHelper {
             String storedHash = getHash(linphoneRcXml_key);
 
             if (!_rcXmlString.isEmpty())
-                return _rcXmlHash.equals(storedHash);
+                return !_rcXmlHash.equals(storedHash);
         } catch (Exception ex) {
             Log.e(tag, "Exception: " + ex.getMessage());
         }
@@ -129,15 +130,27 @@ public class AppConfigHelper {
             }
             hexString.append(h);
         }
+
+        Log.i(tag, "calculateHash("+key+"): " + hexString.toString());
         return hexString.toString();
     }
 
     private void parseConfiguration(Bundle bundle) {
 
+        Set<String> keys = bundle.keySet();
+        int i=0;
+
+        for (String key : keys) {
+            Log.i(tag, "Key("+i+": " + key);
+            Log.i(tag, key + " : " + bundle.getString(key));
+            i++;
+        }
+
         // Intended use: Full configuration, missing values will NOT be configured
         if (bundle.containsKey(linphoneRc_key)) {
             Log.i(tag, "parsing linphoneRc config");
             _rcString = bundle.getString(linphoneRc_key);
+            Log.i(tag, "_rcString: " + _rcString);
         } else {
             _rcString = "";
         }
@@ -147,6 +160,7 @@ public class AppConfigHelper {
         if (bundle.containsKey(linphoneRcXml_key)) {
             Log.i(tag, "parsing linphoneRc XML config");
             _rcXmlString = bundle.getString(linphoneRcXml_key);
+            Log.i(tag, "_rcXmlString: " + _rcString);
         } else {
             _rcXmlString = "";
         }
