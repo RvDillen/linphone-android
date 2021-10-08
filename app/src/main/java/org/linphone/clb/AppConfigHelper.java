@@ -141,7 +141,7 @@ public class AppConfigHelper {
         int i=0;
 
         for (String key : keys) {
-            Log.i(tag, "Key("+i+": " + key);
+            Log.i(tag, "Key("+i+"): " + key);
             Log.i(tag, key + " : " + bundle.getString(key));
             i++;
         }
@@ -160,7 +160,7 @@ public class AppConfigHelper {
         if (bundle.containsKey(linphoneRcXml_key)) {
             Log.i(tag, "parsing linphoneRc XML config");
             _rcXmlString = bundle.getString(linphoneRcXml_key);
-            Log.i(tag, "_rcXmlString: " + _rcString);
+            Log.i(tag, "_rcXmlString: " + _rcXmlString);
         } else {
             _rcXmlString = "";
         }
@@ -169,9 +169,11 @@ public class AppConfigHelper {
 
     private void storeHash(String key) {
         if (key.equals(linphoneRc_key)) {
+            Log.i(tag, "Storing hash for ("+key+"): " + _rcHash);
             _corePreferences.setLinphoneRcHash(_rcHash);
         }
         if (key.equals(linphoneRcXml_key)) {
+            Log.i(tag, "Storing hash for ("+key+"): " + _rcXmlHash);
             _corePreferences.setLinphoneRcXmlHash(_rcXmlHash);
         }
     }
