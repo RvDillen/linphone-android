@@ -347,13 +347,13 @@ class CorePreferences constructor(private val context: Context) {
     var linphoneRcHash: String?
         get() = encryptedSharedPreferences.getString("linphone_rc_config_hash", null)
         set(value) {
-            encryptedSharedPreferences.edit().putString("linphone_rc_config_hash", value)
+            encryptedSharedPreferences.edit().putString("linphone_rc_config_hash", value).apply()
         }
 
     var linphoneRcXmlHash: String?
         get() = encryptedSharedPreferences.getString("linphone_rc_xml_config_hash", null)
         set(value) {
-            encryptedSharedPreferences.edit().putString("linphone_rc_xml_config_hash", value)
+            encryptedSharedPreferences.edit().putString("linphone_rc_xml_config_hash", value).apply()
         }
 
     /* *** Read only application settings, some were previously in non_localizable_custom *** */
