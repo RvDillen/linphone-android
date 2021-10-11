@@ -88,7 +88,7 @@ public class AppConfigHelper {
     }
 
     public String getLinphoneRc() {
-        return _rcString;
+        return parseLinphoneRc(_rcString);
     }
 
     public String getLinphoneRcXml() {
@@ -189,4 +189,72 @@ public class AppConfigHelper {
         return hash == null ? "" : hash;
     }
 
+    public static String parseLinphoneRc(String rcString) {
+
+        rcString = rcString.trim();
+
+        int subLength = rcString.length();
+        boolean hasChange = true;
+
+        StringBuilder bob = new StringBuilder(rcString.substring(0, subLength));
+        String subString = "";
+
+        while (hasChange) {
+
+            hasChange = false;
+
+            // Take substring
+            subString = bob.substring(0, subLength);
+
+            // Search through entire rcString
+            // Look for '=' or ']'
+            // If ']' is found, '[' must be found WITHOUT ANY SPACES between them and ']' should be followed by a 'space'
+            //      Replace 'space' after ']' with 'line feed'
+            // If '=' is found,  search backwards until a 'space' is encountered.
+            //      Replace 'space' with 'line feed'
+
+            int endBraceIndex = subString.lastIndexOf("]");
+            int equalsIndex = subString.lastIndexOf("=");
+
+
+            if (endBraceIndex < equalsIndex) {
+
+                if (equalsIndex != -1) {
+                    // Parse 'equals':
+                    // Search backwards until a space is encountered
+                    int preSpaceIndex = equalsIndex;
+                    while (subString.charAt(preSpaceIndex) != ' ' && preSpaceIndex >= 0)
+                        preSpaceIndex--;
+
+                    // Spaces inside a 'header' are NOT allowed. And header MUST be followed by a space
+                    if (preSpaceIndex >= 0)
+                        bob.replace(preSpaceIndex, preSpaceIndex + 1, "\r\n");
+
+                    // For now, just skip
+                    subLength = equalsIndex - 1;
+                    hasChange = true;
+                }
+
+            } else if (endBraceIndex >= 0) {
+                // Parse 'brace':
+                // Find previous (opposing) brace
+                int startBraceIndex = subString.lastIndexOf("[");
+                String header = subString.substring(startBraceIndex, endBraceIndex+1);
+
+                // Spaces inside a 'header' are NOT allowed. And header MUST be followed by a space
+                if (!header.contains(" ") && subString.charAt(endBraceIndex + 1) == ' ') {
+                    bob.replace(endBraceIndex + 1, endBraceIndex + 2, "\r\n");
+                }
+                // Also, replace a space _BEFORE_ the header if there is one (note that header could at the start of the file/string)
+                if (startBraceIndex > 0 && subString.charAt(startBraceIndex-1) == ' ') {
+                    bob.replace(startBraceIndex-1, startBraceIndex, "\r\n");
+                    subLength = startBraceIndex -1;
+                } else {
+                    subLength = startBraceIndex;
+                }
+                hasChange = true;
+            }
+        }
+        return bob.toString();
+    }
 }

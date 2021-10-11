@@ -52,7 +52,11 @@ class LinphoneApplication : Application() {
                 CoreContext.activateVFS()
             }
 
-            // CLB CreateConfigCLB replaces: val config = Factory.instance().createConfigWithFactory(
+            if (false) {
+                TestConfigClbParsing()
+            }
+
+            // CLB CreateConfigCLB replaces: val config = Factory.instance().createConfigWithFactory()
             val config = CreateConfigCLB(context)
             corePreferences.config = config
 
@@ -123,6 +127,35 @@ class LinphoneApplication : Application() {
                 }
             }
             return config
+        }
+
+        private fun TestConfigClbParsing() {
+
+            val testConfig1 = "[sip] contact=\"Linphone Android\" <sip:linphone.android@unknown-host> "
+            var stringResult = "[sip]\r\ncontact=\"Linphone Android\" <sip:linphone.android@unknown-host>"
+            var stringOutput = AppConfigHelper.parseLinphoneRc(testConfig1)
+            var result = stringOutput.equals(stringResult)
+            LogResult("testConfig1", result)
+
+            val testConfig2 = "[sip] contact=\"Linphone Android\" <sip:linphone.android@unknown-host> use_info=0 keepalive_period=30000 sip_port=-1 sip_tcp_port=-1 sip_tls_port=-1 guess_hostname=1 register_only_when_network_is_up=1 auto_net_state_mon=0 auto_answer_replacing_calls=1 ping_with_options=0 verify_server_certs=1 verify_server_cn=1 ipv6_migration_done=1 media_encryption=none root_ca=/data/user/0/org.linphone/files/rootca.pem default_proxy=0 zrtp_cache_migration_done=1  "
+            stringResult = "[sip]\r\ncontact=\"Linphone Android\" <sip:linphone.android@unknown-host>\r\nuse_info=0\r\nkeepalive_period=30000\r\nsip_port=-1\r\nsip_tcp_port=-1\r\nsip_tls_port=-1\r\nguess_hostname=1\r\nregister_only_when_network_is_up=1\r\nauto_net_state_mon=0\r\nauto_answer_replacing_calls=1\r\nping_with_options=0\r\nverify_server_certs=1\r\nverify_server_cn=1\r\nipv6_migration_done=1\r\nmedia_encryption=none\r\nroot_ca=/data/user/0/org.linphone/files/rootca.pem\r\ndefault_proxy=0\r\nzrtp_cache_migration_done=1"
+            stringOutput = AppConfigHelper.parseLinphoneRc(testConfig2)
+            result = stringOutput.equals(stringResult)
+            LogResult("testConfig1", result)
+
+            val testConfig3 = "[sip] contact=\"Linphone Android\" <sip:linphone.android@unknown-host> use_info=0 keepalive_period=30000 sip_port=-1 sip_tcp_port=-1 sip_tls_port=-1 guess_hostname=1 register_only_when_network_is_up=1 auto_net_state_mon=0 auto_answer_replacing_calls=1 ping_with_options=0 verify_server_certs=1 verify_server_cn=1 ipv6_migration_done=1 media_encryption=none root_ca=/data/user/0/org.linphone/files/rootca.pem default_proxy=0 zrtp_cache_migration_done=1  [video] size=cif device=Android1  [app] tunnel=disabled push_notification=1 auto_start=1 activation_code_length=4 first_launch=0 android.permission.READ_EXTERNAL_STORAGE=0 android.permission.READ_PHONE_STATE=0 android.permission.READ_CONTACTS=0 device_ringtone=1  "
+            stringResult = "[sip]\r\ncontact=\"Linphone Android\" <sip:linphone.android@unknown-host>\r\nuse_info=0\r\nkeepalive_period=30000\r\nsip_port=-1\r\nsip_tcp_port=-1\r\nsip_tls_port=-1\r\nguess_hostname=1\r\nregister_only_when_network_is_up=1\r\nauto_net_state_mon=0\r\nauto_answer_replacing_calls=1\r\nping_with_options=0\r\nverify_server_certs=1\r\nverify_server_cn=1\r\nipv6_migration_done=1\r\nmedia_encryption=none\r\nroot_ca=/data/user/0/org.linphone/files/rootca.pem\r\ndefault_proxy=0\r\nzrtp_cache_migration_done=1 \r\n[video]\r\nsize=cif\r\ndevice=Android1 \r\n[app]\r\ntunnel=disabled\r\npush_notification=1\r\nauto_start=1\r\nactivation_code_length=4\r\nfirst_launch=0\r\nandroid.permission.READ_EXTERNAL_STORAGE=0\r\nandroid.permission.READ_PHONE_STATE=0\r\nandroid.permission.READ_CONTACTS=0\r\ndevice_ringtone=1"
+            stringOutput = AppConfigHelper.parseLinphoneRc(testConfig3)
+            result = stringOutput.equals(stringResult)
+            LogResult("testConfig1", result)
+        }
+
+        private fun LogResult(item: String, result: Boolean) {
+            var stringResult = "FAIL"
+            if (result)
+                stringResult = "OK"
+
+            android.util.Log.d("[CLB]", "Parsing " + item + ": [" + stringResult + "]")
         }
     }
 
