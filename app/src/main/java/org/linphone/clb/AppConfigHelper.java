@@ -69,7 +69,7 @@ public class AppConfigHelper {
         try {
             String storedHash = getHash(linphoneRc_key);
 
-            android.util.Log.i(tag, "Rc Compare ["+storedHash+"] with ["+_rcHash+"]");
+            android.util.Log.i(tag, "Rc hash compare ["+storedHash+"] with ["+_rcHash+"]");
             boolean areEqual = _rcHash.equals(storedHash);
 
             String hasChanges = areEqual ? "no" : "yes";
@@ -89,7 +89,7 @@ public class AppConfigHelper {
 
             if (!_rcXmlString.isEmpty()) {
 
-                android.util.Log.i(tag, "RcXml Compare ["+storedHash+"] with ["+_rcXmlHash+"]");
+                android.util.Log.i(tag, "RcXml Hash compare ["+storedHash+"] with ["+_rcXmlHash+"]");
 
                 boolean areEqual = _rcXmlHash.equals(storedHash);
 
@@ -115,15 +115,16 @@ public class AppConfigHelper {
     }
 
     public void storeRcHash() {
-        if (linphoneRcHasChanges())
+        if (linphoneRcHasChanges()) {
             storeHash(linphoneRc_key);
+        }
     }
 
     public void storeRcXmlHash() {
-        if (linphoneRcXmlHasChanges())
+        if (linphoneRcXmlHasChanges()) {
             storeHash(linphoneRcXml_key);
+        }
     }
-
 
 
     private String calculateHash(final String key, final String value) {

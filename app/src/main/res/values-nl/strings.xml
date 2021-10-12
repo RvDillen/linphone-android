@@ -140,7 +140,7 @@
 
     <!-- CLB -->
     <string name="call_error_unauthorized">Gebruiker niet geauthoriseerd</string>
-    <string name="restrictions_linphonerc_description">Gebruik dit veld om Linphone RC configuratie data te plaatsen. Linphone RC wordt gebruikt om een volledige configuratie te initialiseren of te overschrijven.</string>
-    <string name="restrictions_linphonercxml_description">Gebruik dit veld om Linphone RC XML configuratie data te plaatsen. Linphone RC XML wordt gebruikt om specifieke instellingen te wijzigen. Instellingen die niet aanwezig zijn worden niet gewijzigd.</string>
+    <string name="restrictions_linphonerc_description">Gebruik dit veld om Linphone RC configuratie data te plaatsen. Linphone RC wordt gebruikt om een volledige configuratie te initialiseren of te overschrijven. Alleen valide XML formatering wordt ondersteund. Raadpleeg de CLB handleiding voor meer informatie.</string>
+    <string name="restrictions_linphonercxml_description">Gebruik dit veld om Linphone RC XML configuratie data te plaatsen. Linphone RC XML wordt gebruikt om specifieke instellingen te wijzigen. Instellingen die niet aanwezig zijn worden niet gewijzigd. Alleen valide XML formatering wordt ondersteund. Raadpleeg de CLB handleiding voor meer informatie.</string>
 
 </resources>
