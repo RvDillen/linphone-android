@@ -86,23 +86,23 @@ class LinphoneApplication : Application() {
         private fun CreateConfigCLB(context: Context): Config {
 
             // Get restrictions data (AppConfigHelper)
-            var acf = AppConfigHelper(context, corePreferences)
+            var ach = AppConfigHelper(context, corePreferences)
 
             // Init
             android.util.Log.i("[CLB]", "Checking AppConfig data")
-            acf.checkAppConfig()
+            ach.checkAppConfig()
 
             // Handle changes in LinphoneRc
-            if (acf.linphoneRcHasChanges()) {
+            if (ach.linphoneRcHasChanges()) {
                 android.util.Log.i("[CLB]", "Applying AppConfig linphoneRc changes")
-                val linphonercData = acf.linphoneRc
+                val linphonercData = ach.linphoneRc
 
                 // CLB LinphoneRC changes? => Update
                 // val linphonercData =
                 //    this::class.java.classLoader.getResource("assets/clb_linphonerc_test").readText()
                 if (LinphonePreferencesCLB.instance().UpdateFromLinphoneRcData(linphonercData, corePreferences.configPath)) {
-                    android.util.Log.i("[CLB]", "Store AppConfig linphoneRc hash")
-                    acf.storeRcHash()
+                    android.util.Log.i("AppConfigHelper", "Store AppConfig linphoneRc hash")
+                    ach.storeRcHash()
                 }
             }
 
@@ -113,17 +113,17 @@ class LinphoneApplication : Application() {
             )
 
             // Parse/execute RC XML
-            if (acf.linphoneRcXmlHasChanges()) {
-                android.util.Log.i("[CLB]", "Apply AppConfig linphoneRc XML changes")
-                val linphonercXmlData = acf.linphoneRcXml
+            if (ach.linphoneRcXmlHasChanges()) {
+                android.util.Log.i("AppConfigHelper", "Apply AppConfig linphoneRc XML changes")
+                val linphonercXmlData = ach.linphoneRcXml
 
                 // CLB LinphoneRC XML changes? => Update
                 // val linphonercXmlData =
                 //    this::class.java.classLoader.getResource("assets/clb_linphonerc_xml_test")
                 //        .readText()
                 if (LinphonePreferencesCLB.instance().UpdateFromLinphoneXmlData(linphonercXmlData, config)) {
-                    android.util.Log.i("[CLB]", "Store AppConfig linphoneRc XML hash")
-                    acf.storeRcXmlHash()
+                    android.util.Log.i("AppConfigHelper", "Store AppConfig linphoneRc XML hash")
+                    ach.storeRcXmlHash()
                 }
             }
             return config

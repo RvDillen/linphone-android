@@ -17,7 +17,7 @@ import java.util.Set;
 
 public class AppConfigHelper {
 
-    private final String tag = "acf";
+    private final String tag = "AppConfigHelper";
     // LinphonePreferencesCLB internally uses an InputStream to parse/execute XML settings
     // An extra public method accepting an InputStream directly could come in handy.
     // This AppConfigParser should take the settings bundle, extract the string values
@@ -68,7 +68,14 @@ public class AppConfigHelper {
         // Compare stored hash against calculated hash
         try {
             String storedHash = getHash(linphoneRc_key);
-            return !_rcHash.equals(storedHash);
+
+            String hasChanges = "yes";
+            if ( ! _rcHash.equals(storedHash)) {
+                hasChanges = "no";
+            }
+            android.util.Log.i(tag, "linphoneRc has changes: " + hasChanges);
+
+            return ! _rcHash.equals(storedHash);
         } catch (Exception ex) {
             Log.e(tag, "Exception: " + ex.getMessage());
         }
@@ -79,8 +86,16 @@ public class AppConfigHelper {
         try {
             String storedHash = getHash(linphoneRcXml_key);
 
-            if (!_rcXmlString.isEmpty())
+            if (!_rcXmlString.isEmpty()) {
+
+                String hasChanges = "yes";
+                if ( ! _rcHash.equals(storedHash)) {
+                    hasChanges = "no";
+                }
+                android.util.Log.i(tag, "linphoneRcXml has changes: " + hasChanges);
+
                 return !_rcXmlHash.equals(storedHash);
+            }
         } catch (Exception ex) {
             Log.e(tag, "Exception: " + ex.getMessage());
         }
@@ -189,6 +204,14 @@ public class AppConfigHelper {
         return hash == null ? "" : hash;
     }
 
+    /*
+    linphoneRc is expected to contain a *.ini file format. The MDM (GoogleWorkspace) returns one long string without \r\n
+    parseLinphoneRc re-injects line-endings at the desired locations so Linphone will correctly parse the string's contents.
+
+    The entire string is loaded into a StringBuilder. The string is parsed back to front.
+    Each time a change is made, a smaller substring is used from the StringBuilder's content, until no more changes are made.
+    The resulting output is returned as string
+    */
     public static String parseLinphoneRc(String rcString) {
 
         rcString = rcString.trim();
