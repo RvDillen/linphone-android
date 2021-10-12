@@ -104,6 +104,8 @@ class LinphoneApplication : Application() {
                     android.util.Log.i("AppConfigHelper", "Store AppConfig linphoneRc hash")
                     ach.storeRcHash()
                 }
+            } else {
+                android.util.Log.i("AppConfigHelper", "Hashes are equal, no changes... skipping config.")
             }
 
             android.util.Log.i("[CLB]", "Create Linphone Config")
@@ -125,6 +127,8 @@ class LinphoneApplication : Application() {
                     android.util.Log.i("AppConfigHelper", "Store AppConfig linphoneRc XML hash")
                     ach.storeRcXmlHash()
                 }
+            } else {
+                android.util.Log.i("AppConfigHelper", "Hashes are equal. LinphoneRc XML has no changes. Skipping config.")
             }
             return config
         }

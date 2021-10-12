@@ -69,13 +69,14 @@ public class AppConfigHelper {
         try {
             String storedHash = getHash(linphoneRc_key);
 
-            String hasChanges = "yes";
-            if ( ! _rcHash.equals(storedHash)) {
-                hasChanges = "no";
-            }
+            android.util.Log.i(tag, "Rc Compare ["+storedHash+"] with ["+_rcHash+"]");
+            boolean areEqual = _rcHash.equals(storedHash);
+
+            String hasChanges = areEqual ? "no" : "yes";
             android.util.Log.i(tag, "linphoneRc has changes: " + hasChanges);
 
-            return ! _rcHash.equals(storedHash);
+            return ! areEqual;
+
         } catch (Exception ex) {
             Log.e(tag, "Exception: " + ex.getMessage());
         }
@@ -88,13 +89,16 @@ public class AppConfigHelper {
 
             if (!_rcXmlString.isEmpty()) {
 
-                String hasChanges = "yes";
-                if ( ! _rcHash.equals(storedHash)) {
-                    hasChanges = "no";
-                }
+                android.util.Log.i(tag, "RcXml Compare ["+storedHash+"] with ["+_rcXmlHash+"]");
+
+                boolean areEqual = _rcXmlHash.equals(storedHash);
+
+                String hasChanges = areEqual ? "no": "yes";
                 android.util.Log.i(tag, "linphoneRcXml has changes: " + hasChanges);
 
-                return !_rcXmlHash.equals(storedHash);
+                return ! areEqual;
+            } else {
+                android.util.Log.i(tag, "linphoneRcXml is empty, ignoring configuration.");
             }
         } catch (Exception ex) {
             Log.e(tag, "Exception: " + ex.getMessage());
@@ -183,13 +187,18 @@ public class AppConfigHelper {
     }
 
     private void storeHash(String key) {
-        if (key.equals(linphoneRc_key)) {
-            Log.i(tag, "Storing hash for ("+key+"): " + _rcHash);
-            _corePreferences.setLinphoneRcHash(_rcHash);
-        }
-        if (key.equals(linphoneRcXml_key)) {
-            Log.i(tag, "Storing hash for ("+key+"): " + _rcXmlHash);
-            _corePreferences.setLinphoneRcXmlHash(_rcXmlHash);
+        Log.i(tag, "Try store hash for key: " + key);
+        try {
+            if (key.equals(linphoneRc_key)) {
+                Log.i(tag, "Storing hash for (" + key + "): " + _rcHash);
+                _corePreferences.setLinphoneRcHash(_rcHash);
+            }
+            if (key.equals(linphoneRcXml_key)) {
+                Log.i(tag, "Storing hash for (" + key + "): " + _rcXmlHash);
+                _corePreferences.setLinphoneRcXmlHash(_rcXmlHash);
+            }
+        } catch (Exception ex) {
+            Log.e(tag, "storeHash() Exception: " + ex.getMessage());
         }
     }
 
