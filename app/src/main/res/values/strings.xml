@@ -240,9 +240,9 @@
     <!-- CLB -->
     <string name="call_error_unauthorized">User not authorized</string>
     <string name="restrictions_linphonerc_title">Linphonerc</string>
-    <string name="restrictions_linphonerc_description">Use this field to paste the Linphone RC configuration data. Only valid XML formatting supported.\r\nPlease refer to the CLB Manual for more information.</string>
+    <string name="restrictions_linphonerc_description">Use this field to paste the Linphone RC configuration data. Only valid XML formatting supported.<br/>Please refer to the CLB Manual for more information.</string>
     <string name="restrictions_linphonercxml_title">Linphonerc Xml</string>
-    <string name="restrictions_linphonercxml_description">Use this field to paste the Linphone RC XML configuration data. Only valid XML formatting supported.\r\nPlease refer to the CLB Manual for more information.</string>
+    <string name="restrictions_linphonercxml_description">Use this field to paste the Linphone RC XML configuration data. Only valid XML formatting supported.<br/>Please refer to the CLB Manual for more information.</string>
 
     <!-- Call stats -->
     <string name="call_stats_audio">Audio</string>
