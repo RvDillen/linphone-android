@@ -2,15 +2,11 @@ package org.linphone.clb;
 
 import android.content.Context;
 import android.content.RestrictionsManager;
-import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.util.Log;
 
 import org.linphone.core.CorePreferences;
 
-import java.io.ByteArrayInputStream;
-import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Set;
@@ -47,7 +43,7 @@ public class AppConfigHelper {
 
     public void checkAppConfig() {
 
-        Log.i(tag, "Checking RestrictionsManager for settings.");
+        log("Checking RestrictionsManager for settings.");
 
         RestrictionsManager rm = (RestrictionsManager)_context.getSystemService(Context.RESTRICTIONS_SERVICE);
         _bundle = rm.getApplicationRestrictions();
@@ -69,16 +65,16 @@ public class AppConfigHelper {
         try {
             String storedHash = getHash(linphoneRc_key);
 
-            android.util.Log.i(tag, "Rc hash compare ["+storedHash+"] with ["+_rcHash+"]");
+            log("Rc hash compare ["+storedHash+"] with ["+_rcHash+"]");
             boolean areEqual = _rcHash.equals(storedHash);
 
             String hasChanges = areEqual ? "no" : "yes";
-            android.util.Log.i(tag, "linphoneRc has changes: " + hasChanges);
+            log("linphoneRc has changes: " + hasChanges);
 
             return ! areEqual;
 
         } catch (Exception ex) {
-            Log.e(tag, "Exception: " + ex.getMessage());
+            logError("Exception: " + ex.getMessage());
         }
         return false;
     }
@@ -89,19 +85,19 @@ public class AppConfigHelper {
 
             if (!_rcXmlString.isEmpty()) {
 
-                android.util.Log.i(tag, "RcXml Hash compare ["+storedHash+"] with ["+_rcXmlHash+"]");
+                log("RcXml Hash compare ["+storedHash+"] with ["+_rcXmlHash+"]");
 
                 boolean areEqual = _rcXmlHash.equals(storedHash);
 
                 String hasChanges = areEqual ? "no": "yes";
-                android.util.Log.i(tag, "linphoneRcXml has changes: " + hasChanges);
+                log("linphoneRcXml has changes: " + hasChanges);
 
                 return ! areEqual;
             } else {
-                android.util.Log.i(tag, "linphoneRcXml is empty, ignoring configuration.");
+                log("linphoneRcXml is empty, ignoring configuration.");
             }
         } catch (Exception ex) {
-            Log.e(tag, "Exception: " + ex.getMessage());
+            logError("Exception: " + ex.getMessage());
         }
         return false;
     }
@@ -134,7 +130,7 @@ public class AppConfigHelper {
         try {
             digest = MessageDigest.getInstance("MD5");
         } catch (NoSuchAlgorithmException e) {
-            Log.e(tag, "MD5 algorithm not available for calculating hash");
+            logError("MD5 algorithm not available for calculating hash. Abort!");
             return "";
         }
 
@@ -151,7 +147,7 @@ public class AppConfigHelper {
             hexString.append(h);
         }
 
-        Log.i(tag, "calculateHash("+key+"): " + hexString.toString());
+        log("calculateHash("+key+"): " + hexString.toString());
         return hexString.toString();
     }
 
@@ -161,45 +157,47 @@ public class AppConfigHelper {
         int i=0;
 
         for (String key : keys) {
-            Log.i(tag, "Key("+i+"): " + key);
-            Log.i(tag, key + " : " + bundle.getString(key));
+            log("Key("+i+"): " + key);
+            log(key + " : " + bundle.getString(key));
             i++;
         }
 
         // Intended use: Full configuration, missing values will NOT be configured
         if (bundle.containsKey(linphoneRc_key)) {
-            Log.i(tag, "parsing linphoneRc config");
+            log("parsing linphoneRc config");
             _rcString = bundle.getString(linphoneRc_key);
-            Log.i(tag, "_rcString: " + _rcString);
+            log("_rcString: " + _rcString);
         } else {
+            log("Bundle does not contain linphoneRc key. Return empty string.");
             _rcString = "";
         }
         _rcHash = calculateHash(linphoneRc_key, _rcString);
 
         // Intended use: Partial configuration, missing values will fall back to defaults
         if (bundle.containsKey(linphoneRcXml_key)) {
-            Log.i(tag, "parsing linphoneRc XML config");
+            log("parsing linphoneRc XML config");
             _rcXmlString = bundle.getString(linphoneRcXml_key);
-            Log.i(tag, "_rcXmlString: " + _rcXmlString);
+            log("_rcXmlString: " + _rcXmlString);
         } else {
+            log("Bundle does not contain linphoneRcXml key. Return empty string.");
             _rcXmlString = "";
         }
         _rcXmlHash = calculateHash(linphoneRcXml_key, _rcXmlString);
     }
 
     private void storeHash(String key) {
-        Log.i(tag, "Try store hash for key: " + key);
+        log("Try store hash for key: " + key);
         try {
             if (key.equals(linphoneRc_key)) {
-                Log.i(tag, "Storing hash for (" + key + "): " + _rcHash);
+                log("Storing hash for (" + key + "): " + _rcHash);
                 _corePreferences.setLinphoneRcHash(_rcHash);
             }
             if (key.equals(linphoneRcXml_key)) {
-                Log.i(tag, "Storing hash for (" + key + "): " + _rcXmlHash);
+                log("Storing hash for (" + key + "): " + _rcXmlHash);
                 _corePreferences.setLinphoneRcXmlHash(_rcXmlHash);
             }
         } catch (Exception ex) {
-            Log.e(tag, "storeHash() Exception: " + ex.getMessage());
+            log("storeHash() Exception: " + ex.getMessage());
         }
     }
 
@@ -210,8 +208,17 @@ public class AppConfigHelper {
         else if (key.equals(linphoneRcXml_key))
             hash = _corePreferences.getLinphoneRcXmlHash();
 
-        Log.i(tag, "Return hash for ("+key+"): " + hash);
+        log("Return hash for ("+key+"): " + hash);
         return hash == null ? "" : hash;
+    }
+
+    private void log(String text) {
+        org.linphone.core.tools.Log.i(text);
+        Log.i(tag, text);
+    }
+    private void logError(String text) {
+        org.linphone.core.tools.Log.i(text);
+        Log.e(tag, text);
     }
 
     /*

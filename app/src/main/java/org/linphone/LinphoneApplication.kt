@@ -101,14 +101,15 @@ class LinphoneApplication : Application() {
                 // val linphonercData =
                 //    this::class.java.classLoader.getResource("assets/clb_linphonerc_test").readText()
                 if (LinphonePreferencesCLB.instance().UpdateFromLinphoneRcData(linphonercData, corePreferences.configPath)) {
-                    android.util.Log.i("AppConfigHelper", "Store AppConfig linphoneRc hash")
+                    LogConfig("Store AppConfig linphoneRc hash")
                     ach.storeRcHash()
                 }
             } else {
-                android.util.Log.i("AppConfigHelper", "Hashes are equal, no changes... skipping config.")
+                LogConfig("Hashes are equal, no changes... skipping config.")
             }
 
             android.util.Log.i("[CLB]", "Create Linphone Config")
+            LogConfig("Create Linphone Config")
             val config = Factory.instance().createConfigWithFactory(
                 corePreferences.configPath,
                 corePreferences.factoryConfigPath
@@ -116,7 +117,7 @@ class LinphoneApplication : Application() {
 
             // Parse/execute RC XML
             if (ach.linphoneRcXmlHasChanges()) {
-                android.util.Log.i("AppConfigHelper", "Apply AppConfig linphoneRc XML changes")
+                LogConfig("Apply AppConfig Linphone Rc XML changes.")
                 val linphonercXmlData = ach.linphoneRcXml
 
                 // CLB LinphoneRC XML changes? => Update
@@ -124,11 +125,11 @@ class LinphoneApplication : Application() {
                 //    this::class.java.classLoader.getResource("assets/clb_linphonerc_xml_test")
                 //        .readText()
                 if (LinphonePreferencesCLB.instance().UpdateFromLinphoneXmlData(linphonercXmlData, config)) {
-                    android.util.Log.i("AppConfigHelper", "Store AppConfig linphoneRc XML hash")
+                    LogConfig("Store AppConfig linphoneRc XML hash")
                     ach.storeRcXmlHash()
                 }
             } else {
-                android.util.Log.i("AppConfigHelper", "Hashes are equal. LinphoneRc XML has no changes. Skipping config.")
+                LogConfig("Hashes are equal. Linphone Rc XML has no changes. Skipping config.")
             }
             return config
         }
@@ -152,6 +153,11 @@ class LinphoneApplication : Application() {
             stringOutput = AppConfigHelper.parseLinphoneRc(testConfig3)
             result = stringOutput.equals(stringResult)
             LogResult("testConfig1", result)
+        }
+
+        private fun LogConfig(text: String) {
+            android.util.Log.i("AppConfigHelper", text)
+            Log.i(text)
         }
 
         private fun LogResult(item: String, result: Boolean) {
