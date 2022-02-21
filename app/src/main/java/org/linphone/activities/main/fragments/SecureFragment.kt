@@ -31,6 +31,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.linphone.LinphoneApplication.Companion.corePreferences
 import org.linphone.activities.GenericFragment
 import org.linphone.core.tools.Log
 
@@ -63,13 +64,19 @@ abstract class SecureFragment<T : ViewDataBinding> : GenericFragment<T>() {
     }
 
     private fun enableSecureMode(enable: Boolean) {
+        if (corePreferences.disableSecureMode) {
+            Log.d("[Secure Fragment] Disabling secure flag on window due to setting")
+            return
+        }
+
         Log.d("[Secure Fragment] ${if (enable) "Enabling" else "Disabling"} secure flag on window")
         val window = requireActivity().window
         val windowManager = requireActivity().windowManager
 
         val flags: Int = window.attributes.flags
         if ((enable && flags and WindowManager.LayoutParams.FLAG_SECURE != 0) ||
-            (!enable && flags and WindowManager.LayoutParams.FLAG_SECURE == 0)) {
+            (!enable && flags and WindowManager.LayoutParams.FLAG_SECURE == 0)
+        ) {
             Log.d("[Secure Fragment] Secure flag is already ${if (enable) "enabled" else "disabled"}, skipping...")
             return
         }

@@ -26,6 +26,10 @@
     <uses-permission android:name="android.permission.AUTHENTICATE_ACCOUNTS" />
     <uses-permission android:name="android.permission.GET_ACCOUNTS" />
 
+    <!-- Needed for Telecom Manager -->
+    <uses-permission android:name="android.permission.MANAGE_OWN_CALLS"/>
+    <uses-permission android:name="android.permission.READ_PHONE_NUMBERS" />
+
     <!-- Needed for overlay -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 
@@ -41,26 +45,21 @@
 
         <!-- Restrictions/AppConfig -->
         <meta-data android:name="android.content.APP_RESTRICTIONS" android:resource="@xml/restrictions" />
+        <activity android:name=".activities.main.MainActivity"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:windowSoftInputMode="adjustResize"
+            android:theme="@style/AppSplashScreenTheme">
+            <nav-graph android:value="@navigation/main_nav_graph" />
 
-        <activity
-            android:name=".activities.launcher.LauncherActivity"
-            android:noHistory="true"
-            android:showWhenLocked="true"
-            android:turnScreenOn="true"
-            android:theme="@style/AppTheme">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+
             <meta-data
                 android:name="android.app.shortcuts"
                 android:resource="@xml/shortcuts" />
-        </activity>
-
-        <activity android:name=".activities.main.MainActivity"
-            android:launchMode="singleTask"
-            android:windowSoftInputMode="adjustResize">
-            <nav-graph android:value="@navigation/main_nav_graph" />
 
             <intent-filter>
                 <action android:name="android.intent.action.VIEW_LOCUS" />
@@ -142,6 +141,7 @@
 
         <service
             android:name=".core.CoreService"
+            android:exported="false"
             android:foregroundServiceType="phoneCall|camera|microphone"
             android:stopWithTask="false"
             android:label="@string/app_name" />
@@ -168,7 +168,8 @@
                 android:resource="@xml/contacts" />
         </service>
 
-        <service android:name=".contact.DummyAuthenticationService">
+        <service android:name=".contact.DummyAuthenticationService"
+            android:exported="true">
             <intent-filter>
                 <action android:name="android.accounts.AccountAuthenticator" />
             </intent-filter>
@@ -178,9 +179,18 @@
                 android:resource="@xml/authenticator" />
         </service>
 
+        <service android:name=".telecom.TelecomConnectionService"
+            android:permission="android.permission.BIND_TELECOM_CONNECTION_SERVICE"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.telecom.ConnectionService" />
+            </intent-filter>
+        </service>
+
         <!-- Receivers -->
 
-        <receiver android:name=".core.CorePushReceiver">
+        <receiver android:name=".core.CorePushReceiver"
+            android:exported="false">
             <intent-filter>
                 <action android:name="org.linphone.core.action.PUSH_RECEIVED"/>
             </intent-filter>
@@ -191,7 +201,8 @@
             android:enabled="true"
             android:exported="false" />
 
-        <receiver android:name=".core.BootReceiver">
+        <receiver android:name=".core.BootReceiver"
+            android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />

@@ -79,12 +79,6 @@ class ContactsManager(private val context: Context) {
         @Synchronized
         private set
 
-    var localAccountsContacts = ArrayList<Contact>()
-        @Synchronized
-        get
-        @Synchronized
-        private set
-
     val magicSearch: MagicSearch by lazy {
         val magicSearch = coreContext.core.createMagicSearch()
         magicSearch.limitedSearch = false
@@ -92,6 +86,12 @@ class ContactsManager(private val context: Context) {
     }
 
     var latestContactFetch: String = ""
+
+    private var localAccountsContacts = ArrayList<Contact>()
+        @Synchronized
+        get
+        @Synchronized
+        private set
 
     private val friendsMap: HashMap<String, Friend> = HashMap()
 
@@ -236,13 +236,15 @@ class ContactsManager(private val context: Context) {
     }
 
     @Synchronized
-    fun findContactByAddress(address: Address): Contact? {
-        val localContact = localAccountsContacts.find { localContact ->
-            localContact.sipAddresses.find { localAddress ->
-                address.weakEqual(localAddress)
-            } != null
+    fun findContactByAddress(address: Address, ignoreLocalContact: Boolean = false): Contact? {
+        if (!ignoreLocalContact) {
+            val localContact = localAccountsContacts.find { localContact ->
+                localContact.sipAddresses.find { localAddress ->
+                    address.weakEqual(localAddress)
+                } != null
+            }
+            if (localContact != null) return localContact
         }
-        if (localContact != null) return localContact
 
         val cleanAddress = address.clone()
         cleanAddress.clean() // To remove gruu if any
@@ -315,7 +317,8 @@ class ContactsManager(private val context: Context) {
         val accounts = accountManager.getAccountsByType(context.getString(R.string.sync_account_type))
         if (accounts.isEmpty()) {
             val newAccount = Account(
-                context.getString(R.string.sync_account_name), context.getString(
+                context.getString(R.string.sync_account_name),
+                context.getString(
                     R.string.sync_account_type
                 )
             )

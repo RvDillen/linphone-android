@@ -50,15 +50,19 @@ class PermissionHelper private constructor(private val context: Context) {
         return hasPermission(Manifest.permission.WRITE_CONTACTS)
     }
 
-    fun hasReadPhoneState(): Boolean {
+    fun hasReadPhoneStatePermission(): Boolean {
         return hasPermission(Manifest.permission.READ_PHONE_STATE)
     }
 
-    fun hasReadExternalStorage(): Boolean {
+    fun hasReadPhoneStateOrPhoneNumbersPermission(): Boolean {
+        return Compatibility.hasReadPhoneStateOrNumbersPermission(context)
+    }
+
+    fun hasReadExternalStoragePermission(): Boolean {
         return hasPermission(Manifest.permission.READ_EXTERNAL_STORAGE)
     }
 
-    fun hasWriteExternalStorage(): Boolean {
+    fun hasWriteExternalStoragePermission(): Boolean {
         return hasPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE)
     }
 

@@ -65,20 +65,22 @@ class CallLogsListAdapter(
     ) : RecyclerView.ViewHolder(binding.root) {
         fun bind(callLogGroup: GroupedCallLogData) {
             with(binding) {
-                val callLogViewModel = callLogGroup.lastCallLogViewModel
+                val callLogViewModel = callLogGroup.lastCallLogData
                 viewModel = callLogViewModel
 
                 lifecycleOwner = viewLifecycleOwner
 
                 // This is for item selection through ListTopBarFragment
                 selectionListViewModel = selectionViewModel
-                selectionViewModel.isEditionEnabled.observe(viewLifecycleOwner, {
-                    position = adapterPosition
-                })
+                selectionViewModel.isEditionEnabled.observe(
+                    viewLifecycleOwner
+                ) {
+                    position = bindingAdapterPosition
+                }
 
                 setClickListener {
                     if (selectionViewModel.isEditionEnabled.value == true) {
-                        selectionViewModel.onToggleSelect(adapterPosition)
+                        selectionViewModel.onToggleSelect(bindingAdapterPosition)
                     } else {
                         startCallToEvent.value = Event(callLogGroup)
                     }

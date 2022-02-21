@@ -4,9 +4,10 @@
     <!ENTITY appName "Linphone">
 ]>
 
-<resources xmlns:tools="http://schemas.android.com/tools">
+<resources xmlns:tools="http://schemas.android.com/tools" tools:ignore="MissingTranslation">
     <string name="app_name" translatable="false">&appName; CLB</string>
     <string name="app_name_debug" translatable="false">&appName; CLB (debug)</string>
+    <string name="user_agent_app_name" translatable="false">&appName;Android</string>
     <string name="service_name">&appName; Service</string>
     <string name="service_auto_start_description">&appName; has been started automatically</string>
     <string name="service_description">This is required to receive calls while in background</string>
@@ -19,7 +20,9 @@
     <string name="about_version" translatable="false">&appName; CLB Android %s</string>
     <string name="about_liblinphone_sdk_version" translatable="false">&appName; SDK %s</string>
     <string name="about_privacy_policy">Visit our privacy policy</string>
-    <string name="about_text" translatable="false">GNU General Public License v3.0\n © 2010–2021 Belledonne Communications</string>
+    <string name="about_text" translatable="false">GNU General Public License v3.0\n © 2010–2022 Belledonne Communications</string>
+    <string name="about_weblate_link" translatable="false">https://weblate.linphone.org/projects/linphone/</string>
+    <string name="about_weblate_translation">Help us translate &appName;</string>
 
     <!-- Logs -->
     <string name="logs_upload_failure">Failed to upload logs!</string>
@@ -111,6 +114,7 @@
     </plurals>
     <string name="contact_new_choose_sync_account">Choose where to save the contact</string>
     <string name="contact_local_sync_account">Store locally</string>
+    <string name="contact_cant_be_deleted">This contact can\'t be deleted</string>
 
     <!-- Dialer -->
     <string name="dialer_address_bar_hint">Enter a number or an address</string>
@@ -168,9 +172,11 @@
     <string name="chat_message_imdn_undelivered">Undelivered</string>
     <string name="chat_message_imdn_sent">Sent</string>
     <string name="chat_message_forwarded">Forwarded</string>
+    <string name="chat_message_replied">Reply</string>
     <string name="chat_message_context_menu_resend">Resend</string>
     <string name="chat_message_context_menu_copy_text">Copy text</string>
     <string name="chat_message_context_menu_forward">Forward</string>
+    <string name="chat_message_context_menu_reply">Reply</string>
     <string name="chat_message_context_menu_imdn_info">Delivery status</string>
     <string name="chat_message_context_menu_delete">Delete</string>
     <string name="chat_message_context_menu_add_to_contacts">Add to contacts</string>
@@ -214,6 +220,16 @@
     <string name="chat_message_cant_open_file_in_app_dialog_message">Would you like to open it as text or export it (unencrypted) to a third party app if available?</string>
     <string name="chat_message_cant_open_file_in_app_dialog_export_button">Export</string>
     <string name="chat_message_cant_open_file_in_app_dialog_open_as_text_button">Open as text</string>
+    <string name="chat_room_sending_reply_hint">Reply</string>
+    <string name="chat_room_sending_message_hint">Message</string>
+    <string name="chat_message_voice_recording_hold_to_record">Hold button to record voice message</string>
+    <string name="chat_message_voice_recording_playback_low_volume">Your media volume is low, you may want to increase it</string>
+    <plurals name="chat_room_unread_messages_event">
+        <item quantity="one">%1$d unread message</item>
+        <item quantity="other">%1$d unread messages</item>
+    </plurals>
+    <string name="chat_message_removal_info">Message will be deleted</string>
+    <string name="chat_message_abort_removal">Abort</string>
 
     <!-- Recordings -->
     <string name="recordings_empty_list">No recordings</string>
@@ -283,6 +299,9 @@
     <string name="assistant_general_terms">terms of use</string>
     <string name="assistant_privacy_policy">privacy policy</string>
     <string name="assistant_read_and_agree_terms">I accept Belledonne Communications\' %1$s and %2$s</string>
+    <string name="assistant_generic_account_warning">Some features require a &appName; account, such as group messaging or ephemeral messaging.\n\nThese features are hidden when you register with a third party SIP account.\n\nTo enable it in a commercial project, please contact us.</string>
+    <string name="assistant_generic_account_warning_contact_link" translatable="false">https://www.linphone.org/contact</string>
+    <string name="assistant_generic_account_warning_continue_button_text">I understand</string>
 
     <!-- Assistant errors -->
     <string name="assistant_error_phone_number_invalid_characters">Only digits are expected here</string>
@@ -370,6 +389,8 @@
     <string name="audio_settings_input_device_summary">Changes will take effect starting next call</string>
     <string name="audio_settings_output_device_title">Default output audio device</string>
     <string name="audio_settings_output_device_summary">Changes will take effect starting next call</string>
+    <string name="audio_settings_prefer_bluetooth_devices_title">Route audio to the bluetooth device if any</string>
+    <string name="audio_settings_prefer_bluetooth_devices_summary">It will have priority over the default output device</string>
     <string name="audio_settings_codec_bitrate_title">Codec bitrate limit</string>
     <string name="audio_settings_microphone_gain_title">Microphone gain</string>
     <string name="audio_settings_microphone_gain_summary">(in decibels)</string>
@@ -394,6 +415,7 @@
 
     <!-- Call settings -->
     <string name="call_settings_device_ringtone_title">Use device ringtone</string>
+    <string name="call_settings_ringtones_title">Ringtone</string>
     <string name="call_settings_vibrate_title">Vibrate while incoming call is ringing</string>
     <string name="call_settings_encryption_title">Media encryption</string>
     <string name="call_settings_media_encryption_none">None</string>
@@ -401,6 +423,8 @@
     <string name="call_settings_media_encryption_zrtp">ZRTP</string>
     <string name="call_settings_media_encryption_dtls">DTLS</string>
     <string name="call_settings_encryption_mandatory_title">Media encryption mandatory</string>
+    <string name="call_settings_use_telecom_manager_title">Improve interactions with bluetooth devices</string>
+    <string name="call_settings_use_telecom_manager_summary">Requires some extra permissions</string>
     <string name="call_settings_full_screen_title">Full screen app while in call</string>
     <string name="call_settings_full_screen_summary">Hides status and navigation bars</string>
     <string name="call_settings_overlay_title">Overlay call notification</string>
@@ -421,6 +445,7 @@
     <string name="call_settings_ring_during_early_media_title">Ring during incoming early media</string>
     <string name="call_settings_pause_calls_lost_audio_focus_title">Pause calls when audio focus is lost</string>
     <string name="call_settings_go_to_android_notification_settings">Android notification settings</string>
+    <string name="call_settings_auto_start_recording_title">Automatically start call recording</string>
 
     <!-- Chat settings -->
     <string name="chat_settings_mark_as_read_notif_dismissal_title">Mark as read upon notification dismissal</string>
@@ -446,6 +471,7 @@
     <string name="chat_settings_use_in_app_file_viewer_title">Always open files inside this app</string>
     <string name="chat_settings_use_in_app_file_viewer_summary">You\'ll still be able to export them in third-party apps</string>
     <string name="chat_settins_enable_ephemeral_messages_beta_title">Enable ephemeral messages (beta)</string>
+    <string name="chat_settings_auto_download_voice_recordings">Auto download incoming voice recordings</string>
 
     <!-- Network settings -->
     <string name="network_settings_wifi_only_title">Use WiFi only</string>
@@ -465,6 +491,37 @@
     <string name="contacts_settings_launcher_shortcuts_summary">Will replace chat room shortcuts if any</string>
     <string name="contacts_settings_show_new_contact_account_dialog_title">Always ask in which account save newly created contact</string>
     <string name="contacts_settings_show_new_contact_account_dialog_summary">If disabled contact will be stored locally</string>
+    <string name="contacts_settings_create_new_ldap_config_title">New LDAP configuration</string>
+
+    <!-- LDAP Contacts settings -->
+    <string name="contacts_settings_ldap_title">LDAP</string>
+    <string name="contacts_settings_ldap_enable_title">Enable</string>
+    <string name="contacts_settings_ldap_delete_title">Delete</string>
+    <string name="contacts_settings_ldap_connection_title">Connection</string>
+    <string name="contacts_settings_ldap_server_title">Server URL</string>
+    <string name="contacts_settings_ldap_bind_dn_title">Bind DN</string>
+    <string name="contacts_settings_ldap_password_title">Password</string>
+    <string name="contacts_settings_ldap_auth_method_title">Authentication method</string>
+    <string name="contacts_settings_ldap_auth_method_anonymous">Anonymous</string>
+    <string name="contacts_settings_ldap_auth_method_simple">Simple</string>
+    <string name="contacts_settings_ldap_tls_title">Use TLS</string>
+    <string name="contacts_settings_ldap_cert_check_title">Check certificates</string>
+    <string name="contacts_settings_ldap_cert_check_auto">Auto</string>
+    <string name="contacts_settings_ldap_cert_check_disabled">Disabled</string>
+    <string name="contacts_settings_ldap_cert_check_enabled">Enabled</string>
+    <string name="contacts_settings_ldap_search_title">Search</string>
+    <string name="contacts_settings_ldap_search_base_title">Search base</string>
+    <string name="contacts_settings_ldap_search_base_subtitle">Must not be empty!</string>
+    <string name="contacts_settings_ldap_search_filter_title">Filter</string>
+    <string name="contacts_settings_ldap_search_max_results_title">Max results</string>
+    <string name="contacts_settings_ldap_search_timeout_title">Timeout</string>
+    <string name="contacts_settings_ldap_search_timeout_subtitle">In seconds</string>
+    <string name="contacts_settings_ldap_parsing_title">Parsing</string>
+    <string name="contacts_settings_ldap_name_attribute_title">Name attributes</string>
+    <string name="contacts_settings_ldap_sip_attribute_title">SIP attributes</string>
+    <string name="contacts_settings_ldap_sip_domain_title">Domain</string>
+    <string name="contacts_settings_ldap_misc_title">Misc</string>
+    <string name="contacts_settings_ldap_debug_title">Debug</string>
 
     <!-- Advanced settings -->
     <string name="advanced_settings_debug_mode_title">Debug logs</string>
@@ -491,6 +548,8 @@
     <string name="advanced_settings_reset_debug_logs_title">Reset logs</string>
     <string name="advanced_settings_debug_title">Debug settings</string>
     <string name="advanced_settings_other_title">Other settings</string>
+    <string name="advanced_settings_disable_fragment_security_title">Disable UI\'s secure mode</string>
+    <string name="advanced_settings_disable_fragment_security_summary">Allow screen capture/recording on sensitive views</string>
 
     <!-- Tunnel settings -->
     <string name="tunnel_settings_hostname_url_title">Hostname</string>
@@ -629,6 +688,7 @@
     <string name="content_description_downloaded_file_transfer">Attached file</string>
     <string name="content_description_delivery_status">Message delivery status</string>
     <string name="content_description_forwarded_message">Message has been forwarded</string>
+    <string name="content_description_replied_message">Message is a reply</string>
     <string name="content_description_forward_message">Forward message in this conversation</string>
     <string name="content_description_ephemeral_message">Message is ephemeral</string>
     <string name="content_description_linphone_user">Contact is a &appName; user</string>
@@ -643,7 +703,9 @@
     <string name="content_description_show_chat_room_menu">Show chat room menu</string>
     <string name="content_description_enter_edition_mode">Enter edition mode</string>
     <string name="content_description_attach_file">Attach a file to the message</string>
+    <string name="content_description_attached_file">File attached to the message</string>
     <string name="content_description_send_message">Send message</string>
+    <string name="content_description_record_audio_message">Record audio message</string>
     <string name="content_description_toggle_participant_devices_list">Show or hide the participant devices</string>
     <string name="content_description_ephemeral_duration_selected">Ephemeral duration selected</string>
     <string name="content_description_ephemeral_duration_change">Change ephemeral duration by selected value</string>
@@ -717,4 +779,11 @@
     <string name="content_description_cancel_forward">Cancel message forward</string>
     <string name="content_description_cancel_sharing">Cancel sharing</string>
     <string name="clb_status_connecting">Connecting...</string>
+    <string name="content_description_cancel_reply">Cancel reply</string>
+    <string name="content_description_voice_recording">Record a voice message</string>
+    <string name="content_description_stop_voice_recording">Stop voice recording</string>
+    <string name="content_description_cancel_voice_recording">Cancel voice recording</string>
+    <string name="content_description_pause_voice_recording_playback">Pause voice recording</string>
+    <string name="content_description_play_voice_recording">Play voice recording</string>
+    <string name="content_descripton_scroll_to_bottom">Scroll to bottom or first unread message</string>
 </resources>

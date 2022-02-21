@@ -23,18 +23,20 @@ import android.content.pm.PackageManager
 import android.os.Bundle
 import android.view.View
 import androidx.lifecycle.ViewModelProvider
-import androidx.navigation.fragment.findNavController
 import org.linphone.LinphoneApplication.Companion.coreContext
 import org.linphone.LinphoneApplication.Companion.corePreferences
 import org.linphone.R
-import org.linphone.activities.GenericFragment
+import org.linphone.activities.main.settings.SettingListenerStub
 import org.linphone.activities.main.settings.viewmodels.ContactsSettingsViewModel
+import org.linphone.activities.navigateToEmptySetting
+import org.linphone.activities.navigateToLdapSettings
 import org.linphone.compatibility.Compatibility
 import org.linphone.core.tools.Log
 import org.linphone.databinding.SettingsContactsFragmentBinding
+import org.linphone.utils.Event
 import org.linphone.utils.PermissionHelper
 
-class ContactsSettingsFragment : GenericFragment<SettingsContactsFragmentBinding>() {
+class ContactsSettingsFragment : GenericSettingFragment<SettingsContactsFragmentBinding>() {
     private lateinit var viewModel: ContactsSettingsViewModel
 
     override fun getLayoutId(): Int = R.layout.settings_contacts_fragment
@@ -42,15 +44,17 @@ class ContactsSettingsFragment : GenericFragment<SettingsContactsFragmentBinding
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        binding.lifecycleOwner = this
+        binding.lifecycleOwner = viewLifecycleOwner
+        binding.sharedMainViewModel = sharedViewModel
 
-        viewModel = ViewModelProvider(this).get(ContactsSettingsViewModel::class.java)
+        viewModel = ViewModelProvider(this)[ContactsSettingsViewModel::class.java]
         binding.viewModel = viewModel
 
-        binding.setBackClickListener { findNavController().popBackStack() }
-        binding.back.visibility = if (resources.getBoolean(R.bool.isTablet)) View.INVISIBLE else View.VISIBLE
+        binding.setBackClickListener { goBack() }
 
-        viewModel.launcherShortcutsEvent.observe(viewLifecycleOwner, {
+        viewModel.launcherShortcutsEvent.observe(
+            viewLifecycleOwner
+        ) {
             it.consume { newValue ->
                 if (newValue) {
                     Compatibility.createShortcutsToContacts(requireContext())
@@ -61,14 +65,32 @@ class ContactsSettingsFragment : GenericFragment<SettingsContactsFragmentBinding
                     }
                 }
             }
-        })
+        }
 
-        viewModel.askWriteContactsPermissionForPresenceStorageEvent.observe(viewLifecycleOwner, {
+        viewModel.askWriteContactsPermissionForPresenceStorageEvent.observe(
+            viewLifecycleOwner
+        ) {
             it.consume {
                 Log.i("[Contacts Settings] Asking for WRITE_CONTACTS permission to be able to store presence")
                 requestPermissions(arrayOf(android.Manifest.permission.WRITE_CONTACTS), 1)
             }
-        })
+        }
+
+        viewModel.ldapNewSettingsListener = object : SettingListenerStub() {
+            override fun onClicked() {
+                Log.i("[Contacts Settings] Clicked on new LDAP config")
+                navigateToLdapSettings(-1)
+            }
+        }
+
+        viewModel.ldapSettingsClickedEvent.observe(
+            viewLifecycleOwner
+        ) {
+            it.consume { index ->
+                Log.i("[Contacts Settings] Clicked on LDAP config with index: $index")
+                navigateToLdapSettings(index)
+            }
+        }
 
         if (!PermissionHelper.required(requireContext()).hasReadContactsPermission()) {
             Log.i("[Contacts Settings] Asking for READ_CONTACTS permission")
@@ -104,5 +126,18 @@ class ContactsSettingsFragment : GenericFragment<SettingsContactsFragmentBinding
                 }
             }
         }
+    }
+
+    override fun goBack() {
+        if (sharedViewModel.isSlidingPaneSlideable.value == true) {
+            sharedViewModel.closeSlidingPaneEvent.value = Event(true)
+        } else {
+            navigateToEmptySetting()
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        viewModel.updateLdapConfigurationsList()
     }
 }

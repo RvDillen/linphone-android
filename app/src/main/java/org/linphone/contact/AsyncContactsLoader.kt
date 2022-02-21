@@ -109,14 +109,20 @@ class AsyncContactsLoader(private val context: Context) :
                 Log.i("[Contacts Loader] Only fetching contacts in default directory")
                 selection = ContactsContract.Data.IN_DEFAULT_DIRECTORY + " == 1"
             }
-            val cursor: Cursor? = context.contentResolver
-                .query(
-                    ContactsContract.Data.CONTENT_URI,
-                    projection,
-                    selection,
-                    null,
-                    null
-                )
+
+            val cursor: Cursor? = try {
+                context.contentResolver
+                    .query(
+                        ContactsContract.Data.CONTENT_URI,
+                        projection,
+                        selection,
+                        null,
+                        null
+                    )
+            } catch (e: Exception) {
+                Log.e("[Contacts Loader] Failed to get contacts cursor: $e")
+                null
+            }
 
             if (cursor != null) {
                 Log.i("[Contacts Loader] Found ${cursor.count} entries in cursor")
@@ -129,10 +135,10 @@ class AsyncContactsLoader(private val context: Context) :
 
                     try {
                         val id: String =
-                            cursor.getString(cursor.getColumnIndex(ContactsContract.Data.CONTACT_ID))
+                            cursor.getString(cursor.getColumnIndexOrThrow(ContactsContract.Data.CONTACT_ID))
                         val starred =
-                            cursor.getInt(cursor.getColumnIndex(ContactsContract.Contacts.STARRED)) == 1
-                        val lookupKey = cursor.getString(cursor.getColumnIndex(ContactsContract.Contacts.LOOKUP_KEY))
+                            cursor.getInt(cursor.getColumnIndexOrThrow(ContactsContract.Contacts.STARRED)) == 1
+                        val lookupKey = cursor.getString(cursor.getColumnIndexOrThrow(ContactsContract.Contacts.LOOKUP_KEY))
                         var contact: Contact? = androidContactsCache[id]
                         if (contact == null) {
                             Log.d(
@@ -147,6 +153,10 @@ class AsyncContactsLoader(private val context: Context) :
                     } catch (ise: IllegalStateException) {
                         Log.e(
                             "[Contacts Loader] Couldn't get values from cursor, exception: $ise"
+                        )
+                    } catch (iae: IllegalArgumentException) {
+                        Log.e(
+                            "[Contacts Loader] Couldn't get values from cursor, exception: $iae"
                         )
                     }
                 }

@@ -17,6 +17,9 @@
         <variable
             name="viewModel"
             type="org.linphone.activities.main.contact.viewmodels.ContactViewModel" />
+        <variable
+            name="sharedMainViewModel"
+            type="org.linphone.activities.main.viewmodels.SharedMainViewModel" />
     </data>
 
     <RelativeLayout
@@ -33,6 +36,7 @@
             <ImageView
                 android:id="@+id/back"
                 android:onClick="@{backClickListener}"
+                android:visibility="@{sharedMainViewModel.isSlidingPaneSlideable ? View.VISIBLE : View.GONE}"
                 android:contentDescription="@string/content_description_go_back"
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
@@ -48,6 +52,7 @@
 
             <ImageView
                 android:onClick="@{editClickListener}"
+                android:visibility="@{viewModel.isNativeContact ? View.VISIBLE : View.INVISIBLE}"
                 android:contentDescription="@string/content_description_edit_contact"
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
@@ -58,6 +63,7 @@
 
             <ImageView
                 android:onClick="@{deleteClickListener}"
+                android:visibility="@{viewModel.isNativeContact ? View.VISIBLE : View.INVISIBLE}"
                 android:contentDescription="@string/content_description_delete_contact"
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
@@ -82,7 +88,7 @@
 
                 <org.linphone.contact.BigContactAvatarView
                     android:id="@+id/avatar"
-                    android:layout_width="100dp"
+                    android:layout_width="match_parent"
                     android:layout_height="100dp"
                     android:gravity="center"
                     tools:layout="@layout/contact_avatar_big"

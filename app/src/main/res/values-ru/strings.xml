@@ -4,7 +4,7 @@
 ]>
 <resources xmlns:tools="http://schemas.android.com/tools">
     <string name="service_description">Необходимо для приема звонков в фоновом режиме</string>
-    <string name="sync_account_name">контакты &amp;appName;</string>
+    <string name="sync_account_name">контакты &appName;</string>
     <string name="logs_upload_failure">Не удалось загрузить журналы!</string>
     <string name="logs_reset_complete">Журналы очищены</string>
     <string name="logs_url_copied_to_clipboard">URL-адрес журнала скопирован в буфер обмена</string>
@@ -55,8 +55,7 @@
     <string name="contact_organization">Огранизация</string>
     <string name="contact_choose_existing_or_new_to_add_number">Выберите контакт или создайте новый</string>
     <string name="contact_editor_write_permission_denied">Отказано в разрешении записать контакт, невозможно редактировать контакт</string>
-    <string name="contact_delete_many_dialog">Вы уверены, что хотите удалить эти контакты\? 
-\nОни также будут удалены из адресной книги вашего устройства</string>
+    <string name="contact_delete_many_dialog">Вы уверены, что хотите удалить эти контакты\? \nОни также будут удалены из адресной книги вашего устройства</string>
     <string name="contact_new_choose_sync_account">Выберите, где сохранить контакт</string>
     <string name="contact_local_sync_account">Сохранить локально</string>
     <string name="debug_popup_title">Отладка</string>
@@ -90,8 +89,10 @@
     <string name="chat_message_imdn_undelivered">Не доставлено</string>
     <string name="chat_message_imdn_sent">Отправлено</string>
     <string name="chat_message_forwarded">Переслано</string>
+    <string name="chat_message_replied">Ответить</string>
     <string name="chat_message_context_menu_resend">Отправить повторно</string>
     <string name="chat_message_context_menu_forward">Вперед</string>
+    <string name="chat_message_context_menu_reply">Ответить</string>
     <string name="chat_message_context_menu_imdn_info">Статус доставки</string>
     <string name="chat_message_context_menu_delete">Удалить</string>
     <string name="chat_message_context_menu_add_to_contacts">Добавить в контакты</string>
@@ -149,6 +150,9 @@
     <string name="chat_bubble_cant_open_enrypted_file">Не удается открыть зашифрованный файл в пузыре чата</string>
     <string name="chat_message_cant_open_file_in_app_dialog_export_button">Экспорт</string>
     <string name="chat_message_cant_open_file_in_app_dialog_open_as_text_button">Открыть как текст</string>
+    <string name="chat_room_sending_reply_hint">Ответить</string>
+    <string name="chat_room_sending_message_hint">Сообщение</string>
+    <string name="chat_message_voice_recording_hold_to_record">Удерживайте кнопку для записи голосового сообщения</string>
     <string name="call_stats_ice">Соединение ICE:</string>
     <string name="call_stats_jitter_buffer">Буфер джиттера:</string>
     <string name="call_stats_decoder_name">Декодер:</string>
@@ -157,15 +161,11 @@
     <string name="call_notification_active">Активный звонок</string>
     <string name="assistant_welcome_title">Добро пожаловать</string>
     <string name="assistant_create_account">Создать аккаунт</string>
-    <string name="assistant_login_linphone">Используйте учетную запись &amp;appName;</string>
+    <string name="assistant_login_linphone">Используйте учетную запись &appName;</string>
     <string name="assistant_login_generic">Используйте учетную запись SIP</string>
     <string name="assistant_remote_provisioning">Удаленная конфигурация</string>
     <string name="assistant_ec_calibration">Калибровка подавления эха</string>
-    <string name="assistant_phone_number_link_info_content">"
-\nВашим друзьям будет легче найти вас, если вы свяжете свою учетную запись со своим номером телефона. 
-\n
-\nВы увидите в своей адресной книге, кто использует &amp;appName;, и ваши друзья узнают, что они также могут связаться с вами по &amp;appName;.
-\n"</string>
+    <string name="assistant_phone_number_link_info_content">"\nВашим друзьям будет легче найти вас, если вы свяжете свою учетную запись со своим номером телефона. \n\nВы увидите в своей адресной книге, кто использует &appName;, и ваши друзья узнают, что они также могут связаться с вами по &appName;.\n"</string>
     <string name="assistant_general_terms">условия пользования</string>
     <string name="assistant_privacy_policy">политика конфиденциальности</string>
     <string name="assistant_read_and_agree_terms">Я принимаю %1$s и %2$s Belledonne Communications</string>
@@ -179,7 +179,7 @@
     <string name="assistant_error_account_not_activated">Ваша учетная запись еще не подтверждена</string>
     <string name="assistant_error_invalid_credentials">Учетная запись не существует или пароль не совпадает</string>
     <string name="assistant_create_account_part_1">Подтвердите код страны и введите свой номер телефона</string>
-    <string name="assistant_linphone_login_desc">Введите имя пользователя и пароль учетной записи &amp;appName;</string>
+    <string name="assistant_linphone_login_desc">Введите имя пользователя и пароль учетной записи &appName;</string>
     <string name="assistant_login_forgotten_password">Забыли пароль\?</string>
     <string name="assistant_login">Вход</string>
     <string name="assistant_finish">Завершить настройку</string>
@@ -192,8 +192,7 @@
     <string name="assistant_validate_account_1">Ваша учетная запись создана. Проверьте электронную почту, чтобы подтвердить свою учетную запись:</string>
     <string name="assistant_validate_account_2">Как только это будет сделано, вернитесь сюда и нажмите кнопку.</string>
     <string name="assistant_use_username_instead_or_phone_number">Используйте имя пользователя (необязательно)</string>
-    <string name="assistant_create_account_part_3">Чтобы завершить проверку номера телефона, введите 4-значный код ниже:
-\n</string>
+    <string name="assistant_create_account_part_3">Чтобы завершить проверку номера телефона, введите 4-значный код ниже:\n</string>
     <string name="assistant_link_phone_number">Вы свяжете номер телефона с данным логином:</string>
     <string name="assistant_link_phone_number_skip">Пропустить</string>
     <string name="assistant_link_account">Связать учетную запись</string>
@@ -263,6 +262,7 @@
     <string name="call_settings_media_encryption_srtp">SRTP</string>
     <string name="call_settings_media_encryption_zrtp">ZRTP</string>
     <string name="call_settings_media_encryption_dtls">DTLS</string>
+    <string name="call_settings_auto_start_recording_title">Автоматически начинать запись разговоров</string>
     <string name="chat_settings_file_sharing_url_title">Общий сервер URL</string>
     <string name="chat_settings_file_sharing_url_summary">Не редактируйте, если не знаете, что делаете!</string>
     <string name="chat_settings_auto_download_title">Политика автоматической загрузки входящих файлов</string>
@@ -279,6 +279,7 @@
     <string name="chat_settings_go_to_android_notification_settings">Настройки уведомлений Android</string>
     <string name="chat_settings_use_in_app_file_viewer_title">Всегда открывайте файлы внутри этого приложения</string>
     <string name="chat_settings_use_in_app_file_viewer_summary">Вы по-прежнему сможете экспортировать их в сторонние приложения</string>
+    <string name="chat_settings_auto_download_voice_recordings">Автоматическая загрузка входящих голосовых записей</string>
     <string name="network_settings_wifi_only_title">Использовать только Wi-Fi</string>
     <string name="network_settings_allow_ipv6_title">Разрешить IPv6</string>
     <string name="network_settings_push_notifications_title">Включить push-уведомления</string>
@@ -311,6 +312,7 @@
     <string name="advanced_settings_reset_debug_logs_title">Сбросить журналы</string>
     <string name="advanced_settings_debug_title">Настройки отладки</string>
     <string name="advanced_settings_other_title">Другие настройки</string>
+    <string name="advanced_settings_disable_fragment_security_summary">Разрешить снимок экрана/запись в конфиденциальных представлениях</string>
     <string name="tunnel_settings_hostname_url_title">Имя хоста</string>
     <string name="tunnel_settings_port_title">Порт</string>
     <string name="tunnel_settings_dual_mode_title">Двойной режим включен</string>
@@ -353,8 +355,8 @@
     <string name="account_settings_prefix_title">Префикс для вашей страны</string>
     <string name="account_settings_prefix_summary">без +</string>
     <string name="account_settings_escape_plus_title">Заменить + на 00</string>
-    <string name="notification_channel_missed_call_name">Уведомления о пропущенных звонках &amp;appName;</string>
-    <string name="notification_channel_incoming_call_name">Уведомления о входящих звонках &amp;appName;</string>
+    <string name="notification_channel_missed_call_name">Уведомления о пропущенных звонках &appName;</string>
+    <string name="notification_channel_incoming_call_name">Уведомления о входящих звонках &appName;</string>
     <string name="incoming_call_notification_title">Входящий звонок</string>
     <string name="incoming_call_notification_hangup_action_label">Завершить</string>
     <string name="incoming_call_notification_answer_action_label">Ответить</string>
@@ -408,6 +410,7 @@
     <string name="content_description_remove_pending_file_transfer">Удалить ожидающую передачу файла</string>
     <string name="content_description_downloaded_file_transfer">Прикрепленный файл</string>
     <string name="content_description_delivery_status">Статус доставки сообщения</string>
+    <string name="content_description_replied_message">Сообщение - это ответ</string>
     <string name="content_description_forward_message">Переслать сообщение в этой беседе</string>
     <string name="content_description_ephemeral_message">Сообщение эфемерное</string>
     <string name="content_description_contact_selected">Контакт выбран</string>
@@ -418,6 +421,8 @@
     <string name="content_description_start_call">Начать звонок</string>
     <string name="content_description_enter_edition_mode">Отредактировать</string>
     <string name="content_description_send_message">Отправить сообщение</string>
+    <string name="content_description_attached_file">Файл, прикрепленный к сообщению</string>
+    <string name="content_description_record_audio_message">Записать звуковое сообщение</string>
     <string name="content_description_ephemeral_duration_selected">Выбрана эфемерная продолжительность</string>
     <string name="content_description_ephemeral_duration_change">Изменить эфемерную продолжительность на выбранное значение</string>
     <string name="content_description_create_chat_room">Создать чат-комнату</string>
@@ -473,8 +478,14 @@
     <string name="content_description_open_app">Открывать беседу в приложении вместо пузыря</string>
     <string name="content_description_cancel_forward">Отменить пересылку сообщения</string>
     <string name="content_description_cancel_sharing">Отменить совместное использование</string>
-    <string name="service_name">&amp;appName; Service</string>
-    <string name="service_auto_start_description">&amp;appName; был запущен автоматически</string>
+    <string name="content_description_cancel_reply">Отменить ответ</string>
+    <string name="content_description_voice_recording">Запишите голосовое сообщение</string>
+    <string name="content_description_stop_voice_recording">Остановить запись голоса</string>
+    <string name="content_description_cancel_voice_recording">Отменить запись голоса</string>
+    <string name="content_description_pause_voice_recording_playback">Приостановить запись голоса</string>
+    <string name="content_description_play_voice_recording">Воспроизвести запись голоса</string>
+    <string name="service_name">&appName; Service</string>
+    <string name="service_auto_start_description">&appName; был запущен автоматически</string>
     <string name="about_privacy_policy">Ознакомьтесь с нашей политикой конфиденциальности</string>
     <string name="select_your_country">Выберите вашу страну</string>
     <string name="sip_address">SIP-адрес</string>
@@ -484,9 +495,8 @@
     <string name="quit">Выход</string>
     <string name="no_missed_call_history">В вашей истории нет пропущенных звонков</string>
     <string name="no_contact">В адресной книге нет контактов.</string>
-    <string name="contact_send_sms_invite_text">Привет, присоединяйтесь ко мне на &amp;appName;! Вы можете бесплатно скачать его на %s</string>
-    <string name="contact_delete_one_dialog">Вы хотите удалить этот контакт\? 
-\nОн также будет удален из адресной книги вашего устройства</string>
+    <string name="contact_send_sms_invite_text">Привет, присоединяйтесь ко мне на &appName;! Вы можете бесплатно скачать его на %s</string>
+    <string name="contact_delete_one_dialog">Вы хотите удалить этот контакт\? \nОн также будет удален из адресной книги вашего устройства</string>
     <string name="dialer_address_bar_hint">Введите номер или адрес</string>
     <string name="no_chat_history">Нет разговоров</string>
     <string name="chat_event_conference_destroyed">Вы покинули группу</string>
@@ -502,19 +512,13 @@
     <string name="call_stats_display_filter">Фильтр отображения:</string>
     <string name="assistant_welcome_desc">Этот помощник поможет вам настроить и использовать вашу учетную запись SIP.</string>
     <string name="assistant_phone_number_info_title">Для чего будет использоваться мой номер телефона\?</string>
-    <string name="assistant_phone_number_info_content">"
-\nБлагодаря вашему номеру телефона вашим друзьям будет проще вас найти. 
-\n
-\nВы увидите в своей адресной книге, кто пользуется &amp;appName;, и ваши друзья узнают, что они также могут связаться с вами по &amp;appName;.
-\n"</string>
-    <string name="assistant_phone_number_link_info_content_already_account">Вы можете использовать свой номер телефона только с одной учетной записью &amp;appName;. 
-\n
-\nЕсли вы уже связали свой номер с другой учетной записью, но предпочитаете использовать этот, просто свяжите его сейчас, и ваш номер будет автоматически перенесен в эту учетную запись.</string>
+    <string name="assistant_phone_number_info_content">"\nБлагодаря вашему номеру телефона вашим друзьям будет проще вас найти. \n\nВы увидите в своей адресной книге, кто пользуется &appName;, и ваши друзья узнают, что они также могут связаться с вами по &appName;.\n"</string>
+    <string name="assistant_phone_number_link_info_content_already_account">Вы можете использовать свой номер телефона только с одной учетной записью &appName;. \n\nЕсли вы уже связали свой номер с другой учетной записью, но предпочитаете использовать этот, просто свяжите его сейчас, и ваш номер будет автоматически перенесен в эту учетную запись.</string>
     <string name="assistant_linphone_account">Используйте аккаунт &appName;</string>
     <string name="assistant_login_with_username">Используйте свое имя пользователя и пароль вместо номера телефона</string>
     <string name="assistant_login_desc">Введите имя пользователя и пароль с вашим доменом SIP</string>
     <string name="assistant_password_hash_algorithm">Алгоритм хеширования</string>
-    <string name="assistant_create_account_part_email">Введите имя пользователя, адрес электронной почты и пароль учетной записи &amp;appName;</string>
+    <string name="assistant_create_account_part_email">Введите имя пользователя, адрес электронной почты и пароль учетной записи &appName;</string>
     <string name="chat_event_ephemeral_lifetime_changed">Дата истечения срока действия эфемерных сообщений: %s</string>
     <string name="chat_message_pick_file_dialog">Выбрать источник</string>
     <string name="chat_room_group_info_leave">Покинуть группу</string>
@@ -528,6 +532,7 @@
     <string name="chat_room_delete_many_dialog">Вы уверены, что хотите удалить эти разговоры\?</string>
     <string name="chat_message_cant_open_file_in_app_dialog_title">Кажется, мы не можем отобразить файл.</string>
     <string name="chat_message_cant_open_file_in_app_dialog_message">Вы хотите открыть его как текст или экспортировать (в незашифрованном виде) в стороннее приложение \?</string>
+    <string name="chat_message_voice_recording_playback_low_volume">Низкая громкость мультимедиа, возможно, вы захотите ее увеличить</string>
     <string name="assistant_create_account_part_2">Мы отправили вам SMS с кодом подтверждения на ваш номер телефона:</string>
     <string name="assistant_remote_provisioning_title">Удаленная конфигурация</string>
     <string name="assistant_remote_provisioning_wrong_format">Неизвестный формат URL, не удается загрузить подготовку…</string>
@@ -560,6 +565,7 @@
     <string name="advanced_settings_dark_mode_label_no">Нет</string>
     <string name="advanced_settings_device_name_summary">Изменения будут применены при следующем запуске</string>
     <string name="advanced_settings_logs_server_url_summary">Не редактируйте, если не знаете, что делаете!</string>
+    <string name="advanced_settings_disable_fragment_security_title">Отключить безопасный режим пользовательского интерфейса</string>
     <string name="tunnel_settings_dual_mode_summary">Будет использовать один сервер для загрузки, а другой - для загрузки</string>
     <string name="account_settings_user_id_summary">Введите идентификатор аутентификации, если он отличается от имени пользователя (необязательно)</string>
     <string name="account_settings_disable_title">Отключено</string>
@@ -568,7 +574,7 @@
     <string name="account_settings_apply_prefix_for_calls_title">Применить префикс для исходящих звонков и чата</string>
     <string name="account_settings_apply_prefix_for_calls_summary">Если введен номер, примените префикс к номеру</string>
     <string name="notification_channel_service_name">Сервисные уведомления &appName;</string>
-    <string name="notification_channel_chat_name">Уведомления о мгновенных сообщениях &amp;appName;</string>
+    <string name="notification_channel_chat_name">Уведомления о мгновенных сообщениях &appName;</string>
     <string name="received_chat_notification_reply_label">Ответить</string>
     <string name="missed_calls_notification_body" tools:ignore="PluralsCandidate">%d пропущенных звонков</string>
     <string name="zrtp_dialog_message">Подтвердите следующий код SAS у своего корреспондента</string>
@@ -583,7 +589,7 @@
     <string name="content_description_use_bluetooth_headset">Использовать bluetooth-гарнитуру в качестве аудиовыхода</string>
     <string name="content_description_toggle_call_menu">Показать или скрыть меню дополнительных действий</string>
     <string name="content_description_forwarded_message">Сообщение было переадресовано</string>
-    <string name="content_description_linphone_user">Контакт - пользователь &amp;appName;</string>
+    <string name="content_description_linphone_user">Контакт - пользователь &appName;</string>
     <string name="content_description_show_all_contacts">Показать список всех контактов</string>
     <string name="content_description_continue_chat_room_creation">Перейти к завершающему этапу создания чат-комнаты</string>
     <string name="content_description_show_chat_room_menu">Показать меню чата</string>
@@ -607,4 +613,6 @@
     <string name="content_description_export">Открыть файл в стороннем приложении</string>
     <string name="call_settings_accept_early_media_title">Принимайте early media</string>
     <string name="call_settings_ring_during_early_media_title">Звонок во время входящих early media</string>
+    <string name="call_settings_use_telecom_manager_title">Улучшение взаимодействия с устройствами bluetooth</string>
+    <string name="call_settings_use_telecom_manager_summary">Требуются некоторые дополнительные разрешения</string>
 </resources>

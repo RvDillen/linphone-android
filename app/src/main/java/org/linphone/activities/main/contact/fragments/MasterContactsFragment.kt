@@ -21,15 +21,22 @@ package org.linphone.activities.main.contact.fragments
 
 import android.app.Dialog
 import android.content.pm.PackageManager
+import android.content.res.Configuration
 import android.os.Bundle
 import android.view.View
 import androidx.core.content.ContextCompat
+import androidx.core.view.doOnPreDraw
 import androidx.lifecycle.ViewModelProvider
+import androidx.navigation.fragment.NavHostFragment
 import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import androidx.slidingpanelayout.widget.SlidingPaneLayout
+import com.google.android.material.transition.MaterialSharedAxis
 import org.linphone.LinphoneApplication.Companion.coreContext
+import org.linphone.LinphoneApplication.Companion.corePreferences
 import org.linphone.R
+import org.linphone.activities.clearDisplayedContact
 import org.linphone.activities.main.MainActivity
 import org.linphone.activities.main.contact.adapters.ContactsListAdapter
 import org.linphone.activities.main.contact.viewmodels.ContactsListViewModel
@@ -63,14 +70,76 @@ class MasterContactsFragment : MasterFragment<ContactMasterFragmentBinding, Cont
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        binding.lifecycleOwner = this
+        binding.lifecycleOwner = viewLifecycleOwner
 
-        listViewModel = ViewModelProvider(this).get(ContactsListViewModel::class.java)
+        listViewModel = ViewModelProvider(this)[ContactsListViewModel::class.java]
         binding.viewModel = listViewModel
 
+        /* Shared view model & sliding pane related */
+
         sharedViewModel = requireActivity().run {
-            ViewModelProvider(this).get(SharedMainViewModel::class.java)
+            ViewModelProvider(this)[SharedMainViewModel::class.java]
         }
+
+        view.doOnPreDraw { sharedViewModel.isSlidingPaneSlideable.value = binding.slidingPane.isSlideable }
+
+        useMaterialSharedAxisXForwardAnimation = false
+        sharedViewModel.updateContactsAnimationsBasedOnDestination.observe(
+            viewLifecycleOwner
+        ) {
+            it.consume { id ->
+                val forward = when (id) {
+                    R.id.dialerFragment, R.id.masterChatRoomsFragment -> false
+                    else -> true
+                }
+                if (corePreferences.enableAnimations) {
+                    val portraitOrientation =
+                        resources.configuration.orientation != Configuration.ORIENTATION_LANDSCAPE
+                    val axis =
+                        if (portraitOrientation) MaterialSharedAxis.X else MaterialSharedAxis.Y
+                    enterTransition = MaterialSharedAxis(axis, forward)
+                    reenterTransition = MaterialSharedAxis(axis, forward)
+                    returnTransition = MaterialSharedAxis(axis, !forward)
+                    exitTransition = MaterialSharedAxis(axis, !forward)
+                }
+            }
+        }
+
+        sharedViewModel.contactFragmentOpenedEvent.observe(
+            viewLifecycleOwner
+        ) {
+            it.consume {
+                binding.slidingPane.openPane()
+            }
+        }
+
+        sharedViewModel.closeSlidingPaneEvent.observe(
+            viewLifecycleOwner
+        ) {
+            it.consume {
+                if (!binding.slidingPane.closePane()) {
+                    goBack()
+                }
+            }
+        }
+        sharedViewModel.layoutChangedEvent.observe(
+            viewLifecycleOwner
+        ) {
+            it.consume {
+                sharedViewModel.isSlidingPaneSlideable.value = binding.slidingPane.isSlideable
+                if (binding.slidingPane.isSlideable) {
+                    val navHostFragment =
+                        childFragmentManager.findFragmentById(R.id.contacts_nav_container) as NavHostFragment
+                    if (navHostFragment.navController.currentDestination?.id == R.id.emptyContactFragment) {
+                        Log.i("[Contacts] Foldable device has been folded, closing side pane with empty fragment")
+                        binding.slidingPane.closePane()
+                    }
+                }
+            }
+        }
+        binding.slidingPane.lockMode = SlidingPaneLayout.LOCK_MODE_LOCKED
+
+        /* End of shared view model & sliding pane related */
 
         _adapter = ContactsListAdapter(listSelectionViewModel, viewLifecycleOwner)
         binding.contactsList.setHasFixedSize(true)
@@ -104,15 +173,33 @@ class MasterContactsFragment : MasterFragment<ContactMasterFragmentBinding, Cont
                 val viewModel = DialogViewModel(getString(R.string.contact_delete_one_dialog))
                 val dialog: Dialog = DialogUtils.getDialog(requireContext(), viewModel)
 
+                val contactViewModel = adapter.currentList[viewHolder.bindingAdapterPosition]
+                if (contactViewModel.isNativeContact.value == false) {
+                    adapter.notifyItemChanged(viewHolder.bindingAdapterPosition)
+                    val activity = requireActivity() as MainActivity
+                    activity.showSnackBar(R.string.contact_cant_be_deleted)
+                    return
+                }
+
                 viewModel.showCancelButton {
-                    adapter.notifyItemChanged(viewHolder.adapterPosition)
+                    adapter.notifyItemChanged(viewHolder.bindingAdapterPosition)
                     dialog.dismiss()
                 }
 
-                viewModel.showDeleteButton({
-                    listViewModel.deleteContact(adapter.currentList[viewHolder.adapterPosition].contactInternal)
-                    dialog.dismiss()
-                }, getString(R.string.dialog_delete))
+                viewModel.showDeleteButton(
+                    {
+                        val deletedContact = adapter.currentList[viewHolder.bindingAdapterPosition].contactInternal
+                        listViewModel.deleteContact(deletedContact)
+                        if (!binding.slidingPane.isSlideable &&
+                            deletedContact == sharedViewModel.selectedContact.value
+                        ) {
+                            Log.i("[Contacts] Currently displayed contact has been deleted, removing detail fragment")
+                            clearDisplayedContact()
+                        }
+                        dialog.dismiss()
+                    },
+                    getString(R.string.dialog_delete)
+                )
 
                 dialog.show()
             }
@@ -124,26 +211,30 @@ class MasterContactsFragment : MasterFragment<ContactMasterFragmentBinding, Cont
         binding.contactsList.addItemDecoration(AppUtils.getDividerDecoration(requireContext(), layoutManager))
 
         // Displays the first letter header
-        val headerItemDecoration = RecyclerViewHeaderDecoration(adapter)
+        val headerItemDecoration = RecyclerViewHeaderDecoration(requireContext(), adapter)
         binding.contactsList.addItemDecoration(headerItemDecoration)
 
-        adapter.selectedContactEvent.observe(viewLifecycleOwner, {
+        adapter.selectedContactEvent.observe(
+            viewLifecycleOwner
+        ) {
             it.consume { contact ->
                 Log.i("[Contacts] Selected item in list changed: $contact")
                 sharedViewModel.selectedContact.value = contact
-                listViewModel.filter.value = ""
+                (requireActivity() as MainActivity).hideKeyboard()
 
                 if (editOnClick) {
-                    navigateToContactEditor(sipUriToAdd)
+                    navigateToContactEditor(sipUriToAdd, binding.slidingPane)
                     editOnClick = false
                     sipUriToAdd = null
                 } else {
                     navigateToContact()
                 }
             }
-        })
+        }
 
-        listViewModel.contactsList.observe(viewLifecycleOwner, {
+        listViewModel.contactsList.observe(
+            viewLifecycleOwner
+        ) {
             val id = contactIdToDisplay
             if (id != null) {
                 val contact = coreContext.contactsManager.findContactById(id)
@@ -154,7 +245,7 @@ class MasterContactsFragment : MasterFragment<ContactMasterFragmentBinding, Cont
                 }
             }
             adapter.submitList(it)
-        })
+        }
 
         binding.setAllContactsToggleClickListener {
             listViewModel.sipContactsSelected.value = false
@@ -163,18 +254,23 @@ class MasterContactsFragment : MasterFragment<ContactMasterFragmentBinding, Cont
             listViewModel.sipContactsSelected.value = true
         }
 
-        listViewModel.sipContactsSelected.observe(viewLifecycleOwner, {
+        listViewModel.sipContactsSelected.observe(
+            viewLifecycleOwner
+        ) {
             listViewModel.updateContactsList()
-        })
+        }
 
-        listViewModel.filter.observe(viewLifecycleOwner, {
+        listViewModel.filter.observe(
+            viewLifecycleOwner
+        ) {
             listViewModel.updateContactsList()
-        })
+        }
 
         binding.setNewContactClickListener {
             // Remove any previously selected contact
             sharedViewModel.selectedContact.value = null
-            navigateToContactEditor(sipUriToAdd)
+            editOnClick = false
+            navigateToContactEditor(sipUriToAdd, binding.slidingPane)
         }
 
         val id = arguments?.getString("id")
@@ -218,11 +314,21 @@ class MasterContactsFragment : MasterFragment<ContactMasterFragmentBinding, Cont
 
     override fun deleteItems(indexesOfItemToDelete: ArrayList<Int>) {
         val list = ArrayList<Contact>()
+        var closeSlidingPane = false
         for (index in indexesOfItemToDelete) {
             val contact = adapter.currentList[index].contactInternal
             list.add(contact)
+
+            if (contact == sharedViewModel.selectedContact.value) {
+                closeSlidingPane = true
+            }
         }
         listViewModel.deleteContacts(list)
+
+        if (!binding.slidingPane.isSlideable && closeSlidingPane) {
+            Log.i("[Contacts] Currently displayed contact has been deleted, removing detail fragment")
+            clearDisplayedContact()
+        }
     }
 
     override fun onRequestPermissionsResult(

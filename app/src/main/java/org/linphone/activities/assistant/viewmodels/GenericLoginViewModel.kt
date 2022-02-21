@@ -33,7 +33,7 @@ class GenericLoginViewModelFactory(private val accountCreator: AccountCreator) :
     ViewModelProvider.NewInstanceFactory() {
 
     @Suppress("UNCHECKED_CAST")
-    override fun <T : ViewModel?> create(modelClass: Class<T>): T {
+    override fun <T : ViewModel> create(modelClass: Class<T>): T {
         return GenericLoginViewModel(accountCreator) as T
     }
 }
@@ -136,6 +136,7 @@ class GenericLoginViewModel(private val accountCreator: AccountCreator) : ViewMo
             Log.e("[Assistant] [Generic Login] Account creator couldn't create proxy config")
             coreContext.core.removeListener(coreListener)
             onErrorEvent.value = Event("Error: Failed to create account object")
+            waitForServerAnswer.value = false
             return
         }
 

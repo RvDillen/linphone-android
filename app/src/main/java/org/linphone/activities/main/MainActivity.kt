@@ -30,6 +30,10 @@ import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
 import android.view.inputmethod.InputMethodManager
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.doOnAttach
 import androidx.databinding.DataBindingUtil
 import androidx.fragment.app.FragmentContainerView
 import androidx.lifecycle.ViewModelProvider
@@ -37,6 +41,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.navigation.NavController
 import androidx.navigation.NavDestination
 import androidx.navigation.findNavController
+import androidx.window.layout.FoldingFeature
 import com.google.android.material.snackbar.Snackbar
 import java.io.UnsupportedEncodingException
 import java.net.URLDecoder
@@ -45,8 +50,7 @@ import kotlinx.coroutines.*
 import org.linphone.LinphoneApplication.Companion.coreContext
 import org.linphone.LinphoneApplication.Companion.corePreferences
 import org.linphone.R
-import org.linphone.activities.GenericActivity
-import org.linphone.activities.SnackBarActivity
+import org.linphone.activities.*
 import org.linphone.activities.assistant.AssistantActivity
 import org.linphone.activities.main.viewmodels.CallOverlayViewModel
 import org.linphone.activities.main.viewmodels.SharedMainViewModel
@@ -57,6 +61,7 @@ import org.linphone.core.CorePreferences
 import org.linphone.core.tools.Log
 import org.linphone.databinding.MainActivityBinding
 import org.linphone.utils.AppUtils
+import org.linphone.utils.Event
 import org.linphone.utils.FileUtils
 import org.linphone.utils.GlideApp
 
@@ -98,19 +103,30 @@ class MainActivity : GenericActivity(), SnackBarActivity, NavController.OnDestin
         }
     }
 
+    override fun onLayoutChanges(foldingFeature: FoldingFeature?) {
+        sharedViewModel.layoutChangedEvent.value = Event(true)
+    }
+
+    private var tabsFragmentVisible1 = true
+    private var tabsFragmentVisible2 = true
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        val splashScreen = installSplashScreen()
 
         binding = DataBindingUtil.setContentView(this, R.layout.main_activity)
         binding.lifecycleOwner = this
 
-        sharedViewModel = ViewModelProvider(this).get(SharedMainViewModel::class.java)
+        sharedViewModel = ViewModelProvider(this)[SharedMainViewModel::class.java]
         binding.viewModel = sharedViewModel
 
-        callOverlayViewModel = ViewModelProvider(this).get(CallOverlayViewModel::class.java)
+        callOverlayViewModel = ViewModelProvider(this)[CallOverlayViewModel::class.java]
         binding.callOverlayViewModel = callOverlayViewModel
 
-        sharedViewModel.toggleDrawerEvent.observe(this, {
+        sharedViewModel.toggleDrawerEvent.observe(
+            this
+        ) {
             it.consume {
                 if (binding.sideMenu.isDrawerOpen(Gravity.LEFT)) {
                     binding.sideMenu.closeDrawer(binding.sideMenuContent, true)
@@ -118,17 +134,18 @@ class MainActivity : GenericActivity(), SnackBarActivity, NavController.OnDestin
                     binding.sideMenu.openDrawer(binding.sideMenuContent, true)
                 }
             }
-        })
+        }
 
-        coreContext.callErrorMessageResourceId.observe(this, {
+        coreContext.callErrorMessageResourceId.observe(
+            this
+        ) {
             it.consume { message ->
                 showSnackBar(message)
             }
-        })
+        }
 
         if (coreContext.core.accountList.isEmpty()) {
             if (corePreferences.firstStart) {
-                corePreferences.firstStart = false
                 startActivity(Intent(this, AssistantActivity::class.java))
             }
         }
@@ -136,7 +153,14 @@ class MainActivity : GenericActivity(), SnackBarActivity, NavController.OnDestin
         tabsFragment = findViewById(R.id.tabs_fragment)
         statusFragment = findViewById(R.id.status_fragment)
 
-        initOverlay()
+        binding.root.doOnAttach {
+            Log.i("[Main Activity] Report UI has been fully drawn (TTFD)")
+            try {
+                reportFullyDrawn()
+            } catch (se: SecurityException) {
+                Log.e("[Main Activity] Security exception when doing reportFullyDrawn(): $se")
+            }
+        }
     }
 
     override fun onNewIntent(intent: Intent?) {
@@ -159,6 +183,16 @@ class MainActivity : GenericActivity(), SnackBarActivity, NavController.OnDestin
         Snackbar.make(findViewById(R.id.coordinator), resourceId, Snackbar.LENGTH_LONG).show()
     }
 
+    override fun showSnackBar(resourceId: Int, action: Int, listener: () -> Unit) {
+        Snackbar
+            .make(findViewById(R.id.coordinator), resourceId, Snackbar.LENGTH_LONG)
+            .setAction(action) {
+                Log.i("[Snack Bar] Action listener triggered")
+                listener()
+            }
+            .show()
+    }
+
     override fun showSnackBar(message: String) {
         Snackbar.make(findViewById(R.id.coordinator), message, Snackbar.LENGTH_LONG).show()
     }
@@ -167,6 +201,17 @@ class MainActivity : GenericActivity(), SnackBarActivity, NavController.OnDestin
         super.onPostCreate(savedInstanceState)
         registerComponentCallbacks(componentCallbacks)
         findNavController(R.id.nav_host_fragment).addOnDestinationChangedListener(this)
+
+        binding.rootCoordinatorLayout.viewTreeObserver.addOnGlobalLayoutListener {
+            val portraitOrientation = resources.configuration.orientation != Configuration.ORIENTATION_LANDSCAPE
+            val keyboardVisible = ViewCompat.getRootWindowInsets(binding.rootCoordinatorLayout)
+                ?.isVisible(WindowInsetsCompat.Type.ime()) == true
+            Log.d("[Tabs Fragment] Keyboard is ${if (keyboardVisible) "visible" else "invisible"}")
+            tabsFragmentVisible2 = !portraitOrientation || !keyboardVisible
+            updateTabsFragmentVisibility()
+        }
+
+        initOverlay()
 
         if (intent != null) handleIntentParams(intent)
     }
@@ -182,20 +227,25 @@ class MainActivity : GenericActivity(), SnackBarActivity, NavController.OnDestin
         destination: NavDestination,
         arguments: Bundle?
     ) {
-        currentFocus?.hideKeyboard()
+        hideKeyboard()
         if (statusFragment.visibility == View.GONE) {
             statusFragment.visibility = View.VISIBLE
         }
 
-        when (destination.id) {
+        tabsFragmentVisible1 = when (destination.id) {
             R.id.masterCallLogsFragment, R.id.masterContactsFragment, R.id.dialerFragment, R.id.masterChatRoomsFragment ->
-                tabsFragment.visibility = View.VISIBLE
-            else -> tabsFragment.visibility = View.GONE
+                true
+            else -> false
         }
+        updateTabsFragmentVisibility()
     }
 
-    fun hideStatusFragment() {
-        statusFragment.visibility = View.GONE
+    fun hideKeyboard() {
+        currentFocus?.hideKeyboard()
+    }
+
+    private fun updateTabsFragmentVisibility() {
+        tabsFragment.visibility = if (tabsFragmentVisible1 && tabsFragmentVisible2) View.VISIBLE else View.GONE
     }
 
     private fun View.hideKeyboard() {
@@ -225,9 +275,8 @@ class MainActivity : GenericActivity(), SnackBarActivity, NavController.OnDestin
                     if (uri != null) {
                         val contactId = coreContext.contactsManager.getAndroidContactIdFromUri(uri)
                         if (contactId != null) {
-                            val deepLink = "linphone-android://contact/view/$contactId"
-                            Log.i("[Main Activity] Found contact URI parameter in intent: $uri, starting deep link: $deepLink")
-                            findNavController(R.id.nav_host_fragment).navigate(Uri.parse(deepLink))
+                            Log.i("[Main Activity] Found contact URI parameter in intent: $uri")
+                            navigateToContact(contactId)
                         }
                     }
                 } else {
@@ -254,23 +303,21 @@ class MainActivity : GenericActivity(), SnackBarActivity, NavController.OnDestin
                 when {
                     intent.hasExtra("ContactId") -> {
                         val id = intent.getStringExtra("ContactId")
-                        val deepLink = "linphone-android://contact/view/$id"
-                        Log.i("[Main Activity] Found contact id parameter in intent: $id, starting deep link: $deepLink")
-                        findNavController(R.id.nav_host_fragment).navigate(Uri.parse(deepLink))
+                        Log.i("[Main Activity] Found contact ID in extras: $id")
+                        navigateToContact(id)
                     }
                     intent.hasExtra("Chat") -> {
                         if (corePreferences.disableChat) return
 
-                        val deepLink = if (intent.hasExtra("RemoteSipUri") && intent.hasExtra("LocalSipUri")) {
+                        if (intent.hasExtra("RemoteSipUri") && intent.hasExtra("LocalSipUri")) {
                             val peerAddress = intent.getStringExtra("RemoteSipUri")
                             val localAddress = intent.getStringExtra("LocalSipUri")
                             Log.i("[Main Activity] Found chat room intent extra: local SIP URI=[$localAddress], peer SIP URI=[$peerAddress]")
-                            "linphone-android://chat-room/$localAddress/$peerAddress"
+                            navigateToChatRoom(localAddress, peerAddress)
                         } else {
                             Log.i("[Main Activity] Found chat intent extra, go to chat rooms list")
-                            "linphone-android://chat/"
+                            navigateToChatRooms()
                         }
-                        findNavController(R.id.nav_host_fragment).navigate(Uri.parse(deepLink))
                     }
                     intent.hasExtra("Dialer") -> {
                         Log.i("[Main Activity] Found dialer intent extra, go to dialer")
@@ -281,6 +328,11 @@ class MainActivity : GenericActivity(), SnackBarActivity, NavController.OnDestin
                 }
             }
         }
+
+        // Prevent this intent to be processed again
+        intent.action = null
+        intent.data = null
+        intent.extras?.clear()
     }
 
     private fun handleTelOrSipUri(uri: Uri) {
@@ -400,21 +452,19 @@ class MainActivity : GenericActivity(), SnackBarActivity, NavController.OnDestin
                     addressToIM = addressToIM.substring("mmsto:".length)
             }
 
-            val peerAddress = coreContext.core.interpretUrl(addressToIM)?.asStringUriOnly()
             val localAddress =
                 coreContext.core.defaultAccount?.params?.identityAddress?.asStringUriOnly()
-            val deepLink = "linphone-android://chat-room/$localAddress/$peerAddress"
-            Log.i("[Main Activity] Starting deep link: $deepLink")
-            findNavController(R.id.nav_host_fragment).navigate(Uri.parse(deepLink))
+            val peerAddress = coreContext.core.interpretUrl(addressToIM)?.asStringUriOnly()
+            Log.i("[Main Activity] Navigating to chat room with local [$localAddress] and peer [$peerAddress] addresses")
+            navigateToChatRoom(localAddress, peerAddress)
         } else {
             val shortcutId = intent.getStringExtra("android.intent.extra.shortcut.ID") // Intent.EXTRA_SHORTCUT_ID
             if (shortcutId != null) {
                 Log.i("[Main Activity] Found shortcut ID: $shortcutId")
                 handleLocusOrShortcut(shortcutId)
             } else {
-                val deepLink = "linphone-android://chat/"
-                Log.i("[Main Activity] Starting deep link: $deepLink")
-                findNavController(R.id.nav_host_fragment).navigate(Uri.parse(deepLink))
+                Log.i("[Main Activity] Going into chat rooms list")
+                navigateToChatRooms()
             }
         }
     }
@@ -424,10 +474,11 @@ class MainActivity : GenericActivity(), SnackBarActivity, NavController.OnDestin
         if (split.size == 2) {
             val localAddress = split[0]
             val peerAddress = split[1]
-            val deepLink = "linphone-android://chat-room/$localAddress/$peerAddress"
-            findNavController(R.id.nav_host_fragment).navigate(Uri.parse(deepLink))
+            Log.i("[Main Activity] Navigating to chat room with local [$localAddress] and peer [$peerAddress] addresses, computed from shortcut/locus id")
+            navigateToChatRoom(localAddress, peerAddress)
         } else {
-            Log.e("[Main Activity] Failed to parse shortcut/locus id: $id")
+            Log.e("[Main Activity] Failed to parse shortcut/locus id: $id, going to chat rooms list")
+            navigateToChatRooms()
         }
     }
 
@@ -453,7 +504,8 @@ class MainActivity : GenericActivity(), SnackBarActivity, NavController.OnDestin
                 }
                 MotionEvent.ACTION_UP -> {
                     if (abs(initPosX - view.x) < CorePreferences.OVERLAY_CLICK_SENSITIVITY &&
-                        abs(initPosY - view.y) < CorePreferences.OVERLAY_CLICK_SENSITIVITY) {
+                        abs(initPosY - view.y) < CorePreferences.OVERLAY_CLICK_SENSITIVITY
+                    ) {
                         view.performClick()
                     }
                 }

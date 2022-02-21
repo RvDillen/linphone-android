@@ -31,6 +31,10 @@ import org.linphone.databinding.AssistantEchoCancellerCalibrationFragmentBinding
 import org.linphone.utils.PermissionHelper
 
 class EchoCancellerCalibrationFragment : GenericFragment<AssistantEchoCancellerCalibrationFragmentBinding>() {
+    companion object {
+        const val RECORD_AUDIO_PERMISSION_REQUEST_CODE = 0
+    }
+
     private lateinit var viewModel: EchoCancellerCalibrationViewModel
 
     override fun getLayoutId(): Int = R.layout.assistant_echo_canceller_calibration_fragment
@@ -38,20 +42,22 @@ class EchoCancellerCalibrationFragment : GenericFragment<AssistantEchoCancellerC
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        binding.lifecycleOwner = this
+        binding.lifecycleOwner = viewLifecycleOwner
 
-        viewModel = ViewModelProvider(this).get(EchoCancellerCalibrationViewModel::class.java)
+        viewModel = ViewModelProvider(this)[EchoCancellerCalibrationViewModel::class.java]
         binding.viewModel = viewModel
 
-        viewModel.echoCalibrationTerminated.observe(viewLifecycleOwner, {
+        viewModel.echoCalibrationTerminated.observe(
+            viewLifecycleOwner
+        ) {
             it.consume {
                 requireActivity().finish()
             }
-        })
+        }
 
         if (!PermissionHelper.required(requireContext()).hasRecordAudioPermission()) {
             Log.i("[Echo Canceller Calibration] Asking for RECORD_AUDIO permission")
-            requestPermissions(arrayOf(android.Manifest.permission.RECORD_AUDIO), 0)
+            requestPermissions(arrayOf(android.Manifest.permission.RECORD_AUDIO), RECORD_AUDIO_PERMISSION_REQUEST_CODE)
         } else {
             viewModel.startEchoCancellerCalibration()
         }
@@ -62,13 +68,16 @@ class EchoCancellerCalibrationFragment : GenericFragment<AssistantEchoCancellerC
         permissions: Array<out String>,
         grantResults: IntArray
     ) {
-        val granted = grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED
-        if (granted) {
-            Log.i("[Echo Canceller Calibration] RECORD_AUDIO permission granted")
-            viewModel.startEchoCancellerCalibration()
-        } else {
-            Log.w("[Echo Canceller Calibration] RECORD_AUDIO permission denied")
-            requireActivity().finish()
+        if (requestCode == RECORD_AUDIO_PERMISSION_REQUEST_CODE) {
+            val granted =
+                grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED
+            if (granted) {
+                Log.i("[Echo Canceller Calibration] RECORD_AUDIO permission granted")
+                viewModel.startEchoCancellerCalibration()
+            } else {
+                Log.w("[Echo Canceller Calibration] RECORD_AUDIO permission denied")
+                requireActivity().finish()
+            }
         }
     }
 }

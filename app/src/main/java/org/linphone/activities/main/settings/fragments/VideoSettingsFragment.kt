@@ -26,18 +26,18 @@ import android.view.View
 import androidx.databinding.DataBindingUtil
 import androidx.databinding.ViewDataBinding
 import androidx.lifecycle.ViewModelProvider
-import androidx.navigation.fragment.findNavController
 import org.linphone.BR
 import org.linphone.LinphoneApplication.Companion.coreContext
 import org.linphone.R
-import org.linphone.activities.GenericFragment
 import org.linphone.activities.main.settings.SettingListenerStub
 import org.linphone.activities.main.settings.viewmodels.VideoSettingsViewModel
+import org.linphone.activities.navigateToEmptySetting
 import org.linphone.core.tools.Log
 import org.linphone.databinding.SettingsVideoFragmentBinding
+import org.linphone.utils.Event
 import org.linphone.utils.PermissionHelper
 
-class VideoSettingsFragment : GenericFragment<SettingsVideoFragmentBinding>() {
+class VideoSettingsFragment : GenericSettingFragment<SettingsVideoFragmentBinding>() {
     private lateinit var viewModel: VideoSettingsViewModel
 
     override fun getLayoutId(): Int = R.layout.settings_video_fragment
@@ -45,13 +45,13 @@ class VideoSettingsFragment : GenericFragment<SettingsVideoFragmentBinding>() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        binding.lifecycleOwner = this
+        binding.lifecycleOwner = viewLifecycleOwner
+        binding.sharedMainViewModel = sharedViewModel
 
-        viewModel = ViewModelProvider(this).get(VideoSettingsViewModel::class.java)
+        viewModel = ViewModelProvider(this)[VideoSettingsViewModel::class.java]
         binding.viewModel = viewModel
 
-        binding.setBackClickListener { findNavController().popBackStack() }
-        binding.back.visibility = if (resources.getBoolean(R.bool.isTablet)) View.INVISIBLE else View.VISIBLE
+        binding.setBackClickListener { goBack() }
 
         initVideoCodecsList()
 
@@ -86,18 +86,29 @@ class VideoSettingsFragment : GenericFragment<SettingsVideoFragmentBinding>() {
             binding.setVariable(BR.text_subtitle, "")
             binding.setVariable(BR.defaultValue, payload.recvFmtp)
             binding.setVariable(BR.checked, payload.enabled())
-            binding.setVariable(BR.listener, object : SettingListenerStub() {
-                override fun onBoolValueChanged(newValue: Boolean) {
-                    payload.enable(newValue)
-                }
+            binding.setVariable(
+                BR.listener,
+                object : SettingListenerStub() {
+                    override fun onBoolValueChanged(newValue: Boolean) {
+                        payload.enable(newValue)
+                    }
 
-                override fun onTextValueChanged(newValue: String) {
-                    payload.recvFmtp = newValue
+                    override fun onTextValueChanged(newValue: String) {
+                        payload.recvFmtp = newValue
+                    }
                 }
-            })
-            binding.lifecycleOwner = this
+            )
+            binding.lifecycleOwner = viewLifecycleOwner
             list.add(binding)
         }
         viewModel.videoCodecs.value = list
+    }
+
+    override fun goBack() {
+        if (sharedViewModel.isSlidingPaneSlideable.value == true) {
+            sharedViewModel.closeSlidingPaneEvent.value = Event(true)
+        } else {
+            navigateToEmptySetting()
+        }
     }
 }

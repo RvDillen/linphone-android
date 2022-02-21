@@ -24,10 +24,13 @@
             name="attachFileClickListener"
             type="android.view.View.OnClickListener"/>
         <variable
-            name="sendMessageClickListener"
-            type="android.view.View.OnClickListener"/>
+            name="voiceRecordingTouchListener"
+            type="android.view.View.OnTouchListener" />
         <variable
-            name="startCallClickListener"
+            name="cancelReplyToClickListener"
+            type="android.view.View.OnClickListener" />
+        <variable
+            name="scrollToBottomClickListener"
             type="android.view.View.OnClickListener"/>
         <variable
             name="viewModel"
@@ -35,11 +38,15 @@
         <variable
             name="chatSendingViewModel"
             type="org.linphone.activities.main.chat.viewmodels.ChatMessageSendingViewModel" />
+        <variable
+            name="sharedMainViewModel"
+            type="org.linphone.activities.main.viewmodels.SharedMainViewModel" />
     </data>
 
     <RelativeLayout
         android:layout_width="match_parent"
-        android:layout_height="match_parent">
+        android:layout_height="match_parent"
+        android:clickable="true">
 
         <LinearLayout
             android:id="@+id/top_bar"
@@ -52,6 +59,7 @@
                 android:id="@+id/back"
                 android:contentDescription="@string/content_description_go_back"
                 android:onClick="@{backClickListener}"
+                android:visibility="@{sharedMainViewModel.isSlidingPaneSlideable ? View.VISIBLE : View.GONE}"
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
                 android:layout_weight="0.2"
@@ -66,7 +74,7 @@
                 android:layout_weight="@{viewModel.oneToOneChatRoom ? 0.4f : 0.6f}"
                 android:gravity="center_vertical|left"
                 android:orientation="vertical"
-                android:paddingLeft="5dp">
+                android:paddingLeft="15dp">
 
                 <org.linphone.views.MarqueeTextView
                     android:onClick="@{titleClickListener}"
@@ -96,7 +104,7 @@
             </LinearLayout>
 
             <ImageView
-                android:onClick="@{startCallClickListener}"
+                android:onClick="@{() -> viewModel.startCall()}"
                 android:contentDescription="@string/content_description_start_call"
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
@@ -108,7 +116,7 @@
 
             <ImageView
                 android:id="@+id/menu"
-                android:visibility="@{viewModel.basicChatRoom ? View.GONE : View.VISIBLE}"
+                android:visibility="@{viewModel.hideMenu() || chatSendingViewModel.isReadOnly ? View.GONE : View.VISIBLE}"
                 android:onClick="@{menuClickListener}"
                 android:contentDescription="@string/content_description_show_chat_room_menu"
                 android:layout_width="0dp"
@@ -120,7 +128,7 @@
 
             <ImageView
                 android:onClick="@{editClickListener}"
-                android:visibility="@{viewModel.basicChatRoom ? View.VISIBLE : View.GONE}"
+                android:visibility="@{menu.visibility == View.GONE ? View.VISIBLE : View.GONE}"
                 android:contentDescription="@string/content_description_enter_edition_mode"
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
@@ -147,10 +155,35 @@
             android:background="?attr/lightToolbarBackgroundColor"
             android:orientation="vertical">
 
+            <ViewStub
+                android:id="@+id/stubbed_message_to_reply_to"
+                android:visibility="@{chatSendingViewModel.isPendingAnswer ? View.VISIBLE : View.GONE, default=gone}"
+                app:inflatedVisibility="@{chatSendingViewModel.isPendingAnswer ? View.VISIBLE : View.GONE}"
+                app:data="@{chatSendingViewModel.pendingChatMessageToReplyTo}"
+                android:layout="@layout/chat_message_reply"
+                app:cancelClickListener="@{cancelReplyToClickListener}"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"/>
+
+            <ViewStub
+                android:id="@+id/stubbed_voice_recording"
+                android:visibility="@{chatSendingViewModel.isPendingVoiceRecord ? View.VISIBLE : View.GONE, default=gone}"
+                app:inflatedVisibility="@{chatSendingViewModel.isPendingVoiceRecord ? View.VISIBLE : View.GONE}"
+                app:viewModel="@{chatSendingViewModel}"
+                android:layout="@layout/chat_message_voice_recording"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content" />
+
+            <View
+                android:visibility="@{chatSendingViewModel.isPendingVoiceRecord &amp;&amp; chatSendingViewModel.attachments.size() > 0 ? View.VISIBLE : View.GONE, default=gone}"
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="?attr/dividerColor" />
+
             <HorizontalScrollView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:background="?attr/lightToolbarBackgroundColor"
+                android:background="?attr/backgroundColor2"
                 android:orientation="horizontal">
 
                 <LinearLayout
@@ -165,31 +198,45 @@
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:visibility="@{chatSendingViewModel.isReadOnly ? View.GONE : View.VISIBLE}"
                 android:gravity="center_vertical"
-                android:background="?attr/backgroundColor"
+                android:background="?attr/lightToolbarBackgroundColor"
                 android:orientation="horizontal">
 
                 <ImageView
                     android:onClick="@{attachFileClickListener}"
-                    android:enabled="@{chatSendingViewModel.attachFileEnabled &amp;&amp; !chatSendingViewModel.isReadOnly}"
+                    android:enabled="@{chatSendingViewModel.attachFileEnabled}"
                     android:contentDescription="@string/content_description_attach_file"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:padding="5dp"
+                    android:padding="10dp"
                     android:src="@drawable/chat_file" />
+
+                <ImageView
+                    android:id="@+id/voice_record"
+                    android:onTouch="@{voiceRecordingTouchListener}"
+                    android:onClick="@{() -> chatSendingViewModel.toggleVoiceRecording()}"
+                    android:selected="@{chatSendingViewModel.isVoiceRecording}"
+                    android:contentDescription="@string/content_description_voice_recording"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:paddingTop="10dp"
+                    android:paddingBottom="10dp"
+                    android:paddingRight="10dp"
+                    android:src="@drawable/record_audio_message" />
 
                 <org.linphone.activities.main.chat.views.RichEditText
                     android:id="@+id/message"
-                    android:enabled="@{!chatSendingViewModel.isReadOnly}"
                     android:text="@={chatSendingViewModel.textToSend}"
+                    android:hint="@{chatSendingViewModel.isPendingAnswer ? @string/chat_room_sending_reply_hint : @string/chat_room_sending_message_hint}"
+                    android:imeOptions="@{chatSendingViewModel.imeFlags}"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_gravity="center_vertical"
-                    android:layout_marginTop="5dp"
-                    android:layout_marginBottom="5dp"
+                    android:layout_marginTop="10dp"
+                    android:layout_marginBottom="10dp"
                     android:layout_weight="1"
                     android:background="@drawable/resizable_text_field"
-                    android:imeOptions="flagNoExtractUi"
                     android:inputType="textShortMessage|textMultiLine|textAutoComplete|textAutoCorrect|textCapSentences"
                     android:maxLines="6"
                     android:padding="5dp"
@@ -202,17 +249,17 @@
 
                     <ImageView
                         android:id="@+id/send_message"
-                        android:onClick="@{sendMessageClickListener}"
-                        android:enabled="@{chatSendingViewModel.sendMessageEnabled &amp;&amp; !chatSendingViewModel.isReadOnly}"
+                        android:onClick="@{() -> chatSendingViewModel.sendMessage()}"
+                        android:enabled="@{chatSendingViewModel.sendMessageEnabled}"
                         android:contentDescription="@string/content_description_send_message"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:padding="5dp"
+                        android:padding="10dp"
                         android:src="@drawable/chat_send_message" />
 
                     <ImageView
-                        android:visibility="@{viewModel.chatRoom.ephemeralEnabled() ? View.VISIBLE : View.GONE, default=gone}"
-                        android:enabled="@{chatSendingViewModel.sendMessageEnabled &amp;&amp; !chatSendingViewModel.isReadOnly}"
+                        android:visibility="@{viewModel.chatRoom.isEphemeralEnabled() ? View.VISIBLE : View.GONE, default=gone}"
+                        android:enabled="@{chatSendingViewModel.sendMessageEnabled}"
                         android:contentDescription="@string/content_description_ephemeral_message"
                         android:clickable="false"
                         android:layout_width="20dp"
@@ -229,27 +276,30 @@
 
         </LinearLayout>
 
-        <TextView
-            android:id="@+id/remote_composing"
-            android:text="@{viewModel.composingList, default=@string/chat_remote_is_composing}"
-            android:visibility="@{viewModel.remoteIsComposing ? View.VISIBLE : View.INVISIBLE}"
-            android:layout_marginLeft="5dp"
-            style="@style/standard_small_text_font"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_above="@id/footer" />
-
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/chat_messages_list"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:layout_above="@id/remote_composing"
+            android:layout_above="@id/footer"
             android:layout_below="@+id/top_bar"
             android:cacheColorHint="@color/transparent_color"
             android:choiceMode="multipleChoice"
+            android:clipToPadding="false"
             android:divider="@android:color/transparent"
             android:listSelector="@color/transparent_color"
+            android:paddingBottom="20dp"
             android:transcriptMode="normal" />
+
+        <TextView
+            android:id="@+id/remote_composing"
+            style="@style/standard_small_text_font"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_above="@id/footer"
+            android:paddingLeft="5dp"
+            android:background="?attr/backgroundColor"
+            android:text="@{viewModel.composingList, default=@string/chat_remote_is_composing}"
+            android:visibility="@{viewModel.remoteIsComposing ? View.VISIBLE : View.GONE}" />
 
         <ImageView
             android:src="@{viewModel.securityLevelIcon, default=@drawable/security_alert_indicator}"
@@ -263,6 +313,39 @@
             android:layout_alignParentRight="true"
             android:layout_marginTop="8dp"
             android:layout_marginRight="8dp" />
+
+        <RelativeLayout
+            android:onClick="@{scrollToBottomClickListener}"
+            android:visibility="@{viewModel.isUserScrollingUp ? View.VISIBLE : View.GONE, default=gone}"
+            android:layout_width="50dp"
+            android:layout_height="50dp"
+            android:layout_marginEnd="5dp"
+            android:layout_marginBottom="10dp"
+            android:layout_above="@id/footer"
+            android:layout_alignParentEnd="true">
+
+            <ImageView
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:layout_alignParentStart="true"
+                android:layout_alignParentBottom="true"
+                android:background="@drawable/round_button_background"
+                android:padding="13dp"
+                android:contentDescription="@string/content_descripton_scroll_to_bottom"
+                android:src="@drawable/scroll_to_bottom" />
+
+            <TextView
+                style="@style/unread_count_font"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_alignParentTop="true"
+                android:layout_alignParentEnd="true"
+                android:background="@{viewModel.unreadMessagesCount == 0 ? @drawable/hidden_unread_message_count_bg : @drawable/unread_message_count_bg, default=@drawable/unread_message_count_bg}"
+                android:gravity="center"
+                android:text="@{viewModel.unreadMessagesCount == 0 ? `` : String.valueOf(viewModel.unreadMessagesCount), default=1}"
+                android:translationY="@{viewModel.chatUnreadCountTranslateY}" />
+
+        </RelativeLayout>
 
     </RelativeLayout>
 

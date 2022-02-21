@@ -31,7 +31,7 @@ class IncomingCallViewModelFactory(private val call: Call) :
     ViewModelProvider.NewInstanceFactory() {
 
     @Suppress("UNCHECKED_CAST")
-    override fun <T : ViewModel?> create(modelClass: Class<T>): T {
+    override fun <T : ViewModel> create(modelClass: Class<T>): T {
         return IncomingCallViewModel(call) as T
     }
 }
@@ -60,10 +60,10 @@ class IncomingCallViewModel(call: Call) : CallViewModel(call) {
         coreContext.core.addListener(listener)
 
         screenLocked.value = false
-        inviteWithVideo.value = call.remoteParams?.videoEnabled() == true && coreContext.core.videoActivationPolicy.automaticallyAccept
+        inviteWithVideo.value = call.remoteParams?.isVideoEnabled == true && coreContext.core.videoActivationPolicy.automaticallyAccept
         earlyMediaVideoEnabled.value = corePreferences.acceptEarlyMedia &&
-                call.state == Call.State.IncomingEarlyMedia &&
-                call.currentParams.videoEnabled()
+            call.state == Call.State.IncomingEarlyMedia &&
+            call.currentParams.isVideoEnabled
     }
 
     override fun onCleared() {

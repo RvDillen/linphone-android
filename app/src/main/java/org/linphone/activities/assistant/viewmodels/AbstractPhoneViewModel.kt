@@ -30,7 +30,8 @@ import org.linphone.core.DialPlan
 import org.linphone.core.tools.Log
 import org.linphone.utils.PhoneNumberUtils
 
-abstract class AbstractPhoneViewModel(val accountCreator: AccountCreator) : ViewModel(),
+abstract class AbstractPhoneViewModel(val accountCreator: AccountCreator) :
+    ViewModel(),
     CountryPickerFragment.CountryPickedListener {
 
     val prefix = MutableLiveData<String>()
@@ -55,14 +56,19 @@ abstract class AbstractPhoneViewModel(val accountCreator: AccountCreator) : View
     }
 
     fun updateFromPhoneNumberAndOrDialPlan(number: String?, dialPlan: DialPlan?) {
+        val internationalPrefix = "+${dialPlan?.countryCallingCode}"
         if (dialPlan != null) {
             Log.i("[Assistant] Found prefix from dial plan: ${dialPlan.countryCallingCode}")
-            prefix.value = "+${dialPlan.countryCallingCode}"
+            prefix.value = internationalPrefix
         }
 
         if (number != null) {
             Log.i("[Assistant] Found phone number: $number")
-            phoneNumber.value = number!!
+            phoneNumber.value = if (number.startsWith(internationalPrefix)) {
+                number.substring(internationalPrefix.length)
+            } else {
+                number
+            }
         }
     }
 

@@ -44,16 +44,18 @@ class GenericAccountLoginFragment : GenericFragment<AssistantGenericAccountLogin
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        binding.lifecycleOwner = this
+        binding.lifecycleOwner = viewLifecycleOwner
 
         sharedViewModel = requireActivity().run {
-            ViewModelProvider(this).get(SharedAssistantViewModel::class.java)
+            ViewModelProvider(this)[SharedAssistantViewModel::class.java]
         }
 
-        viewModel = ViewModelProvider(this, GenericLoginViewModelFactory(sharedViewModel.getAccountCreator(true))).get(GenericLoginViewModel::class.java)
+        viewModel = ViewModelProvider(this, GenericLoginViewModelFactory(sharedViewModel.getAccountCreator(true)))[GenericLoginViewModel::class.java]
         binding.viewModel = viewModel
 
-        viewModel.leaveAssistantEvent.observe(viewLifecycleOwner, {
+        viewModel.leaveAssistantEvent.observe(
+            viewLifecycleOwner
+        ) {
             it.consume {
                 coreContext.contactsManager.updateLocalContacts()
 
@@ -63,11 +65,14 @@ class GenericAccountLoginFragment : GenericFragment<AssistantGenericAccountLogin
                     requireActivity().finish()
                 }
             }
-        })
+        }
 
-        viewModel.invalidCredentialsEvent.observe(viewLifecycleOwner, {
+        viewModel.invalidCredentialsEvent.observe(
+            viewLifecycleOwner
+        ) {
             it.consume {
-                val dialogViewModel = DialogViewModel(getString(R.string.assistant_error_invalid_credentials))
+                val dialogViewModel =
+                    DialogViewModel(getString(R.string.assistant_error_invalid_credentials))
                 val dialog: Dialog = DialogUtils.getDialog(requireContext(), dialogViewModel)
 
                 dialogViewModel.showCancelButton {
@@ -75,19 +80,24 @@ class GenericAccountLoginFragment : GenericFragment<AssistantGenericAccountLogin
                     dialog.dismiss()
                 }
 
-                dialogViewModel.showDeleteButton({
-                    viewModel.continueEvenIfInvalidCredentials()
-                    dialog.dismiss()
-                }, getString(R.string.assistant_continue_even_if_credentials_invalid))
+                dialogViewModel.showDeleteButton(
+                    {
+                        viewModel.continueEvenIfInvalidCredentials()
+                        dialog.dismiss()
+                    },
+                    getString(R.string.assistant_continue_even_if_credentials_invalid)
+                )
 
                 dialog.show()
             }
-        })
+        }
 
-        viewModel.onErrorEvent.observe(viewLifecycleOwner, {
+        viewModel.onErrorEvent.observe(
+            viewLifecycleOwner
+        ) {
             it.consume { message ->
                 (requireActivity() as AssistantActivity).showSnackBar(message)
             }
-        })
+        }
     }
 }

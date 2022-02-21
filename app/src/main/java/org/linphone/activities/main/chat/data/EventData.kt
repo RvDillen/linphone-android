@@ -35,12 +35,20 @@ class EventData(private val eventLog: EventLog) : GenericContactData(
         } else {
             eventLog.participantAddress!!
         }
-    }) {
+    }
+) {
     val text = MutableLiveData<String>()
 
     val isSecurity: Boolean by lazy {
         when (eventLog.type) {
             EventLog.Type.ConferenceSecurityEvent -> true
+            else -> false
+        }
+    }
+
+    val isGroupLeft: Boolean by lazy {
+        when (eventLog.type) {
+            EventLog.Type.ConferenceTerminated -> true
             else -> false
         }
     }

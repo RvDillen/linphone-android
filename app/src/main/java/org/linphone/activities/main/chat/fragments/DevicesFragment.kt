@@ -40,10 +40,10 @@ class DevicesFragment : SecureFragment<ChatRoomDevicesFragmentBinding>() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        binding.lifecycleOwner = this
+        binding.lifecycleOwner = viewLifecycleOwner
 
         sharedViewModel = requireActivity().run {
-            ViewModelProvider(this).get(SharedMainViewModel::class.java)
+            ViewModelProvider(this)[SharedMainViewModel::class.java]
         }
 
         val chatRoom = sharedViewModel.selectedChatRoom.value
@@ -54,7 +54,7 @@ class DevicesFragment : SecureFragment<ChatRoomDevicesFragmentBinding>() {
             return
         }
 
-        isSecure = chatRoom.currentParams.encryptionEnabled()
+        isSecure = chatRoom.currentParams.isEncryptionEnabled
 
         listViewModel = ViewModelProvider(
             this,
@@ -63,7 +63,13 @@ class DevicesFragment : SecureFragment<ChatRoomDevicesFragmentBinding>() {
         binding.viewModel = listViewModel
 
         binding.setBackClickListener {
-            findNavController().popBackStack()
+            goBack()
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+
+        listViewModel.updateParticipants()
     }
 }

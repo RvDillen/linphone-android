@@ -39,16 +39,18 @@ class EmailAccountValidationFragment : GenericFragment<AssistantEmailAccountVali
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        binding.lifecycleOwner = this
+        binding.lifecycleOwner = viewLifecycleOwner
 
         sharedViewModel = requireActivity().run {
-            ViewModelProvider(this).get(SharedAssistantViewModel::class.java)
+            ViewModelProvider(this)[SharedAssistantViewModel::class.java]
         }
 
-        viewModel = ViewModelProvider(this, EmailAccountValidationViewModelFactory(sharedViewModel.getAccountCreator())).get(EmailAccountValidationViewModel::class.java)
+        viewModel = ViewModelProvider(this, EmailAccountValidationViewModelFactory(sharedViewModel.getAccountCreator()))[EmailAccountValidationViewModel::class.java]
         binding.viewModel = viewModel
 
-        viewModel.leaveAssistantEvent.observe(viewLifecycleOwner, {
+        viewModel.leaveAssistantEvent.observe(
+            viewLifecycleOwner
+        ) {
             it.consume {
                 coreContext.contactsManager.updateLocalContacts()
 
@@ -58,12 +60,14 @@ class EmailAccountValidationFragment : GenericFragment<AssistantEmailAccountVali
                 args.putString("Password", viewModel.accountCreator.password)
                 navigateToAccountLinking(args)
             }
-        })
+        }
 
-        viewModel.onErrorEvent.observe(viewLifecycleOwner, {
+        viewModel.onErrorEvent.observe(
+            viewLifecycleOwner
+        ) {
             it.consume { message ->
                 (requireActivity() as AssistantActivity).showSnackBar(message)
             }
-        })
+        }
     }
 }

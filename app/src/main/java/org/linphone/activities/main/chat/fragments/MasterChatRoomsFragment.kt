@@ -20,16 +20,23 @@
 package org.linphone.activities.main.chat.fragments
 
 import android.app.Dialog
+import android.content.res.Configuration
 import android.os.Bundle
 import android.view.View
 import androidx.core.content.ContextCompat
+import androidx.core.view.doOnPreDraw
 import androidx.lifecycle.ViewModelProvider
+import androidx.navigation.fragment.NavHostFragment
 import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import androidx.slidingpanelayout.widget.SlidingPaneLayout
+import com.google.android.material.transition.MaterialSharedAxis
 import org.linphone.LinphoneApplication.Companion.coreContext
+import org.linphone.LinphoneApplication.Companion.corePreferences
 import org.linphone.R
 import org.linphone.activities.GenericActivity
+import org.linphone.activities.clearDisplayedChatRoom
 import org.linphone.activities.main.MainActivity
 import org.linphone.activities.main.chat.adapters.ChatRoomsListAdapter
 import org.linphone.activities.main.chat.viewmodels.ChatRoomsListViewModel
@@ -71,18 +78,76 @@ class MasterChatRoomsFragment : MasterFragment<ChatRoomMasterFragmentBinding, Ch
         super.onDestroyView()
     }
 
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+
+        useMaterialSharedAxisXForwardAnimation = false
+        if (corePreferences.enableAnimations) {
+            val portraitOrientation = resources.configuration.orientation != Configuration.ORIENTATION_LANDSCAPE
+            val axis = if (portraitOrientation) MaterialSharedAxis.X else MaterialSharedAxis.Y
+            enterTransition = MaterialSharedAxis(axis, true)
+            reenterTransition = MaterialSharedAxis(axis, true)
+            returnTransition = MaterialSharedAxis(axis, false)
+            exitTransition = MaterialSharedAxis(axis, false)
+        }
+    }
+
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
         isSecure = true
-        binding.lifecycleOwner = this
+        binding.lifecycleOwner = viewLifecycleOwner
 
-        listViewModel = ViewModelProvider(this).get(ChatRoomsListViewModel::class.java)
+        listViewModel = requireActivity().run {
+            ViewModelProvider(this)[ChatRoomsListViewModel::class.java]
+        }
         binding.viewModel = listViewModel
 
+        /* Shared view model & sliding pane related */
+
         sharedViewModel = requireActivity().run {
-            ViewModelProvider(this).get(SharedMainViewModel::class.java)
+            ViewModelProvider(this)[SharedMainViewModel::class.java]
         }
+
+        view.doOnPreDraw { sharedViewModel.isSlidingPaneSlideable.value = binding.slidingPane.isSlideable }
+
+        // Chat room loading can take some time, so wait until it is ready before opening the pane
+        sharedViewModel.chatRoomFragmentOpenedEvent.observe(
+            viewLifecycleOwner
+        ) {
+            it.consume {
+                binding.slidingPane.openPane()
+            }
+        }
+
+        sharedViewModel.closeSlidingPaneEvent.observe(
+            viewLifecycleOwner
+        ) {
+            it.consume {
+                (requireActivity() as MainActivity).hideKeyboard()
+                if (!binding.slidingPane.closePane()) {
+                    goBack()
+                }
+            }
+        }
+        sharedViewModel.layoutChangedEvent.observe(
+            viewLifecycleOwner
+        ) {
+            it.consume {
+                sharedViewModel.isSlidingPaneSlideable.value = binding.slidingPane.isSlideable
+                if (binding.slidingPane.isSlideable) {
+                    val navHostFragment =
+                        childFragmentManager.findFragmentById(R.id.chat_nav_container) as NavHostFragment
+                    if (navHostFragment.navController.currentDestination?.id == R.id.emptyChatFragment) {
+                        Log.i("[Chat] Foldable device has been folded, closing side pane with empty fragment")
+                        binding.slidingPane.closePane()
+                    }
+                }
+            }
+        }
+        binding.slidingPane.lockMode = SlidingPaneLayout.LOCK_MODE_LOCKED
+
+        /* End of shared view model & sliding pane related */
 
         _adapter = ChatRoomsListAdapter(listSelectionViewModel, viewLifecycleOwner)
         // SubmitList is done on a background thread
@@ -110,10 +175,9 @@ class MasterChatRoomsFragment : MasterFragment<ChatRoomMasterFragmentBinding, Ch
         )
         val swipeListener = object : RecyclerViewSwipeListener {
             override fun onLeftToRightSwipe(viewHolder: RecyclerView.ViewHolder) {
-                val chatRoomViewModel = adapter.currentList[viewHolder.adapterPosition]
+                val chatRoomViewModel = adapter.currentList[viewHolder.bindingAdapterPosition]
                 chatRoomViewModel.chatRoom.markAsRead()
-                coreContext.notificationsManager.dismissChatNotification(chatRoomViewModel.chatRoom)
-                adapter.notifyItemChanged(viewHolder.adapterPosition)
+                adapter.notifyItemChanged(viewHolder.bindingAdapterPosition)
             }
 
             override fun onRightToLeftSwipe(viewHolder: RecyclerView.ViewHolder) {
@@ -121,14 +185,24 @@ class MasterChatRoomsFragment : MasterFragment<ChatRoomMasterFragmentBinding, Ch
                 val dialog: Dialog = DialogUtils.getDialog(requireContext(), viewModel)
 
                 viewModel.showCancelButton {
-                    adapter.notifyItemChanged(viewHolder.adapterPosition)
+                    adapter.notifyItemChanged(viewHolder.bindingAdapterPosition)
                     dialog.dismiss()
                 }
 
-                viewModel.showDeleteButton({
-                    listViewModel.deleteChatRoom(adapter.currentList[viewHolder.adapterPosition].chatRoom)
-                    dialog.dismiss()
-                }, getString(R.string.dialog_delete))
+                viewModel.showDeleteButton(
+                    {
+                        val deletedChatRoom = adapter.currentList[viewHolder.bindingAdapterPosition].chatRoom
+                        listViewModel.deleteChatRoom(deletedChatRoom)
+                        if (!binding.slidingPane.isSlideable &&
+                            deletedChatRoom == sharedViewModel.selectedChatRoom.value
+                        ) {
+                            Log.i("[Chat] Currently displayed chat room has been deleted, removing detail fragment")
+                            clearDisplayedChatRoom()
+                        }
+                        dialog.dismiss()
+                    },
+                    getString(R.string.dialog_delete)
+                )
 
                 dialog.show()
             }
@@ -139,27 +213,48 @@ class MasterChatRoomsFragment : MasterFragment<ChatRoomMasterFragmentBinding, Ch
         // Divider between items
         binding.chatList.addItemDecoration(AppUtils.getDividerDecoration(requireContext(), layoutManager))
 
-        listViewModel.chatRooms.observe(viewLifecycleOwner, { chatRooms ->
+        listViewModel.chatRooms.observe(
+            viewLifecycleOwner
+        ) { chatRooms ->
             adapter.submitList(chatRooms)
-        })
+        }
 
-        listViewModel.contactsUpdatedEvent.observe(viewLifecycleOwner, {
+        listViewModel.contactsUpdatedEvent.observe(
+            viewLifecycleOwner
+        ) {
             it.consume {
                 adapter.notifyDataSetChanged()
             }
-        })
+        }
 
-        adapter.selectedChatRoomEvent.observe(viewLifecycleOwner, {
+        adapter.selectedChatRoomEvent.observe(
+            viewLifecycleOwner
+        ) {
             it.consume { chatRoom ->
                 if ((requireActivity() as GenericActivity).isDestructionPending) {
                     Log.w("[Chat] Activity is pending destruction, don't start navigating now!")
                     sharedViewModel.destructionPendingChatRoom = chatRoom
                 } else {
-                    sharedViewModel.selectedChatRoom.value = chatRoom
-                    navigateToChatRoom(AppUtils.createBundleWithSharedTextAndFiles(sharedViewModel))
+                    if (chatRoom.peerAddress.asStringUriOnly() == coreContext.notificationsManager.currentlyDisplayedChatRoomAddress) {
+                        if (!binding.slidingPane.isOpen) {
+                            Log.w("[Chat] Chat room is displayed but sliding pane is closed...")
+                            if (!binding.slidingPane.openPane()) {
+                                Log.e("[Chat] Tried to open pane to workaround already displayed chat room issue, failed!")
+                            }
+                        } else {
+                            Log.w("[Chat] This chat room is already displayed!")
+                        }
+                    } else {
+                        sharedViewModel.selectedChatRoom.value = chatRoom
+                        navigateToChatRoom(
+                            AppUtils.createBundleWithSharedTextAndFiles(
+                                sharedViewModel
+                            )
+                        )
+                    }
                 }
             }
-        })
+        }
 
         binding.setEditClickListener {
             listSelectionViewModel.isEditionEnabled.value = true
@@ -169,8 +264,7 @@ class MasterChatRoomsFragment : MasterFragment<ChatRoomMasterFragmentBinding, Ch
             sharedViewModel.messageToForwardEvent.value?.consume {
                 Log.i("[Chat] Cancelling message forward")
             }
-            listViewModel.forwardPending.value = false
-            adapter.forwardPending(false)
+            sharedViewModel.isPendingMessageForward.value = false
         }
 
         binding.setCancelSharingClickListener {
@@ -183,13 +277,13 @@ class MasterChatRoomsFragment : MasterFragment<ChatRoomMasterFragmentBinding, Ch
 
         binding.setNewOneToOneChatRoomClickListener {
             sharedViewModel.chatRoomParticipants.value = arrayListOf()
-            navigateToChatRoomCreation(false)
+            navigateToChatRoomCreation(false, binding.slidingPane)
         }
 
         binding.setNewGroupChatRoomClickListener {
             sharedViewModel.selectedGroupChatRoom.value = null
             sharedViewModel.chatRoomParticipants.value = arrayListOf()
-            navigateToChatRoomCreation(true)
+            navigateToChatRoomCreation(true, binding.slidingPane)
         }
 
         val pendingDestructionChatRoom = sharedViewModel.destructionPendingChatRoom
@@ -210,62 +304,76 @@ class MasterChatRoomsFragment : MasterFragment<ChatRoomMasterFragmentBinding, Ch
             val chatRoom = coreContext.core.searchChatRoom(null, localAddress, remoteSipAddress, arrayOfNulls(0))
             if (chatRoom != null) {
                 Log.i("[Chat] Found matching chat room $chatRoom")
-                chatRoom.markAsRead()
                 adapter.selectedChatRoomEvent.value = Event(chatRoom)
             }
         } else {
-            sharedViewModel.textToShare.observe(viewLifecycleOwner, {
+            sharedViewModel.textToShare.observe(
+                viewLifecycleOwner
+            ) {
                 if (it.isNotEmpty()) {
                     Log.i("[Chat] Found text to share")
                     // val activity = requireActivity() as MainActivity
                     // activity.showSnackBar(R.string.chat_room_toast_choose_for_sharing)
                     listViewModel.textSharingPending.value = true
+                    clearDisplayedChatRoom()
                 } else {
                     if (sharedViewModel.filesToShare.value.isNullOrEmpty()) {
                         listViewModel.textSharingPending.value = false
                     }
                 }
-            })
-            sharedViewModel.filesToShare.observe(viewLifecycleOwner, {
+            }
+            sharedViewModel.filesToShare.observe(
+                viewLifecycleOwner
+            ) {
                 if (it.isNotEmpty()) {
                     Log.i("[Chat] Found ${it.size} files to share")
                     // val activity = requireActivity() as MainActivity
                     // activity.showSnackBar(R.string.chat_room_toast_choose_for_sharing)
                     listViewModel.fileSharingPending.value = true
+                    clearDisplayedChatRoom()
                 } else {
                     if (sharedViewModel.textToShare.value.isNullOrEmpty()) {
                         listViewModel.fileSharingPending.value = false
                     }
                 }
-            })
-            sharedViewModel.messageToForwardEvent.observe(viewLifecycleOwner, {
-                if (!it.consumed()) {
+            }
+            sharedViewModel.isPendingMessageForward.observe(
+                viewLifecycleOwner
+            ) {
+                listViewModel.forwardPending.value = it
+                adapter.forwardPending(it)
+                if (it) {
                     Log.i("[Chat] Found chat message to transfer")
-                    // val activity = requireActivity() as MainActivity
-                    // activity.showSnackBar(R.string.chat_room_toast_choose_for_sharing)
-                    listViewModel.forwardPending.value = true
-                    adapter.forwardPending(true)
-                } else {
-                    listViewModel.forwardPending.value = false
-                    adapter.forwardPending(false)
                 }
-            })
+            }
 
-            listViewModel.onErrorEvent.observe(viewLifecycleOwner, {
+            listViewModel.onErrorEvent.observe(
+                viewLifecycleOwner
+            ) {
                 it.consume { messageResourceId ->
                     (activity as MainActivity).showSnackBar(messageResourceId)
                 }
-            })
+            }
         }
     }
 
     override fun deleteItems(indexesOfItemToDelete: ArrayList<Int>) {
         val list = ArrayList<ChatRoom>()
+        var closeSlidingPane = false
         for (index in indexesOfItemToDelete) {
             val chatRoomViewModel = adapter.currentList[index]
             list.add(chatRoomViewModel.chatRoom)
+
+            if (chatRoomViewModel.chatRoom == sharedViewModel.selectedChatRoom.value) {
+                closeSlidingPane = true
+            }
         }
         listViewModel.deleteChatRooms(list)
+
+        if (!binding.slidingPane.isSlideable && closeSlidingPane) {
+            Log.i("[Chat] Currently displayed chat room has been deleted, removing detail fragment")
+            clearDisplayedChatRoom()
+        }
     }
 
     private fun scrollToTop() {

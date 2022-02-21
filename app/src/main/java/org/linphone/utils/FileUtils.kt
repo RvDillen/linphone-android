@@ -36,7 +36,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
-import org.linphone.LinphoneApplication
 import org.linphone.LinphoneApplication.Companion.coreContext
 import org.linphone.R
 import org.linphone.core.tools.Log
@@ -71,33 +70,54 @@ class FileUtils {
         }
 
         fun isPlainTextFile(path: String): Boolean {
-            val extension = getExtensionFromFileName(path).toLowerCase(Locale.getDefault())
+            val extension = getExtensionFromFileName(path).lowercase(Locale.getDefault())
             val type = MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension)
             return type?.startsWith("text/plain") ?: false
         }
 
         fun isExtensionPdf(path: String): Boolean {
-            val extension = getExtensionFromFileName(path).toLowerCase(Locale.getDefault())
+            val extension = getExtensionFromFileName(path).lowercase(Locale.getDefault())
             val type = MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension)
             return type?.startsWith("application/pdf") ?: false
         }
 
         fun isExtensionImage(path: String): Boolean {
-            val extension = getExtensionFromFileName(path).toLowerCase(Locale.getDefault())
+            val extension = getExtensionFromFileName(path).lowercase(Locale.getDefault())
             val type = MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension)
             return type?.startsWith("image/") ?: false
         }
 
         fun isExtensionVideo(path: String): Boolean {
-            val extension = getExtensionFromFileName(path).toLowerCase(Locale.getDefault())
+            val extension = getExtensionFromFileName(path).lowercase(Locale.getDefault())
             val type = MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension)
             return type?.startsWith("video/") ?: false
         }
 
         fun isExtensionAudio(path: String): Boolean {
-            val extension = getExtensionFromFileName(path).toLowerCase(Locale.getDefault())
+            val extension = getExtensionFromFileName(path).lowercase(Locale.getDefault())
             val type = MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension)
             return type?.startsWith("audio/") ?: false
+        }
+
+        fun clearExistingPlainFiles() {
+            for (file in coreContext.context.filesDir.listFiles().orEmpty()) {
+                if (file.path.endsWith(VFS_PLAIN_FILE_EXTENSION)) {
+                    Log.w("[File Utils] Found forgotten plain file: ${file.path}, deleting it")
+                    deleteFile(file.path)
+                }
+            }
+            for (file in coreContext.context.getExternalFilesDir(Environment.DIRECTORY_PICTURES)?.listFiles().orEmpty()) {
+                if (file.path.endsWith(VFS_PLAIN_FILE_EXTENSION)) {
+                    Log.w("[File Utils] Found forgotten plain file: ${file.path}, deleting it")
+                    deleteFile(file.path)
+                }
+            }
+            for (file in coreContext.context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)?.listFiles().orEmpty()) {
+                if (file.path.endsWith(VFS_PLAIN_FILE_EXTENSION)) {
+                    Log.w("[File Utils] Found forgotten plain file: ${file.path}, deleting it")
+                    deleteFile(file.path)
+                }
+            }
         }
 
         fun getFileStorageDir(isPicture: Boolean = false): File {
@@ -149,6 +169,95 @@ class FileUtils {
             return file
         }
 
+        suspend fun getFilesPathFromPickerIntent(data: Intent?, temporaryImageFilePath: File?): List<String> {
+            var filePath: String? = null
+            if (data != null) {
+                val clipData = data.clipData
+                if (clipData != null && clipData.itemCount > 1) { // Multiple selection
+                    Log.i("[File Utils] Found ${clipData.itemCount} elements")
+                    val list = arrayListOf<String>()
+                    for (i in 0 until clipData.itemCount) {
+                        val dataUri = clipData.getItemAt(i).uri
+                        if (dataUri != null) {
+                            filePath = dataUri.toString()
+                            Log.i("[File Utils] Using data URI $filePath")
+                        }
+                        filePath = cleanFilePath(filePath)
+                        if (filePath != null) list.add(filePath)
+                    }
+                    return list
+                } else { // Single selection
+                    val dataUri = if (clipData != null && clipData.itemCount == 1) {
+                        clipData.getItemAt(0).uri
+                    } else {
+                        data.data
+                    }
+                    if (dataUri != null) {
+                        filePath = dataUri.toString()
+                        Log.i("[File Utils] Using data URI $filePath")
+                    } else if (temporaryImageFilePath?.exists() == true) {
+                        filePath = temporaryImageFilePath.absolutePath
+                        Log.i("[File Utils] Data URI is null, using $filePath")
+                    }
+                    filePath = cleanFilePath(filePath)
+                    if (filePath != null) return arrayListOf(filePath)
+                }
+            } else if (temporaryImageFilePath?.exists() == true) {
+                filePath = temporaryImageFilePath.absolutePath
+                Log.i("[File Utils] Data is null, using $filePath")
+                filePath = cleanFilePath(filePath)
+                if (filePath != null) return arrayListOf(filePath)
+            }
+            return arrayListOf()
+        }
+
+        suspend fun getFilePathFromPickerIntent(data: Intent?, temporaryImageFilePath: File?): String? {
+            var filePath: String? = null
+            if (data != null) {
+                val clipData = data.clipData
+                if (clipData != null && clipData.itemCount > 1) { // Multiple selection
+                    Log.e("[File Utils] Expecting only one file, got ${clipData.itemCount}")
+                } else { // Single selection
+                    val dataUri = if (clipData != null && clipData.itemCount == 1) {
+                        clipData.getItemAt(0).uri
+                    } else {
+                        data.data
+                    }
+                    if (dataUri != null) {
+                        filePath = dataUri.toString()
+                        Log.i("[File Utils] Using data URI $filePath")
+                    } else if (temporaryImageFilePath?.exists() == true) {
+                        filePath = temporaryImageFilePath.absolutePath
+                        Log.i("[File Utils] Data URI is null, using $filePath")
+                    }
+                }
+            } else if (temporaryImageFilePath?.exists() == true) {
+                filePath = temporaryImageFilePath.absolutePath
+                Log.i("[File Utils] Data is null, using $filePath")
+            }
+            return cleanFilePath(filePath)
+        }
+
+        private suspend fun cleanFilePath(filePath: String?): String? {
+            if (filePath != null) {
+                val uriToParse = Uri.parse(filePath)
+                if (filePath.startsWith("content://com.android.contacts/contacts/lookup/")) {
+                    Log.i("[File Utils] Contact sharing URI detected")
+                    return ContactUtils.getContactVcardFilePath(uriToParse)
+                } else if (filePath.startsWith("content://") ||
+                    filePath.startsWith("file://")
+                ) {
+                    val result = getFilePath(coreContext.context, uriToParse)
+                    Log.i("[File Utils] Path was using a content or file scheme, real path is: $result")
+                    if (result == null) {
+                        Log.e("[File Utils] Failed to get access to file $uriToParse")
+                    }
+                    return result
+                }
+            }
+            return filePath
+        }
+
         fun deleteFile(filePath: String) {
             val file = File(filePath)
             if (file.exists()) {
@@ -176,9 +285,9 @@ class FileUtils {
                     context.contentResolver.openInputStream(uri)
                 Log.i(
                     "[File Utils] Trying to copy file from " +
-                            uri.toString() +
-                            " to local file " +
-                            localFile.absolutePath
+                        uri.toString() +
+                        " to local file " +
+                        localFile.absolutePath
                 )
                 coroutineScope {
                     val deferred = async { copyToFile(remoteFile, localFile) }
@@ -328,7 +437,8 @@ class FileUtils {
                     } catch (e: Exception) {
                         Log.e(
                             "[Chat Message] Couldn't get URI for file $file using file provider ${context.getString(
-                                R.string.file_provider)}"
+                                R.string.file_provider
+                            )}"
                         )
                         Uri.parse(path)
                     }
@@ -375,12 +485,31 @@ class FileUtils {
 
             try {
                 activity.startActivity(intent)
-                if (LinphoneApplication.corePreferences.enableAnimations) {
-                    activity.overridePendingTransition(R.anim.enter_right, R.anim.exit_left)
-                }
                 return true
             } catch (anfe: ActivityNotFoundException) {
                 Log.e("[File Viewer] Can't open file in third party app: $anfe")
+            }
+            return false
+        }
+
+        fun openMediaStoreFile(
+            activity: Activity,
+            contentFilePath: String,
+            newTask: Boolean = false
+        ): Boolean {
+            val intent = Intent(Intent.ACTION_VIEW)
+            val contentUri: Uri = Uri.parse(contentFilePath)
+            intent.data = contentUri
+            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            if (newTask) {
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+
+            try {
+                activity.startActivity(intent)
+                return true
+            } catch (anfe: ActivityNotFoundException) {
+                Log.e("[File Viewer] Can't open media store export in third party app: $anfe")
             }
             return false
         }

@@ -22,10 +22,8 @@ package org.linphone.activities.main.fragments
 import android.app.Dialog
 import android.os.Bundle
 import android.view.View
-import androidx.core.view.doOnPreDraw
 import androidx.databinding.ViewDataBinding
 import androidx.lifecycle.ViewModelProvider
-import org.linphone.LinphoneApplication
 import org.linphone.R
 import org.linphone.activities.main.adapters.SelectionListAdapter
 import org.linphone.activities.main.viewmodels.DialogViewModel
@@ -52,35 +50,41 @@ abstract class MasterFragment<T : ViewDataBinding, U : SelectionListAdapter<*, *
     protected open val dialogConfirmationMessageBeforeRemoval: Int = R.plurals.dialog_default_delete
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
-        if (LinphoneApplication.corePreferences.enableAnimations) {
-            postponeEnterTransition()
-            view.doOnPreDraw { startPostponedEnterTransition() }
-        }
-
         super.onViewCreated(view, savedInstanceState)
 
         // List selection
-        listSelectionViewModel = ViewModelProvider(this).get(ListTopBarViewModel::class.java)
+        listSelectionViewModel = ViewModelProvider(this)[ListTopBarViewModel::class.java]
 
-        listSelectionViewModel.isEditionEnabled.observe(viewLifecycleOwner, {
+        listSelectionViewModel.isEditionEnabled.observe(
+            viewLifecycleOwner
+        ) {
             if (!it) listSelectionViewModel.onUnSelectAll()
-        })
+        }
 
-        listSelectionViewModel.selectAllEvent.observe(viewLifecycleOwner, {
+        listSelectionViewModel.selectAllEvent.observe(
+            viewLifecycleOwner
+        ) {
             it.consume {
                 listSelectionViewModel.onSelectAll(getItemCount() - 1)
             }
-        })
+        }
 
-        listSelectionViewModel.unSelectAllEvent.observe(viewLifecycleOwner, {
+        listSelectionViewModel.unSelectAllEvent.observe(
+            viewLifecycleOwner
+        ) {
             it.consume {
                 listSelectionViewModel.onUnSelectAll()
             }
-        })
+        }
 
-        listSelectionViewModel.deleteSelectionEvent.observe(viewLifecycleOwner, {
+        listSelectionViewModel.deleteSelectionEvent.observe(
+            viewLifecycleOwner
+        ) {
             it.consume {
-                val confirmationDialog = AppUtils.getStringWithPlural(dialogConfirmationMessageBeforeRemoval, listSelectionViewModel.selectedItems.value.orEmpty().size)
+                val confirmationDialog = AppUtils.getStringWithPlural(
+                    dialogConfirmationMessageBeforeRemoval,
+                    listSelectionViewModel.selectedItems.value.orEmpty().size
+                )
                 val viewModel = DialogViewModel(confirmationDialog)
                 val dialog: Dialog = DialogUtils.getDialog(requireContext(), viewModel)
 
@@ -89,15 +93,18 @@ abstract class MasterFragment<T : ViewDataBinding, U : SelectionListAdapter<*, *
                     listSelectionViewModel.isEditionEnabled.value = false
                 }
 
-                viewModel.showDeleteButton({
-                    delete()
-                    dialog.dismiss()
-                    listSelectionViewModel.isEditionEnabled.value = false
-                }, getString(R.string.dialog_delete))
+                viewModel.showDeleteButton(
+                    {
+                        delete()
+                        dialog.dismiss()
+                        listSelectionViewModel.isEditionEnabled.value = false
+                    },
+                    getString(R.string.dialog_delete)
+                )
 
                 dialog.show()
             }
-        })
+        }
     }
 
     private fun delete() {

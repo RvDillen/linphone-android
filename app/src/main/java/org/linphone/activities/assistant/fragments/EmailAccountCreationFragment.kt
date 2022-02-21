@@ -40,25 +40,29 @@ class EmailAccountCreationFragment : GenericFragment<AssistantEmailAccountCreati
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        binding.lifecycleOwner = this
+        binding.lifecycleOwner = viewLifecycleOwner
 
         sharedViewModel = requireActivity().run {
-            ViewModelProvider(this).get(SharedAssistantViewModel::class.java)
+            ViewModelProvider(this)[SharedAssistantViewModel::class.java]
         }
 
-        viewModel = ViewModelProvider(this, EmailAccountCreationViewModelFactory(sharedViewModel.getAccountCreator())).get(EmailAccountCreationViewModel::class.java)
+        viewModel = ViewModelProvider(this, EmailAccountCreationViewModelFactory(sharedViewModel.getAccountCreator()))[EmailAccountCreationViewModel::class.java]
         binding.viewModel = viewModel
 
-        viewModel.goToEmailValidationEvent.observe(viewLifecycleOwner, {
+        viewModel.goToEmailValidationEvent.observe(
+            viewLifecycleOwner
+        ) {
             it.consume {
                 navigateToEmailAccountValidation()
             }
-        })
+        }
 
-        viewModel.onErrorEvent.observe(viewLifecycleOwner, {
+        viewModel.onErrorEvent.observe(
+            viewLifecycleOwner
+        ) {
             it.consume { message ->
                 (requireActivity() as AssistantActivity).showSnackBar(message)
             }
-        })
+        }
     }
 }

@@ -42,7 +42,7 @@ class CallViewModelFactory(private val call: Call) :
     ViewModelProvider.NewInstanceFactory() {
 
     @Suppress("UNCHECKED_CAST")
-    override fun <T : ViewModel?> create(modelClass: Class<T>): T {
+    override fun <T : ViewModel> create(modelClass: Class<T>): T {
         return CallViewModel(call) as T
     }
 }
@@ -114,6 +114,7 @@ open class CallViewModel(val call: Call) : GenericContactViewModel(call.remoteAd
         call.addListener(listener)
 
         isPaused.value = call.state == Call.State.Paused
+        isOutgoingEarlyMedia.value = call.state == Call.State.OutgoingEarlyMedia
     }
 
     override fun onCleared() {
@@ -138,7 +139,7 @@ open class CallViewModel(val call: Call) : GenericContactViewModel(call.remoteAd
     }
 
     fun takeScreenshot() {
-        if (call.currentParams.videoEnabled()) {
+        if (call.currentParams.isVideoEnabled) {
             val fileName = System.currentTimeMillis().toString() + ".jpeg"
             call.takeVideoSnapshot(FileUtils.getFileStoragePath(fileName).absolutePath)
         }
@@ -148,15 +149,18 @@ open class CallViewModel(val call: Call) : GenericContactViewModel(call.remoteAd
         timer?.cancel()
 
         timer = Timer("Call update timeout")
-        timer?.schedule(object : TimerTask() {
-            override fun run() {
-                // Decline call update
-                viewModelScope.launch {
-                    withContext(Dispatchers.Main) {
-                        coreContext.answerCallVideoUpdateRequest(call, false)
+        timer?.schedule(
+            object : TimerTask() {
+                override fun run() {
+                    // Decline call update
+                    viewModelScope.launch {
+                        withContext(Dispatchers.Main) {
+                            coreContext.answerCallVideoUpdateRequest(call, false)
+                        }
                     }
                 }
-            }
-        }, 30000)
+            },
+            30000
+        )
     }
 }

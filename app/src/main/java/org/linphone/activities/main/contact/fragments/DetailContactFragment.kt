@@ -24,11 +24,12 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.view.View
+import androidx.core.view.doOnPreDraw
 import androidx.lifecycle.ViewModelProvider
 import androidx.navigation.fragment.findNavController
 import org.linphone.LinphoneApplication.Companion.coreContext
 import org.linphone.R
-import org.linphone.activities.GenericFragment
+import org.linphone.activities.*
 import org.linphone.activities.main.*
 import org.linphone.activities.main.contact.viewmodels.ContactViewModel
 import org.linphone.activities.main.contact.viewmodels.ContactViewModelFactory
@@ -40,6 +41,7 @@ import org.linphone.activities.navigateToDialer
 import org.linphone.core.tools.Log
 import org.linphone.databinding.ContactDetailFragmentBinding
 import org.linphone.utils.DialogUtils
+import org.linphone.utils.Event
 
 class DetailContactFragment : GenericFragment<ContactDetailFragmentBinding>() {
     private lateinit var viewModel: ContactViewModel
@@ -50,11 +52,14 @@ class DetailContactFragment : GenericFragment<ContactDetailFragmentBinding>() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        binding.lifecycleOwner = this
+        binding.lifecycleOwner = viewLifecycleOwner
 
         sharedViewModel = requireActivity().run {
-            ViewModelProvider(this).get(SharedMainViewModel::class.java)
+            ViewModelProvider(this)[SharedMainViewModel::class.java]
         }
+        binding.sharedMainViewModel = sharedViewModel
+
+        useMaterialSharedAxisXForwardAnimation = sharedViewModel.isSlidingPaneSlideable.value == false
 
         val id = arguments?.getString("id")
         arguments?.clear()
@@ -67,7 +72,7 @@ class DetailContactFragment : GenericFragment<ContactDetailFragmentBinding>() {
         if (contact == null) {
             Log.e("[Contact] Contact is null, aborting!")
             // (activity as MainActivity).showSnackBar(R.string.error)
-            findNavController().navigateUp()
+            goBack()
             return
         }
 
@@ -77,40 +82,55 @@ class DetailContactFragment : GenericFragment<ContactDetailFragmentBinding>() {
         )[ContactViewModel::class.java]
         binding.viewModel = viewModel
 
-        viewModel.sendSmsToEvent.observe(viewLifecycleOwner, {
+        viewModel.sendSmsToEvent.observe(
+            viewLifecycleOwner
+        ) {
             it.consume { number ->
                 sendSms(number)
             }
-        })
+        }
 
-        viewModel.startCallToEvent.observe(viewLifecycleOwner, {
+        viewModel.startCallToEvent.observe(
+            viewLifecycleOwner
+        ) {
             it.consume { address ->
                 if (coreContext.core.callsNb > 0) {
                     Log.i("[Contact] Starting dialer with pre-filled URI ${address.asStringUriOnly()}, is transfer? ${sharedViewModel.pendingCallTransfer}")
+                    sharedViewModel.updateContactsAnimationsBasedOnDestination.value =
+                        Event(R.id.dialerFragment)
+                    sharedViewModel.updateDialerAnimationsBasedOnDestination.value =
+                        Event(R.id.masterContactsFragment)
+
                     val args = Bundle()
                     args.putString("URI", address.asStringUriOnly())
                     args.putBoolean("Transfer", sharedViewModel.pendingCallTransfer)
-                    args.putBoolean("SkipAutoCallStart", true) // If auto start call setting is enabled, ignore it
+                    args.putBoolean(
+                        "SkipAutoCallStart",
+                        true
+                    ) // If auto start call setting is enabled, ignore it
                     navigateToDialer(args)
                 } else {
                     coreContext.startCall(address)
                 }
             }
-        })
+        }
 
-        viewModel.chatRoomCreatedEvent.observe(viewLifecycleOwner, {
+        viewModel.chatRoomCreatedEvent.observe(
+            viewLifecycleOwner
+        ) {
             it.consume { chatRoom ->
+                sharedViewModel.updateContactsAnimationsBasedOnDestination.value =
+                    Event(R.id.masterChatRoomsFragment)
                 val args = Bundle()
                 args.putString("LocalSipUri", chatRoom.localAddress.asStringUriOnly())
                 args.putString("RemoteSipUri", chatRoom.peerAddress.asStringUriOnly())
                 navigateToChatRoom(args)
             }
-        })
+        }
 
         binding.setBackClickListener {
-            findNavController().popBackStack()
+            goBack()
         }
-        binding.back.visibility = if (resources.getBoolean(R.bool.isTablet)) View.INVISIBLE else View.VISIBLE
 
         binding.setEditClickListener {
             navigateToContactEditor()
@@ -120,11 +140,28 @@ class DetailContactFragment : GenericFragment<ContactDetailFragmentBinding>() {
             confirmContactRemoval()
         }
 
-        viewModel.onErrorEvent.observe(viewLifecycleOwner, {
+        viewModel.onErrorEvent.observe(
+            viewLifecycleOwner
+        ) {
             it.consume { messageResourceId ->
                 (activity as MainActivity).showSnackBar(messageResourceId)
             }
-        })
+        }
+
+        view.doOnPreDraw {
+            // Notifies fragment is ready to be drawn
+            sharedViewModel.contactFragmentOpenedEvent.value = Event(true)
+        }
+    }
+
+    override fun goBack() {
+        if (!findNavController().popBackStack()) {
+            if (sharedViewModel.isSlidingPaneSlideable.value == true) {
+                sharedViewModel.closeSlidingPaneEvent.value = Event(true)
+            } else {
+                navigateToEmptyContact()
+            }
+        }
     }
 
     private fun confirmContactRemoval() {
@@ -135,11 +172,14 @@ class DetailContactFragment : GenericFragment<ContactDetailFragmentBinding>() {
             dialog.dismiss()
         }
 
-        dialogViewModel.showDeleteButton({
-            viewModel.deleteContact()
-            dialog.dismiss()
-            findNavController().navigateUp()
-        }, getString(R.string.dialog_delete))
+        dialogViewModel.showDeleteButton(
+            {
+                viewModel.deleteContact()
+                dialog.dismiss()
+                goBack()
+            },
+            getString(R.string.dialog_delete)
+        )
 
         dialog.show()
     }

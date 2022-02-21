@@ -76,34 +76,52 @@ class OutgoingCallActivity : ProximitySensorActivity() {
         )[CallViewModel::class.java]
         binding.viewModel = viewModel
 
-        controlsViewModel = ViewModelProvider(this).get(ControlsViewModel::class.java)
+        controlsViewModel = ViewModelProvider(this)[ControlsViewModel::class.java]
         binding.controlsViewModel = controlsViewModel
 
-        viewModel.callEndedEvent.observe(this, {
+        viewModel.callEndedEvent.observe(
+            this
+        ) {
             it.consume {
                 Log.i("[Outgoing Call Activity] Call ended, finish activity")
                 finish()
             }
-        })
+        }
 
-        viewModel.callConnectedEvent.observe(this, {
+        viewModel.callConnectedEvent.observe(
+            this
+        ) {
             it.consume {
                 Log.i("[Outgoing Call Activity] Call connected, finish activity")
                 finish()
             }
-        })
+        }
 
-        controlsViewModel.isSpeakerSelected.observe(this, {
+        controlsViewModel.isSpeakerSelected.observe(
+            this
+        ) {
             enableProximitySensor(!it)
-        })
+        }
 
-        controlsViewModel.askPermissionEvent.observe(this, {
+        controlsViewModel.askAudioRecordPermissionEvent.observe(
+            this
+        ) {
             it.consume { permission ->
                 requestPermissions(arrayOf(permission), 0)
             }
-        })
+        }
 
-        controlsViewModel.toggleNumpadEvent.observe(this, {
+        controlsViewModel.askCameraPermissionEvent.observe(
+            this
+        ) {
+            it.consume { permission ->
+                requestPermissions(arrayOf(permission), 0)
+            }
+        }
+
+        controlsViewModel.toggleNumpadEvent.observe(
+            this
+        ) {
             it.consume { open ->
                 if (this::numpadAnimator.isInitialized) {
                     if (open) {
@@ -113,7 +131,7 @@ class OutgoingCallActivity : ProximitySensorActivity() {
                     }
                 }
             }
-        })
+        }
 
         if (Version.sdkAboveOrEqual(Version.API23_MARSHMALLOW_60)) {
             checkPermissions()
@@ -155,7 +173,7 @@ class OutgoingCallActivity : ProximitySensorActivity() {
             Log.i("[Outgoing Call Activity] Asking for RECORD_AUDIO permission")
             permissionsRequiredList.add(Manifest.permission.RECORD_AUDIO)
         }
-        if (viewModel.call.currentParams.videoEnabled() && !PermissionHelper.get().hasCameraPermission()) {
+        if (viewModel.call.currentParams.isVideoEnabled && !PermissionHelper.get().hasCameraPermission()) {
             Log.i("[Outgoing Call Activity] Asking for CAMERA permission")
             permissionsRequiredList.add(Manifest.permission.CAMERA)
         }
@@ -192,7 +210,9 @@ class OutgoingCallActivity : ProximitySensorActivity() {
         for (call in coreContext.core.calls) {
             if (call.state == Call.State.OutgoingInit ||
                 call.state == Call.State.OutgoingProgress ||
-                call.state == Call.State.OutgoingRinging) {
+                call.state == Call.State.OutgoingRinging ||
+                call.state == Call.State.OutgoingEarlyMedia
+            ) {
                 return call
             }
         }

@@ -37,10 +37,8 @@ import org.linphone.activities.main.dialer.NumpadDigitListener
 import org.linphone.compatibility.Compatibility
 import org.linphone.core.*
 import org.linphone.core.tools.Log
-import org.linphone.utils.AppUtils
-import org.linphone.utils.AudioRouteUtils
+import org.linphone.utils.*
 import org.linphone.utils.Event
-import org.linphone.utils.PermissionHelper
 
 class ControlsViewModel : ViewModel() {
     val isMicrophoneMuted = MutableLiveData<Boolean>()
@@ -89,7 +87,11 @@ class ControlsViewModel : ViewModel() {
         MutableLiveData<Event<Boolean>>()
     }
 
-    val askPermissionEvent: MutableLiveData<Event<String>> by lazy {
+    val askAudioRecordPermissionEvent: MutableLiveData<Event<String>> by lazy {
+        MutableLiveData<Event<String>>()
+    }
+
+    val askCameraPermissionEvent: MutableLiveData<Event<String>> by lazy {
         MutableLiveData<Event<String>>()
     }
 
@@ -178,7 +180,7 @@ class ControlsViewModel : ViewModel() {
             }
 
             if (coreContext.isVideoCallOrConferenceActive() && !PermissionHelper.get().hasCameraPermission()) {
-                askPermissionEvent.value = Event(Manifest.permission.CAMERA)
+                askCameraPermissionEvent.value = Event(Manifest.permission.CAMERA)
             }
 
             updateUI()
@@ -246,13 +248,13 @@ class ControlsViewModel : ViewModel() {
 
     fun toggleMuteMicrophone() {
         if (!PermissionHelper.get().hasRecordAudioPermission()) {
-            askPermissionEvent.value = Event(Manifest.permission.RECORD_AUDIO)
+            askAudioRecordPermissionEvent.value = Event(Manifest.permission.RECORD_AUDIO)
             return
         }
 
         somethingClickedEvent.value = Event(true)
-        val micEnabled = coreContext.core.micEnabled()
-        coreContext.core.enableMic(!micEnabled)
+        val micEnabled = coreContext.core.isMicEnabled
+        coreContext.core.isMicEnabled = !micEnabled
         updateMuteMicState()
     }
 
@@ -281,7 +283,7 @@ class ControlsViewModel : ViewModel() {
 
     fun toggleVideo() {
         if (!PermissionHelper.get().hasCameraPermission()) {
-            askPermissionEvent.value = Event(Manifest.permission.CAMERA)
+            askCameraPermissionEvent.value = Event(Manifest.permission.CAMERA)
             return
         }
 
@@ -302,7 +304,7 @@ class ControlsViewModel : ViewModel() {
 
             isVideoUpdateInProgress.value = true
             val params = core.createCallParams(currentCall)
-            params?.enableVideo(!currentCall.currentParams.videoEnabled())
+            params?.isVideoEnabled = !currentCall.currentParams.isVideoEnabled
             currentCall.update(params)
         }
     }
@@ -335,15 +337,34 @@ class ControlsViewModel : ViewModel() {
 
     fun toggleRecording(closeMenu: Boolean) {
         somethingClickedEvent.value = Event(true)
-        val currentCall = coreContext.core.currentCall
-        if (currentCall != null) {
-            if (currentCall.isRecording) {
-                currentCall.stopRecording()
-            } else {
-                currentCall.startRecording()
+
+        val core = coreContext.core
+        val currentCall = core.currentCall
+        val conference = core.conference
+
+        when {
+            currentCall != null -> {
+                if (currentCall.isRecording) {
+                    currentCall.stopRecording()
+                } else {
+                    currentCall.startRecording()
+                }
+                isRecording.value = currentCall.isRecording
+            }
+            conference != null -> {
+                val path = LinphoneUtils.getRecordingFilePathForConference()
+                if (conference.isRecording) {
+                    conference.stopRecording()
+                } else {
+                    conference.startRecording(path)
+                }
+                isRecording.value = conference.isRecording
+            }
+            else -> {
+                isRecording.value = false
             }
         }
-        isRecording.value = currentCall?.isRecording
+
         if (closeMenu) toggleOptionsMenu()
     }
 
@@ -365,7 +386,7 @@ class ControlsViewModel : ViewModel() {
         somethingClickedEvent.value = Event(true)
 
         val core = coreContext.core
-        val currentCallVideoEnabled = core.currentCall?.currentParams?.videoEnabled() ?: false
+        val currentCallVideoEnabled = core.currentCall?.currentParams?.isVideoEnabled ?: false
 
         val params = core.createConferenceParams()
         params.isVideoEnabled = currentCallVideoEnabled
@@ -398,7 +419,7 @@ class ControlsViewModel : ViewModel() {
     }
 
     fun updateMuteMicState() {
-        isMicrophoneMuted.value = !PermissionHelper.get().hasRecordAudioPermission() || !coreContext.core.micEnabled()
+        isMicrophoneMuted.value = !PermissionHelper.get().hasRecordAudioPermission() || !coreContext.core.isMicEnabled
         isMuteMicrophoneEnabled.value = coreContext.core.currentCall != null || coreContext.core.conference?.isIn == true
     }
 
@@ -444,9 +465,11 @@ class ControlsViewModel : ViewModel() {
     private fun updateVideoAvailable() {
         val core = coreContext.core
         val currentCall = core.currentCall
-        isVideoAvailable.value = (core.videoCaptureEnabled() || core.videoPreviewEnabled()) &&
-                ((currentCall != null && !currentCall.mediaInProgress()) ||
-                        core.conference?.isIn == true)
+        isVideoAvailable.value = (core.isVideoCaptureEnabled || core.isVideoPreviewEnabled) &&
+            (
+                (currentCall != null && !currentCall.mediaInProgress()) ||
+                    core.conference?.isIn == true
+                )
     }
 
     private fun updateVideoEnabled() {

@@ -58,7 +58,8 @@ class CallsViewModel : ViewModel() {
             if (currentCall == null) {
                 currentCallViewModel.value?.destroy()
             } else if (currentCallViewModel.value?.call != currentCall) {
-                currentCallViewModel.value = CallViewModel(currentCall)
+                val viewModel = CallViewModel(currentCall)
+                currentCallViewModel.value = viewModel
             }
 
             if (state == Call.State.End || state == Call.State.Released || state == Call.State.Error) {
@@ -74,11 +75,11 @@ class CallsViewModel : ViewModel() {
             } else if (call.state == Call.State.UpdatedByRemote) {
                 // If the correspondent asks to turn on video while audio call,
                 // defer update until user has chosen whether to accept it or not
-                val remoteVideo = call.remoteParams?.videoEnabled() ?: false
-                val localVideo = call.currentParams.videoEnabled()
+                val remoteVideo = call.remoteParams?.isVideoEnabled ?: false
+                val localVideo = call.currentParams.isVideoEnabled
                 val autoAccept = call.core.videoActivationPolicy.automaticallyAccept
                 if (remoteVideo && !localVideo && !autoAccept) {
-                    if (coreContext.core.videoCaptureEnabled() || coreContext.core.videoDisplayEnabled()) {
+                    if (coreContext.core.isVideoCaptureEnabled || coreContext.core.isVideoDisplayEnabled) {
                         call.deferUpdate()
                         callUpdateEvent.value = Event(call)
                     } else {
@@ -98,7 +99,9 @@ class CallsViewModel : ViewModel() {
         noActiveCall.value = currentCall == null
         if (currentCall != null) {
             currentCallViewModel.value?.destroy()
-            currentCallViewModel.value = CallViewModel(currentCall)
+
+            val viewModel = CallViewModel(currentCall)
+            currentCallViewModel.value = viewModel
         }
 
         callPausedByRemote.value = currentCall?.state == Call.State.PausedByRemote
@@ -121,7 +124,7 @@ class CallsViewModel : ViewModel() {
     }
 
     fun takeScreenshot() {
-        if (!PermissionHelper.get().hasWriteExternalStorage()) {
+        if (!PermissionHelper.get().hasWriteExternalStoragePermission()) {
             askWriteExternalStoragePermissionEvent.value = Event(true)
         } else {
             currentCallViewModel.value?.takeScreenshot()

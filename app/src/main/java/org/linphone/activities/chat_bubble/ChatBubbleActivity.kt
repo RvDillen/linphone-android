@@ -37,6 +37,8 @@ import org.linphone.activities.main.chat.adapters.ChatMessagesListAdapter
 import org.linphone.activities.main.chat.viewmodels.*
 import org.linphone.activities.main.viewmodels.ListTopBarViewModel
 import org.linphone.core.ChatRoom
+import org.linphone.core.ChatRoomListenerStub
+import org.linphone.core.EventLog
 import org.linphone.core.Factory
 import org.linphone.core.tools.Log
 import org.linphone.databinding.ChatBubbleActivityBinding
@@ -58,6 +60,12 @@ class ChatBubbleActivity : GenericActivity() {
         }
     }
 
+    private val listener = object : ChatRoomListenerStub() {
+        override fun onChatMessageReceived(chatRoom: ChatRoom, eventLog: EventLog) {
+            chatRoom.markAsRead()
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -73,7 +81,8 @@ class ChatBubbleActivity : GenericActivity() {
             val localAddress = Factory.instance().createAddress(localSipUri)
             val remoteSipAddress = Factory.instance().createAddress(remoteSipUri)
             chatRoom = coreContext.core.searchChatRoom(
-                null, localAddress, remoteSipAddress, arrayOfNulls(
+                null, localAddress, remoteSipAddress,
+                arrayOfNulls(
                     0
                 )
             )
@@ -84,8 +93,6 @@ class ChatBubbleActivity : GenericActivity() {
             finish()
             return
         }
-
-        chatRoom.markAsRead()
 
         viewModel = ViewModelProvider(
             this,
@@ -104,7 +111,7 @@ class ChatBubbleActivity : GenericActivity() {
         )[ChatMessageSendingViewModel::class.java]
         binding.chatSendingViewModel = chatSendingViewModel
 
-        val listSelectionViewModel = ViewModelProvider(this).get(ListTopBarViewModel::class.java)
+        val listSelectionViewModel = ViewModelProvider(this)[ListTopBarViewModel::class.java]
         adapter = ChatMessagesListAdapter(listSelectionViewModel, this)
         // SubmitList is done on a background thread
         // We need this adapter data observer to know when to scroll
@@ -114,29 +121,42 @@ class ChatBubbleActivity : GenericActivity() {
         // Disable context menu on each message
         adapter.disableContextMenu()
 
-        adapter.openContentEvent.observe(this, {
+        adapter.openContentEvent.observe(
+            this
+        ) {
             it.consume { content ->
                 if (content.isFileEncrypted) {
-                    Toast.makeText(this, R.string.chat_bubble_cant_open_enrypted_file, Toast.LENGTH_LONG).show()
+                    Toast.makeText(
+                        this,
+                        R.string.chat_bubble_cant_open_enrypted_file,
+                        Toast.LENGTH_LONG
+                    ).show()
                 } else {
                     FileUtils.openFileInThirdPartyApp(this, content.filePath.orEmpty(), true)
                 }
             }
-        })
+        }
 
         val layoutManager = LinearLayoutManager(this)
         layoutManager.stackFromEnd = true
         binding.chatMessagesList.layoutManager = layoutManager
 
-        listViewModel.events.observe(this, { events ->
+        listViewModel.events.observe(
+            this
+        ) { events ->
             adapter.submitList(events)
-        })
+        }
 
-        chatSendingViewModel.textToSend.observe(this, {
+        chatSendingViewModel.textToSend.observe(
+            this
+        ) {
             chatSendingViewModel.onTextToSendChanged(it)
-        })
+        }
 
         binding.setOpenAppClickListener {
+            coreContext.notificationsManager.currentlyDisplayedChatRoomAddress = null
+            coreContext.notificationsManager.changeDismissNotificationUponReadForChatRoom(viewModel.chatRoom, false)
+
             val intent = Intent(this, MainActivity::class.java)
             intent.putExtra("RemoteSipUri", remoteSipUri)
             intent.putExtra("LocalSipUri", localSipUri)
@@ -146,7 +166,7 @@ class ChatBubbleActivity : GenericActivity() {
         }
 
         binding.setCloseBubbleClickListener {
-            coreContext.notificationsManager.cancelChatNotificationIdForSipUri(viewModel.chatRoom.peerAddress.asStringUriOnly())
+            coreContext.notificationsManager.dismissChatNotification(viewModel.chatRoom)
         }
 
         binding.setSendMessageClickListener {
@@ -157,6 +177,12 @@ class ChatBubbleActivity : GenericActivity() {
 
     override fun onResume() {
         super.onResume()
+
+        viewModel.chatRoom.addListener(listener)
+
+        // Workaround for the removed notification when a chat room is marked as read
+        coreContext.notificationsManager.changeDismissNotificationUponReadForChatRoom(viewModel.chatRoom, true)
+        viewModel.chatRoom.markAsRead()
 
         val peerAddress = viewModel.chatRoom.peerAddress.asStringUriOnly()
         coreContext.notificationsManager.currentlyDisplayedChatRoomAddress = peerAddress
@@ -170,7 +196,10 @@ class ChatBubbleActivity : GenericActivity() {
     }
 
     override fun onPause() {
+        viewModel.chatRoom.removeListener(listener)
+
         coreContext.notificationsManager.currentlyDisplayedChatRoomAddress = null
+        coreContext.notificationsManager.changeDismissNotificationUponReadForChatRoom(viewModel.chatRoom, false)
 
         super.onPause()
     }

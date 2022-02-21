@@ -22,9 +22,11 @@ package org.linphone.compatibility
 import android.annotation.SuppressLint
 import android.annotation.TargetApi
 import android.app.Activity
+import android.app.PendingIntent
 import android.bluetooth.BluetoothAdapter
 import android.content.ContentValues
 import android.content.Context
+import android.content.Intent
 import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Build
@@ -33,6 +35,7 @@ import android.os.Vibrator
 import android.provider.MediaStore
 import android.provider.Settings
 import android.view.WindowManager
+import android.view.inputmethod.EditorInfo
 import org.linphone.R
 import org.linphone.core.Content
 import org.linphone.core.tools.Log
@@ -44,8 +47,10 @@ import org.linphone.utils.PermissionHelper
 @TargetApi(21)
 class Api21Compatibility {
     companion object {
+        @SuppressLint("MissingPermission")
         fun getDeviceName(context: Context): String {
-            var name = BluetoothAdapter.getDefaultAdapter().name
+            val adapter = BluetoothAdapter.getDefaultAdapter()
+            var name = adapter?.name
             if (name == null) {
                 name = Settings.Secure.getString(
                     context.contentResolver,
@@ -69,12 +74,15 @@ class Api21Compatibility {
         }
 
         suspend fun addImageToMediaStore(context: Context, content: Content): Boolean {
-            if (!PermissionHelper.get().hasWriteExternalStorage()) {
+            if (!PermissionHelper.get().hasWriteExternalStoragePermission()) {
                 Log.e("[Media Store] Write external storage permission denied")
                 return false
             }
 
-            val filePath = content.filePath
+            val plainFilePath = content.plainFilePath.orEmpty()
+            val isVfsEncrypted = plainFilePath.isNotEmpty()
+            Log.w("[Media Store] Content is encrypted, requesting plain file path")
+            val filePath = if (isVfsEncrypted) plainFilePath else content.filePath
             if (filePath == null) {
                 Log.e("[Media Store] Content doesn't have a file path!")
                 return false
@@ -92,6 +100,10 @@ class Api21Compatibility {
             }
             val collection = MediaStore.Images.Media.getContentUri("external")
             val mediaStoreFilePath = addContentValuesToCollection(context, filePath, collection, values)
+            if (isVfsEncrypted) {
+                Log.w("[Media Store] Content was encrypted, delete plain version: $plainFilePath")
+                FileUtils.deleteFile(plainFilePath)
+            }
             if (mediaStoreFilePath.isNotEmpty()) {
                 content.userData = mediaStoreFilePath
                 return true
@@ -100,12 +112,15 @@ class Api21Compatibility {
         }
 
         suspend fun addVideoToMediaStore(context: Context, content: Content): Boolean {
-            if (!PermissionHelper.get().hasWriteExternalStorage()) {
+            if (!PermissionHelper.get().hasWriteExternalStoragePermission()) {
                 Log.e("[Media Store] Write external storage permission denied")
                 return false
             }
 
-            val filePath = content.filePath
+            val plainFilePath = content.plainFilePath.orEmpty()
+            val isVfsEncrypted = plainFilePath.isNotEmpty()
+            Log.w("[Media Store] Content is encrypted, requesting plain file path")
+            val filePath = if (isVfsEncrypted) plainFilePath else content.filePath
             if (filePath == null) {
                 Log.e("[Media Store] Content doesn't have a file path!")
                 return false
@@ -124,6 +139,10 @@ class Api21Compatibility {
             }
             val collection = MediaStore.Video.Media.getContentUri("external")
             val mediaStoreFilePath = addContentValuesToCollection(context, filePath, collection, values)
+            if (isVfsEncrypted) {
+                Log.w("[Media Store] Content was encrypted, delete plain version: $plainFilePath")
+                FileUtils.deleteFile(plainFilePath)
+            }
             if (mediaStoreFilePath.isNotEmpty()) {
                 content.userData = mediaStoreFilePath
                 return true
@@ -132,12 +151,15 @@ class Api21Compatibility {
         }
 
         suspend fun addAudioToMediaStore(context: Context, content: Content): Boolean {
-            if (!PermissionHelper.get().hasWriteExternalStorage()) {
+            if (!PermissionHelper.get().hasWriteExternalStoragePermission()) {
                 Log.e("[Media Store] Write external storage permission denied")
                 return false
             }
 
-            val filePath = content.filePath
+            val plainFilePath = content.plainFilePath.orEmpty()
+            val isVfsEncrypted = plainFilePath.isNotEmpty()
+            Log.w("[Media Store] Content is encrypted, requesting plain file path")
+            val filePath = if (isVfsEncrypted) plainFilePath else content.filePath
             if (filePath == null) {
                 Log.e("[Media Store] Content doesn't have a file path!")
                 return false
@@ -157,6 +179,10 @@ class Api21Compatibility {
             val collection = MediaStore.Audio.Media.getContentUri("external")
 
             val mediaStoreFilePath = addContentValuesToCollection(context, filePath, collection, values)
+            if (isVfsEncrypted) {
+                Log.w("[Media Store] Content was encrypted, delete plain version: $plainFilePath")
+                FileUtils.deleteFile(plainFilePath)
+            }
             if (mediaStoreFilePath.isNotEmpty()) {
                 content.userData = mediaStoreFilePath
                 return true
@@ -206,6 +232,18 @@ class Api21Compatibility {
 
         fun requestDismissKeyguard(activity: Activity) {
             activity.window.addFlags(WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD)
+        }
+
+        fun getUpdateCurrentPendingIntentFlag(): Int {
+            return PendingIntent.FLAG_UPDATE_CURRENT
+        }
+
+        fun getImeFlagsForSecureChatRoom(): Int {
+            return EditorInfo.IME_FLAG_NO_EXTRACT_UI
+        }
+
+        fun startForegroundService(context: Context, intent: Intent) {
+            context.startService(intent)
         }
     }
 }

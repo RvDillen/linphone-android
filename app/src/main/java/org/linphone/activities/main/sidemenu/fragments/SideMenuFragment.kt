@@ -31,7 +31,6 @@ import androidx.lifecycle.lifecycleScope
 import java.io.File
 import kotlinx.coroutines.launch
 import org.linphone.LinphoneApplication.Companion.coreContext
-import org.linphone.LinphoneApplication.Companion.corePreferences
 import org.linphone.R
 import org.linphone.activities.GenericFragment
 import org.linphone.activities.assistant.AssistantActivity
@@ -46,7 +45,6 @@ import org.linphone.core.tools.Log
 import org.linphone.databinding.SideMenuFragmentBinding
 import org.linphone.utils.Event
 import org.linphone.utils.FileUtils
-import org.linphone.utils.ImageUtils
 import org.linphone.utils.PermissionHelper
 
 class SideMenuFragment : GenericFragment<SideMenuFragmentBinding>() {
@@ -59,19 +57,21 @@ class SideMenuFragment : GenericFragment<SideMenuFragmentBinding>() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        binding.lifecycleOwner = this
+        binding.lifecycleOwner = viewLifecycleOwner
 
-        viewModel = ViewModelProvider(this).get(SideMenuViewModel::class.java)
+        viewModel = ViewModelProvider(this)[SideMenuViewModel::class.java]
         binding.viewModel = viewModel
 
         sharedViewModel = requireActivity().run {
-            ViewModelProvider(this).get(SharedMainViewModel::class.java)
+            ViewModelProvider(this)[SharedMainViewModel::class.java]
         }
 
-        sharedViewModel.accountRemoved.observe(viewLifecycleOwner, {
+        sharedViewModel.accountRemoved.observe(
+            viewLifecycleOwner
+        ) {
             Log.i("[Side Menu] Account removed, update accounts list")
             viewModel.updateAccountsList()
-        })
+        }
 
         viewModel.accountsSettingsListener = object : SettingListenerStub() {
             override fun onAccountClicked(identity: String) {
@@ -91,10 +91,6 @@ class SideMenuFragment : GenericFragment<SideMenuFragmentBinding>() {
         binding.setAssistantClickListener {
             sharedViewModel.toggleDrawerEvent.value = Event(true)
             startActivity(Intent(context, AssistantActivity::class.java))
-
-            if (corePreferences.enableAnimations) {
-                requireActivity().overridePendingTransition(R.anim.enter_right, R.anim.exit_left)
-            }
         }
 
         binding.setSettingsClickListener {
@@ -113,15 +109,21 @@ class SideMenuFragment : GenericFragment<SideMenuFragmentBinding>() {
         }
 
         binding.setQuitClickListener {
+            Log.i("[Side Menu] Quitting app")
             requireActivity().finishAndRemoveTask()
+
+            Log.i("[Side Menu] Stopping Core Context")
+            coreContext.notificationsManager.stopForegroundNotification()
             coreContext.stop()
         }
+
+        onBackPressedCallback.isEnabled = false
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         if (resultCode == Activity.RESULT_OK) {
             lifecycleScope.launch {
-                val contactImageFilePath = ImageUtils.getFilePathFromPickerIntent(data, temporaryPicturePath)
+                val contactImageFilePath = FileUtils.getFilePathFromPickerIntent(data, temporaryPicturePath)
                 if (contactImageFilePath != null) {
                     viewModel.setPictureFromPath(contactImageFilePath)
                 }

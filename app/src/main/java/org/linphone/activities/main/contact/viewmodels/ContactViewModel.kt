@@ -43,7 +43,7 @@ class ContactViewModelFactory(private val contact: Contact) :
     ViewModelProvider.NewInstanceFactory() {
 
     @Suppress("UNCHECKED_CAST")
-    override fun <T : ViewModel?> create(modelClass: Class<T>): T {
+    override fun <T : ViewModel> create(modelClass: Class<T>): T {
         return ContactViewModel(contact) as T
     }
 }
@@ -73,6 +73,8 @@ class ContactViewModel(val contactInternal: Contact) : ErrorReportingViewModel()
     }
 
     val waitForChatRoomCreation = MutableLiveData<Boolean>()
+
+    val isNativeContact = MutableLiveData<Boolean>()
 
     private val contactsUpdatedListener = object : ContactsUpdatedListenerStub() {
         override fun onContactUpdated(contact: Contact) {
@@ -127,6 +129,7 @@ class ContactViewModel(val contactInternal: Contact) : ErrorReportingViewModel()
     init {
         contact.value = contactInternal
         displayName.value = contactInternal.fullName ?: contactInternal.firstName + " " + contactInternal.lastName
+        isNativeContact.value = contactInternal is NativeContact
 
         updateNumbersAndAddresses(contactInternal)
         coreContext.contactsManager.addListener(contactsUpdatedListener)
@@ -172,7 +175,7 @@ class ContactViewModel(val contactInternal: Contact) : ErrorReportingViewModel()
         }
     }
 
-    private fun updateNumbersAndAddresses(contact: Contact) {
+    fun updateNumbersAndAddresses(contact: Contact) {
         val list = arrayListOf<ContactNumberOrAddressData>()
         for (address in contact.sipAddresses) {
             val value = address.asStringUriOnly()

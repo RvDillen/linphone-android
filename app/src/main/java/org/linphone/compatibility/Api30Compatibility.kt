@@ -19,21 +19,53 @@
  */
 package org.linphone.compatibility
 
+import android.Manifest
 import android.annotation.TargetApi
+import android.app.Activity
 import android.content.Context
 import android.content.pm.ShortcutManager
+import androidx.fragment.app.Fragment
 import org.linphone.core.ChatRoom
+import org.linphone.core.tools.Log
 import org.linphone.utils.LinphoneUtils
 
 @TargetApi(30)
 class Api30Compatibility {
     companion object {
-        fun removeChatRoomShortcut(context: Context, chatRoom: ChatRoom) {
-            val peerAddress = chatRoom.peerAddress.asStringUriOnly()
-            val localAddress = chatRoom.localAddress.asStringUriOnly()
+        fun hasReadPhoneNumbersPermission(context: Context): Boolean {
+            val granted = Compatibility.hasPermission(context, Manifest.permission.READ_PHONE_NUMBERS)
+            if (granted) {
+                Log.d("[Permission Helper] Permission READ_PHONE_NUMBERS is granted")
+            } else {
+                Log.w("[Permission Helper] Permission READ_PHONE_NUMBERS is denied")
+            }
+            return granted
+        }
 
+        fun requestReadPhoneNumbersPermission(fragment: Fragment, code: Int) {
+            fragment.requestPermissions(arrayOf(Manifest.permission.READ_PHONE_NUMBERS), code)
+        }
+
+        fun requestTelecomManagerPermission(activity: Activity, code: Int) {
+            activity.requestPermissions(
+                arrayOf(
+                    Manifest.permission.READ_PHONE_NUMBERS,
+                    Manifest.permission.READ_PHONE_STATE,
+                    Manifest.permission.MANAGE_OWN_CALLS
+                ),
+                code
+            )
+        }
+
+        fun hasTelecomManagerPermission(context: Context): Boolean {
+            return Compatibility.hasPermission(context, Manifest.permission.READ_PHONE_NUMBERS) &&
+                Compatibility.hasPermission(context, Manifest.permission.READ_PHONE_STATE) &&
+                Compatibility.hasPermission(context, Manifest.permission.MANAGE_OWN_CALLS)
+        }
+
+        fun removeChatRoomShortcut(context: Context, chatRoom: ChatRoom) {
             val shortcutManager = context.getSystemService(ShortcutManager::class.java)
-            val id = LinphoneUtils.getChatRoomId(localAddress, peerAddress)
+            val id = LinphoneUtils.getChatRoomId(chatRoom.localAddress, chatRoom.peerAddress)
             val shortcutsToRemoveList = arrayListOf(id)
             shortcutManager.removeLongLivedShortcuts(shortcutsToRemoveList)
         }

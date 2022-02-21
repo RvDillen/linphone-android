@@ -21,6 +21,7 @@ package org.linphone.activities.main.chat.views
 
 import android.content.Context
 import android.text.Layout
+import android.text.method.LinkMovementMethod
 import android.util.AttributeSet
 import androidx.appcompat.widget.AppCompatTextView
 import kotlin.math.ceil
@@ -40,6 +41,12 @@ class MultiLineWrapContentWidthTextView : AppCompatTextView {
         defStyleAttr: Int
     ) : super(context, attrs, defStyleAttr)
 
+    override fun setText(text: CharSequence?, type: BufferType?) {
+        super.setText(text, type)
+        // Required for PatternClickableSpan
+        movementMethod = LinkMovementMethod.getInstance()
+    }
+
     override fun onMeasure(widthSpec: Int, heightSpec: Int) {
         var wSpec = widthSpec
         val widthMode = MeasureSpec.getMode(wSpec)
@@ -47,9 +54,11 @@ class MultiLineWrapContentWidthTextView : AppCompatTextView {
         if (widthMode == MeasureSpec.AT_MOST) {
             val layout = layout
             if (layout != null) {
-                val maxWidth = (ceil(getMaxLineWidth(layout).toDouble()).toInt() +
+                val maxWidth = (
+                    ceil(getMaxLineWidth(layout).toDouble()).toInt() +
                         totalPaddingLeft +
-                        totalPaddingRight)
+                        totalPaddingRight
+                    )
                 wSpec = MeasureSpec.makeMeasureSpec(maxWidth, MeasureSpec.AT_MOST)
             }
         }

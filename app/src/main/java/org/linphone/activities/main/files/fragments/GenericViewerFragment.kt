@@ -36,7 +36,7 @@ abstract class GenericViewerFragment<T : ViewDataBinding> : SecureFragment<T>() 
         super.onViewCreated(view, savedInstanceState)
 
         sharedViewModel = requireActivity().run {
-            ViewModelProvider(this).get(SharedMainViewModel::class.java)
+            ViewModelProvider(this)[SharedMainViewModel::class.java]
         }
 
         isSecure = arguments?.getBoolean("Secure") ?: false
@@ -55,5 +55,9 @@ abstract class GenericViewerFragment<T : ViewDataBinding> : SecureFragment<T>() 
 
         (childFragmentManager.findFragmentById(R.id.top_bar_fragment) as? TopBarFragment)
             ?.setContent(content)
+    }
+
+    override fun goBack() {
+        findNavController().popBackStack()
     }
 }

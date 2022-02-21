@@ -19,6 +19,7 @@
  */
 package org.linphone.utils
 
+import android.app.Activity
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.drawable.Drawable
@@ -29,6 +30,8 @@ import android.util.Patterns
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.InputMethodManager
 import android.widget.*
 import android.widget.SeekBar.OnSeekBarChangeListener
 import androidx.constraintlayout.widget.ConstraintLayout
@@ -50,6 +53,7 @@ import org.linphone.activities.GenericActivity
 import org.linphone.activities.main.settings.SettingListener
 import org.linphone.contact.ContactAvatarView
 import org.linphone.core.tools.Log
+import org.linphone.views.VoiceRecordProgressBar
 
 /**
  * This file contains all the data binding necessary for the app
@@ -183,6 +187,23 @@ fun editTextSetting(view: EditText, lambda: () -> Unit) {
 
         override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
     })
+}
+
+@BindingAdapter("onSettingImeDone")
+fun editTextImeDone(view: EditText, lambda: () -> Unit) {
+    view.setOnEditorActionListener { _, actionId, _ ->
+        if (actionId == EditorInfo.IME_ACTION_DONE) {
+            lambda()
+
+            view.clearFocus()
+
+            val imm = view.context.getSystemService(Activity.INPUT_METHOD_SERVICE) as InputMethodManager
+            imm.hideSoftInputFromWindow(view.windowToken, 0)
+
+            return@setOnEditorActionListener true
+        }
+        false
+    }
 }
 
 @BindingAdapter("onFocusChangeVisibilityOf")
@@ -531,4 +552,24 @@ fun setEditTextErrorListener(editText: EditText, attrChange: InverseBindingListe
 
         override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
     })
+}
+
+@BindingAdapter("app:max")
+fun VoiceRecordProgressBar.setProgressMax(max: Int) {
+    setMax(max)
+}
+
+@BindingAdapter("android:progress")
+fun VoiceRecordProgressBar.setPrimaryProgress(progress: Int) {
+    setProgress(progress)
+}
+
+@BindingAdapter("android:secondaryProgress")
+fun VoiceRecordProgressBar.setSecProgress(progress: Int) {
+    setSecondaryProgress(progress)
+}
+
+@BindingAdapter("app:secondaryProgressTint")
+fun VoiceRecordProgressBar.setSecProgressTint(color: Int) {
+    setSecondaryProgressTint(color)
 }

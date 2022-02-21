@@ -24,7 +24,6 @@ import android.net.Uri
 import android.os.Bundle
 import android.view.View
 import androidx.lifecycle.ViewModelProvider
-import androidx.navigation.fragment.findNavController
 import org.linphone.R
 import org.linphone.activities.main.fragments.SecureFragment
 import org.linphone.databinding.AboutFragmentBinding
@@ -37,12 +36,12 @@ class AboutFragment : SecureFragment<AboutFragmentBinding>() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        binding.lifecycleOwner = this
+        binding.lifecycleOwner = viewLifecycleOwner
 
-        viewModel = ViewModelProvider(this).get(AboutViewModel::class.java)
+        viewModel = ViewModelProvider(this)[AboutViewModel::class.java]
         binding.viewModel = viewModel
 
-        binding.setBackClickListener { findNavController().popBackStack() }
+        binding.setBackClickListener { goBack() }
 
         binding.setPrivacyPolicyClickListener {
             val browserIntent = Intent(
@@ -56,6 +55,14 @@ class AboutFragment : SecureFragment<AboutFragmentBinding>() {
             val browserIntent = Intent(
                 Intent.ACTION_VIEW,
                 Uri.parse(getString(R.string.about_license_link))
+            )
+            startActivity(browserIntent)
+        }
+
+        binding.setWeblateClickListener {
+            val browserIntent = Intent(
+                Intent.ACTION_VIEW,
+                Uri.parse(getString(R.string.about_weblate_link))
             )
             startActivity(browserIntent)
         }

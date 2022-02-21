@@ -20,15 +20,22 @@
 package org.linphone.activities.main.history.fragments
 
 import android.app.Dialog
+import android.content.res.Configuration
 import android.os.Bundle
 import android.view.View
 import androidx.core.content.ContextCompat
+import androidx.core.view.doOnPreDraw
 import androidx.lifecycle.ViewModelProvider
+import androidx.navigation.fragment.NavHostFragment
 import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import androidx.slidingpanelayout.widget.SlidingPaneLayout
+import com.google.android.material.transition.MaterialSharedAxis
 import org.linphone.LinphoneApplication.Companion.coreContext
+import org.linphone.LinphoneApplication.Companion.corePreferences
 import org.linphone.R
+import org.linphone.activities.clearDisplayedCallHistory
 import org.linphone.activities.main.fragments.MasterFragment
 import org.linphone.activities.main.history.adapters.CallLogsListAdapter
 import org.linphone.activities.main.history.data.GroupedCallLogData
@@ -63,17 +70,63 @@ class MasterCallLogsFragment : MasterFragment<HistoryMasterFragmentBinding, Call
         super.onDestroyView()
     }
 
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        useMaterialSharedAxisXForwardAnimation = false
+
+        if (corePreferences.enableAnimations) {
+            val portraitOrientation = resources.configuration.orientation != Configuration.ORIENTATION_LANDSCAPE
+            val axis = if (portraitOrientation) MaterialSharedAxis.X else MaterialSharedAxis.Y
+            enterTransition = MaterialSharedAxis(axis, false)
+            reenterTransition = MaterialSharedAxis(axis, false)
+            returnTransition = MaterialSharedAxis(axis, true)
+            exitTransition = MaterialSharedAxis(axis, true)
+        }
+    }
+
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        binding.lifecycleOwner = this
+        binding.lifecycleOwner = viewLifecycleOwner
 
-        listViewModel = ViewModelProvider(this).get(CallLogsListViewModel::class.java)
+        listViewModel = ViewModelProvider(this)[CallLogsListViewModel::class.java]
         binding.viewModel = listViewModel
 
+        /* Shared view model & sliding pane related */
+
         sharedViewModel = requireActivity().run {
-            ViewModelProvider(this).get(SharedMainViewModel::class.java)
+            ViewModelProvider(this)[SharedMainViewModel::class.java]
         }
+
+        view.doOnPreDraw { sharedViewModel.isSlidingPaneSlideable.value = binding.slidingPane.isSlideable }
+
+        sharedViewModel.closeSlidingPaneEvent.observe(
+            viewLifecycleOwner
+        ) {
+            it.consume {
+                if (!binding.slidingPane.closePane()) {
+                    goBack()
+                }
+            }
+        }
+        sharedViewModel.layoutChangedEvent.observe(
+            viewLifecycleOwner
+        ) {
+            it.consume {
+                sharedViewModel.isSlidingPaneSlideable.value = binding.slidingPane.isSlideable
+                if (binding.slidingPane.isSlideable) {
+                    val navHostFragment =
+                        childFragmentManager.findFragmentById(R.id.history_nav_container) as NavHostFragment
+                    if (navHostFragment.navController.currentDestination?.id == R.id.emptyCallHistoryFragment) {
+                        Log.i("[History] Foldable device has been folded, closing side pane with empty fragment")
+                        binding.slidingPane.closePane()
+                    }
+                }
+            }
+        }
+        binding.slidingPane.lockMode = SlidingPaneLayout.LOCK_MODE_LOCKED
+
+        /* End of shared view model & sliding pane related */
 
         _adapter = CallLogsListAdapter(listSelectionViewModel, viewLifecycleOwner)
         // SubmitList is done on a background thread
@@ -106,14 +159,24 @@ class MasterCallLogsFragment : MasterFragment<HistoryMasterFragmentBinding, Call
                 val dialog: Dialog = DialogUtils.getDialog(requireContext(), viewModel)
 
                 viewModel.showCancelButton {
-                    adapter.notifyItemChanged(viewHolder.adapterPosition)
+                    adapter.notifyItemChanged(viewHolder.bindingAdapterPosition)
                     dialog.dismiss()
                 }
 
-                viewModel.showDeleteButton({
-                    listViewModel.deleteCallLogGroup(adapter.currentList[viewHolder.adapterPosition])
-                    dialog.dismiss()
-                }, getString(R.string.dialog_delete))
+                viewModel.showDeleteButton(
+                    {
+                        val deletedCallGroup = adapter.currentList[viewHolder.bindingAdapterPosition]
+                        listViewModel.deleteCallLogGroup(deletedCallGroup)
+                        if (!binding.slidingPane.isSlideable &&
+                            deletedCallGroup.lastCallLog.callId == sharedViewModel.selectedCallLogGroup.value?.lastCallLog?.callId
+                        ) {
+                            Log.i("[History] Currently displayed history has been deleted, removing detail fragment")
+                            clearDisplayedCallHistory()
+                        }
+                        dialog.dismiss()
+                    },
+                    getString(R.string.dialog_delete)
+                )
 
                 dialog.show()
             }
@@ -125,58 +188,73 @@ class MasterCallLogsFragment : MasterFragment<HistoryMasterFragmentBinding, Call
         binding.callLogsList.addItemDecoration(AppUtils.getDividerDecoration(requireContext(), layoutManager))
 
         // Displays formatted date header
-        val headerItemDecoration = RecyclerViewHeaderDecoration(adapter)
+        val headerItemDecoration = RecyclerViewHeaderDecoration(requireContext(), adapter)
         binding.callLogsList.addItemDecoration(headerItemDecoration)
 
-        listViewModel.callLogs.observe(viewLifecycleOwner, { callLogs ->
+        listViewModel.callLogs.observe(
+            viewLifecycleOwner
+        ) { callLogs ->
             if (listViewModel.missedCallLogsSelected.value == false) {
                 adapter.submitList(callLogs)
             }
-        })
+        }
 
-        listViewModel.missedCallLogs.observe(viewLifecycleOwner, { callLogs ->
+        listViewModel.missedCallLogs.observe(
+            viewLifecycleOwner
+        ) { callLogs ->
             if (listViewModel.missedCallLogsSelected.value == true) {
                 adapter.submitList(callLogs)
             }
-        })
+        }
 
-        listViewModel.missedCallLogsSelected.observe(viewLifecycleOwner, {
+        listViewModel.missedCallLogsSelected.observe(
+            viewLifecycleOwner
+        ) {
             if (it) {
                 adapter.submitList(listViewModel.missedCallLogs.value)
             } else {
                 adapter.submitList(listViewModel.callLogs.value)
             }
-        })
+        }
 
-        listViewModel.contactsUpdatedEvent.observe(viewLifecycleOwner, {
+        listViewModel.contactsUpdatedEvent.observe(
+            viewLifecycleOwner
+        ) {
             it.consume {
                 adapter.notifyDataSetChanged()
             }
-        })
+        }
 
-        adapter.selectedCallLogEvent.observe(viewLifecycleOwner, {
+        adapter.selectedCallLogEvent.observe(
+            viewLifecycleOwner
+        ) {
             it.consume { callLog ->
                 sharedViewModel.selectedCallLogGroup.value = callLog
-                navigateToCallHistory()
+                navigateToCallHistory(binding.slidingPane)
             }
-        })
+        }
 
-        adapter.startCallToEvent.observe(viewLifecycleOwner, {
+        adapter.startCallToEvent.observe(
+            viewLifecycleOwner
+        ) {
             it.consume { callLogGroup ->
                 val remoteAddress = callLogGroup.lastCallLog.remoteAddress
                 if (coreContext.core.callsNb > 0) {
                     Log.i("[History] Starting dialer with pre-filled URI ${remoteAddress.asStringUriOnly()}, is transfer? ${sharedViewModel.pendingCallTransfer}")
+                    sharedViewModel.updateDialerAnimationsBasedOnDestination.value =
+                        Event(R.id.masterCallLogsFragment)
                     val args = Bundle()
                     args.putString("URI", remoteAddress.asStringUriOnly())
                     args.putBoolean("Transfer", sharedViewModel.pendingCallTransfer)
-                    args.putBoolean("SkipAutoCallStart", true) // If auto start call setting is enabled, ignore it
+                    // If auto start call setting is enabled, ignore it
+                    args.putBoolean("SkipAutoCallStart", true)
                     navigateToDialer(args)
                 } else {
                     val localAddress = callLogGroup.lastCallLog.localAddress
                     coreContext.startCall(remoteAddress, localAddress = localAddress)
                 }
             }
-        })
+        }
 
         binding.setAllCallLogsToggleClickListener {
             listViewModel.missedCallLogsSelected.value = false
@@ -193,18 +271,28 @@ class MasterCallLogsFragment : MasterFragment<HistoryMasterFragmentBinding, Call
         super.onResume()
 
         val tabsViewModel = requireActivity().run {
-            ViewModelProvider(this).get(TabsViewModel::class.java)
+            ViewModelProvider(this)[TabsViewModel::class.java]
         }
         tabsViewModel.updateMissedCallCount()
     }
 
     override fun deleteItems(indexesOfItemToDelete: ArrayList<Int>) {
         val list = ArrayList<GroupedCallLogData>()
+        var closeSlidingPane = false
         for (index in indexesOfItemToDelete) {
             val callLogGroup = adapter.currentList[index]
             list.add(callLogGroup)
+
+            if (callLogGroup.lastCallLog.callId == sharedViewModel.selectedCallLogGroup.value?.lastCallLog?.callId) {
+                closeSlidingPane = true
+            }
         }
         listViewModel.deleteCallLogGroups(list)
+
+        if (!binding.slidingPane.isSlideable && closeSlidingPane) {
+            Log.i("[History] Currently displayed history has been deleted, removing detail fragment")
+            clearDisplayedCallHistory()
+        }
     }
 
     private fun scrollToTop() {

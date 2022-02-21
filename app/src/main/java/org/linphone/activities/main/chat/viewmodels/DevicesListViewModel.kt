@@ -31,7 +31,7 @@ class DevicesListViewModelFactory(private val chatRoom: ChatRoom) :
     ViewModelProvider.NewInstanceFactory() {
 
     @Suppress("UNCHECKED_CAST")
-    override fun <T : ViewModel?> create(modelClass: Class<T>): T {
+    override fun <T : ViewModel> create(modelClass: Class<T>): T {
         return DevicesListViewModel(chatRoom) as T
     }
 }
@@ -59,16 +59,16 @@ class DevicesListViewModel(private val chatRoom: ChatRoom) : ViewModel() {
 
     init {
         chatRoom.addListener(listener)
-        updateParticipants()
     }
 
     override fun onCleared() {
         participants.value.orEmpty().forEach(DevicesListGroupData::destroy)
         chatRoom.removeListener(listener)
+
         super.onCleared()
     }
 
-    private fun updateParticipants() {
+    fun updateParticipants() {
         participants.value.orEmpty().forEach(DevicesListGroupData::destroy)
 
         val list = arrayListOf<DevicesListGroupData>()

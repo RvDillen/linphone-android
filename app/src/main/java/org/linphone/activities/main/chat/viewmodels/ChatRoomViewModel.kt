@@ -19,10 +19,13 @@
  */
 package org.linphone.activities.main.chat.viewmodels
 
+import android.animation.ValueAnimator
+import android.view.animation.LinearInterpolator
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import org.linphone.LinphoneApplication.Companion.coreContext
+import org.linphone.LinphoneApplication.Companion.corePreferences
 import org.linphone.R
 import org.linphone.contact.Contact
 import org.linphone.contact.ContactDataInterface
@@ -37,7 +40,7 @@ class ChatRoomViewModelFactory(private val chatRoom: ChatRoom) :
     ViewModelProvider.NewInstanceFactory() {
 
     @Suppress("UNCHECKED_CAST")
-    override fun <T : ViewModel?> create(modelClass: Class<T>): T {
+    override fun <T : ViewModel> create(modelClass: Class<T>): T {
         return ChatRoomViewModel(chatRoom) as T
     }
 }
@@ -47,7 +50,7 @@ class ChatRoomViewModel(val chatRoom: ChatRoom) : ViewModel(), ContactDataInterf
     override val displayName: MutableLiveData<String> = MutableLiveData<String>()
     override val securityLevel: MutableLiveData<ChatRoomSecurityLevel> = MutableLiveData<ChatRoomSecurityLevel>()
     override val showGroupChatAvatar: Boolean = chatRoom.hasCapability(ChatRoomCapabilities.Conference.toInt()) &&
-            !chatRoom.hasCapability(ChatRoomCapabilities.OneToOne.toInt())
+        !chatRoom.hasCapability(ChatRoomCapabilities.OneToOne.toInt())
 
     val subject = MutableLiveData<String>()
 
@@ -71,22 +74,46 @@ class ChatRoomViewModel(val chatRoom: ChatRoom) : ViewModel(), ContactDataInterf
 
     val peerSipUri = MutableLiveData<String>()
 
+    val ephemeralEnabled = MutableLiveData<Boolean>()
+
     val oneToOneChatRoom: Boolean = chatRoom.hasCapability(ChatRoomCapabilities.OneToOne.toInt())
 
     val encryptedChatRoom: Boolean = chatRoom.hasCapability(ChatRoomCapabilities.Encrypted.toInt())
 
-    val basicChatRoom: Boolean = chatRoom.hasCapability(ChatRoomCapabilities.Basic.toInt())
+    val ephemeralChatRoom: Boolean = chatRoom.hasCapability(ChatRoomCapabilities.Ephemeral.toInt())
+
+    val meAdmin: MutableLiveData<Boolean> by lazy {
+        MutableLiveData<Boolean>()
+    }
+
+    val isUserScrollingUp = MutableLiveData<Boolean>()
 
     var oneParticipantOneDevice: Boolean = false
 
-    var addressToCall: Address? = null
-
     var onlyParticipantOnlyDeviceAddress: Address? = null
+
+    val chatUnreadCountTranslateY = MutableLiveData<Float>()
+
+    private var addressToCall: Address? = null
+
+    private val bounceAnimator: ValueAnimator by lazy {
+        ValueAnimator.ofFloat(AppUtils.getDimension(R.dimen.tabs_fragment_unread_count_bounce_offset), 0f).apply {
+            addUpdateListener {
+                val value = it.animatedValue as Float
+                chatUnreadCountTranslateY.value = value
+            }
+            interpolator = LinearInterpolator()
+            duration = 250
+            repeatMode = ValueAnimator.REVERSE
+            repeatCount = ValueAnimator.INFINITE
+        }
+    }
 
     private val contactsUpdatedListener = object : ContactsUpdatedListenerStub() {
         override fun onContactsUpdated() {
             Log.i("[Chat Room] Contacts have changed")
             contactLookup()
+            updateLastMessageToDisplay()
         }
     }
 
@@ -172,7 +199,15 @@ class ChatRoomViewModel(val chatRoom: ChatRoom) : ViewModel(), ContactDataInterf
 
         override fun onEphemeralMessageDeleted(chatRoom: ChatRoom, eventLog: EventLog) {
             Log.i("[Chat Room] Ephemeral message deleted, updated last message displayed")
-            lastMessageText.value = formatLastMessage(chatRoom.lastMessageInHistory)
+            updateLastMessageToDisplay()
+        }
+
+        override fun onEphemeralEvent(chatRoom: ChatRoom, eventLog: EventLog) {
+            ephemeralEnabled.value = chatRoom.isEphemeralEnabled
+        }
+
+        override fun onParticipantAdminStatusChanged(chatRoom: ChatRoom, eventLog: EventLog) {
+            meAdmin.value = chatRoom.me?.isAdmin ?: false
         }
     }
 
@@ -181,18 +216,22 @@ class ChatRoomViewModel(val chatRoom: ChatRoom) : ViewModel(), ContactDataInterf
         chatRoom.addListener(chatRoomListener)
         coreContext.contactsManager.addListener(contactsUpdatedListener)
 
-        lastMessageText.value = formatLastMessage(chatRoom.lastMessageInHistory)
         unreadMessagesCount.value = chatRoom.unreadMessagesCount
         lastUpdate.value = TimestampUtils.toString(chatRoom.lastUpdateTime, true)
 
         subject.value = chatRoom.subject
         updateSecurityIcon()
+        meAdmin.value = chatRoom.me?.isAdmin ?: false
+        ephemeralEnabled.value = chatRoom.isEphemeralEnabled
 
         contactLookup()
         updateParticipants()
+        updateLastMessageToDisplay()
 
         callInProgress.value = chatRoom.core.callsNb > 0
         updateRemotesComposing()
+
+        if (corePreferences.enableAnimations) bounceAnimator.start()
     }
 
     override fun onCleared() {
@@ -204,6 +243,11 @@ class ChatRoomViewModel(val chatRoom: ChatRoom) : ViewModel(), ContactDataInterf
         coreContext.contactsManager.removeListener(contactsUpdatedListener)
         chatRoom.removeListener(chatRoomListener)
         chatRoom.core.removeListener(coreListener)
+        if (corePreferences.enableAnimations) bounceAnimator.end()
+    }
+
+    fun hideMenu(): Boolean {
+        return chatRoom.hasCapability(ChatRoomCapabilities.Basic.toInt()) || (oneToOneChatRoom && !encryptedChatRoom)
     }
 
     fun contactLookup() {
@@ -223,6 +267,17 @@ class ChatRoomViewModel(val chatRoom: ChatRoom) : ViewModel(), ContactDataInterf
         } else {
             getParticipantsNames()
         }
+    }
+
+    fun startCall() {
+        val address = addressToCall
+        if (address != null) {
+            coreContext.startCall(address)
+        }
+    }
+
+    fun updateLastMessageToDisplay() {
+        lastMessageText.value = formatLastMessage(chatRoom.lastMessageInHistory)
     }
 
     private fun formatLastMessage(msg: ChatMessage?): String {
@@ -297,14 +352,14 @@ class ChatRoomViewModel(val chatRoom: ChatRoom) : ViewModel(), ContactDataInterf
     }
 
     private fun updateParticipants() {
-        peerSipUri.value = if (oneToOneChatRoom && !basicChatRoom)
+        peerSipUri.value = if (oneToOneChatRoom && !chatRoom.hasCapability(ChatRoomCapabilities.Basic.toInt()))
             chatRoom.participants.firstOrNull()?.address?.asStringUriOnly()
                 ?: chatRoom.peerAddress.asStringUriOnly()
         else chatRoom.peerAddress.asStringUriOnly()
 
         oneParticipantOneDevice = chatRoom.hasCapability(ChatRoomCapabilities.OneToOne.toInt()) &&
-                chatRoom.me?.devices?.size == 1 &&
-                chatRoom.participants.firstOrNull()?.devices?.size == 1
+            chatRoom.me?.devices?.size == 1 &&
+            chatRoom.participants.firstOrNull()?.devices?.size == 1
 
         addressToCall = if (chatRoom.hasCapability(ChatRoomCapabilities.Basic.toInt()))
             chatRoom.peerAddress

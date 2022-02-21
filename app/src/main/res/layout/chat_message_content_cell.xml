@@ -27,7 +27,7 @@
             android:maxHeight="@dimen/chat_message_bubble_image_height_big"
             android:layout_size="@{data.alone ? 0f : @dimen/chat_message_bubble_file_size}"
             app:glidePath="@{data.filePath}"
-            android:visibility="@{data.image ? View.VISIBLE : View.GONE}"
+            android:visibility="@{!data.downloadable &amp;&amp; data.image ? View.VISIBLE : View.GONE}"
             android:scaleType="@{data.alone ? ScaleType.FIT_CENTER : ScaleType.CENTER_CROP}"
             android:adjustViewBounds="true" />
 
@@ -40,25 +40,33 @@
             android:maxHeight="@dimen/chat_message_bubble_image_height_big"
             android:layout_size="@{data.alone ? 0f : @dimen/chat_message_bubble_file_size}"
             android:src="@{data.videoPreview}"
-            android:visibility="@{data.video ? View.VISIBLE : View.GONE}"
+            android:visibility="@{!data.downloadable &amp;&amp; data.video ? View.VISIBLE : View.GONE}"
             android:scaleType="@{data.alone ? ScaleType.FIT_CENTER : ScaleType.CENTER_CROP}"
             android:adjustViewBounds="true" />
 
         <ImageView
-            android:visibility="@{data.video ? View.VISIBLE : View.GONE}"
-            android:layout_width="20dp"
-            android:layout_height="20dp"
-            android:src="@drawable/recording_play_pause"
+            android:visibility="@{!data.downloadable &amp;&amp; data.video ? View.VISIBLE : View.GONE}"
+            android:layout_width="@dimen/play_pause_button_size"
+            android:layout_height="@dimen/play_pause_button_size"
+            android:padding="9dp"
+            android:src="@drawable/record_play_dark"
+            android:background="@drawable/round_recording_button_background_dark"
             android:contentDescription="@string/content_description_chat_message_video_attachment"
             android:layout_centerInParent="true"/>
 
+        <include layout="@layout/chat_message_voice_record_content_cell"
+            app:data="@{data}"
+            app:longClickListener="@{longClickListener}"
+            android:visibility="@{!data.downloadable &amp;&amp; data.voiceRecording ? View.VISIBLE : View.GONE, default=gone}" />
+
         <LinearLayout
             android:layout_width="@dimen/chat_message_bubble_file_size"
-            android:layout_height="@dimen/chat_message_bubble_file_size"
+            android:layout_height="wrap_content"
+            android:minHeight="@dimen/chat_message_bubble_file_size"
             android:orientation="vertical"
             android:gravity="center"
             android:background="?attr/backgroundColor"
-            android:visibility="@{data.downloadable || data.pdf || data.audio || data.genericFile ? View.VISIBLE : View.GONE}">
+            android:visibility="@{data.downloadable || data.audio || data.pdf || data.genericFile ? View.VISIBLE : View.GONE}">
 
             <TextView
                 style="@style/chat_file_attachment_font"
@@ -67,11 +75,10 @@
                 android:layout_margin="5dp"
                 android:ellipsize="middle"
                 android:singleLine="true"
-                android:padding="10dp"
                 android:gravity="center"
                 android:textAlignment="center"
                 android:drawablePadding="5dp"
-                android:drawableTop="@{data.video ? @drawable/file_video : (data.image ? @drawable/file_picture : (data.pdf ? @drawable/file_pdf : (data.audio ? @drawable/file_audio : @drawable/file))), default=@drawable/file}"
+                android:drawableTop="@{data.video ? @drawable/file_video : (data.image ? @drawable/file_picture : (data.pdf ? @drawable/file_pdf : (data.audio ? @drawable/file_audio : (data.voiceRecording ? @drawable/audio_recording_reply_preview_default : @drawable/file)))), default=@drawable/file}"
                 android:text="@{data.fileName, default=`test.pdf`}"
                 android:onClick="@{() -> data.downloadable ? data.download() : data.openFile()}"
                 android:onLongClick="@{longClickListener}"/>
@@ -80,6 +87,8 @@
                 style="@style/chat_file_attachment_font"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:gravity="center"
+                android:layout_marginBottom="5dp"
                 android:text="@{data.downloadLabel}"
                 android:onClick="@{() -> data.download()}"
                 android:visibility="@{data.downloadable ? View.VISIBLE : View.GONE}"/>
@@ -89,7 +98,7 @@
         <RelativeLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:visibility="@{data.downloadProgressInt > 0 ? View.VISIBLE : View.GONE}"
+            android:visibility="@{data.downloadProgressInt > 0 ? View.VISIBLE : View.GONE, default=gone}"
             android:layout_centerInParent="true">
 
             <com.google.android.material.progressindicator.CircularProgressIndicator

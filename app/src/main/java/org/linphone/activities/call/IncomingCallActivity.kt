@@ -78,19 +78,23 @@ class IncomingCallActivity : GenericActivity() {
         )[IncomingCallViewModel::class.java]
         binding.viewModel = viewModel
 
-        viewModel.callEndedEvent.observe(this, {
+        viewModel.callEndedEvent.observe(
+            this
+        ) {
             it.consume {
                 Log.i("[Incoming Call Activity] Call ended, finish activity")
                 finish()
             }
-        })
+        }
 
-        viewModel.earlyMediaVideoEnabled.observe(this, {
+        viewModel.earlyMediaVideoEnabled.observe(
+            this
+        ) {
             if (it) {
                 Log.i("[Incoming Call Activity] Early media video being received, set native window id")
                 coreContext.core.nativeVideoWindowId = binding.remoteVideoSurface
             }
-        })
+        }
 
         val keyguardManager = getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
         val keyguardLocked = keyguardManager.isKeyguardLocked
@@ -133,7 +137,7 @@ class IncomingCallActivity : GenericActivity() {
             permissionsRequiredList.add(Manifest.permission.RECORD_AUDIO)
         }
 
-        if (viewModel.call.currentParams.videoEnabled() && !PermissionHelper.get().hasCameraPermission()) {
+        if (viewModel.call.currentParams.isVideoEnabled && !PermissionHelper.get().hasCameraPermission()) {
             Log.i("[Incoming Call Activity] Asking for CAMERA permission")
             permissionsRequiredList.add(Manifest.permission.CAMERA)
         }
@@ -169,7 +173,8 @@ class IncomingCallActivity : GenericActivity() {
     private fun findIncomingCall(): Call? {
         for (call in coreContext.core.calls) {
             if (call.state == Call.State.IncomingReceived ||
-                call.state == Call.State.IncomingEarlyMedia) {
+                call.state == Call.State.IncomingEarlyMedia
+            ) {
                 return call
             }
         }

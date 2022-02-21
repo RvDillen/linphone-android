@@ -23,7 +23,6 @@ import android.app.Dialog
 import android.os.Bundle
 import android.view.View
 import androidx.lifecycle.ViewModelProvider
-import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
 import org.linphone.R
 import org.linphone.activities.main.MainActivity
@@ -55,14 +54,14 @@ class GroupInfoFragment : SecureFragment<ChatRoomGroupInfoFragmentBinding>() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        binding.lifecycleOwner = this
+        binding.lifecycleOwner = viewLifecycleOwner
 
         sharedViewModel = requireActivity().run {
-            ViewModelProvider(this).get(SharedMainViewModel::class.java)
+            ViewModelProvider(this)[SharedMainViewModel::class.java]
         }
 
         val chatRoom: ChatRoom? = sharedViewModel.selectedGroupChatRoom.value
-        isSecure = chatRoom?.currentParams?.encryptionEnabled() ?: false
+        isSecure = chatRoom?.currentParams?.isEncryptionEnabled ?: false
 
         viewModel = ViewModelProvider(
             this,
@@ -75,7 +74,7 @@ class GroupInfoFragment : SecureFragment<ChatRoomGroupInfoFragmentBinding>() {
         adapter = GroupInfoParticipantsAdapter(
             viewLifecycleOwner,
             chatRoom?.hasCapability(ChatRoomCapabilities.Encrypted.toInt()) ?: viewModel.isEncrypted.value == true
-            )
+        )
         binding.participants.adapter = adapter
 
         val layoutManager = LinearLayoutManager(activity)
@@ -84,38 +83,55 @@ class GroupInfoFragment : SecureFragment<ChatRoomGroupInfoFragmentBinding>() {
         // Divider between items
         binding.participants.addItemDecoration(AppUtils.getDividerDecoration(requireContext(), layoutManager))
 
-        viewModel.participants.observe(viewLifecycleOwner, {
+        viewModel.participants.observe(
+            viewLifecycleOwner
+        ) {
             adapter.submitList(it)
-        })
+        }
 
-        viewModel.isMeAdmin.observe(viewLifecycleOwner, { isMeAdmin ->
+        viewModel.isMeAdmin.observe(
+            viewLifecycleOwner
+        ) { isMeAdmin ->
             adapter.showAdminControls(isMeAdmin && chatRoom != null)
-        })
+        }
 
-        viewModel.meAdminChangedEvent.observe(viewLifecycleOwner, {
+        viewModel.meAdminChangedEvent.observe(
+            viewLifecycleOwner
+        ) {
             it.consume { isMeAdmin ->
                 showMeAdminStateChanged(isMeAdmin)
             }
-        })
+        }
 
-        adapter.participantRemovedEvent.observe(viewLifecycleOwner, {
+        adapter.participantRemovedEvent.observe(
+            viewLifecycleOwner
+        ) {
             it.consume { participant ->
                 viewModel.removeParticipant(participant)
             }
-        })
+        }
 
         addParticipantsFromSharedViewModel()
 
         binding.setBackClickListener {
-            findNavController().popBackStack()
+            goBack()
         }
 
-        viewModel.createdChatRoomEvent.observe(viewLifecycleOwner, {
+        viewModel.createdChatRoomEvent.observe(
+            viewLifecycleOwner
+        ) {
             it.consume { chatRoom ->
-                sharedViewModel.selectedChatRoom.value = chatRoom
-                navigateToChatRoom(AppUtils.createBundleWithSharedTextAndFiles(sharedViewModel))
+                goToChatRoom(chatRoom, true)
             }
-        })
+        }
+
+        viewModel.updatedChatRoomEvent.observe(
+            viewLifecycleOwner
+        ) {
+            it.consume { chatRoom ->
+                goToChatRoom(chatRoom, false)
+            }
+        }
 
         binding.setNextClickListener {
             if (viewModel.chatRoom != null) {
@@ -144,10 +160,13 @@ class GroupInfoFragment : SecureFragment<ChatRoomGroupInfoFragmentBinding>() {
             val dialogViewModel = DialogViewModel(getString(R.string.chat_room_group_info_leave_dialog_message))
             val dialog: Dialog = DialogUtils.getDialog(requireContext(), dialogViewModel)
 
-            dialogViewModel.showDeleteButton({
-                viewModel.leaveGroup()
-                dialog.dismiss()
-            }, getString(R.string.chat_room_group_info_leave_dialog_button))
+            dialogViewModel.showDeleteButton(
+                {
+                    viewModel.leaveGroup()
+                    dialog.dismiss()
+                },
+                getString(R.string.chat_room_group_info_leave_dialog_button)
+            )
 
             dialogViewModel.showCancelButton {
                 dialog.dismiss()
@@ -156,11 +175,13 @@ class GroupInfoFragment : SecureFragment<ChatRoomGroupInfoFragmentBinding>() {
             dialog.show()
         }
 
-        viewModel.onErrorEvent.observe(viewLifecycleOwner, {
+        viewModel.onErrorEvent.observe(
+            viewLifecycleOwner
+        ) {
             it.consume { messageResourceId ->
                 (activity as MainActivity).showSnackBar(messageResourceId)
             }
-        })
+        }
     }
 
     private fun addParticipantsFromSharedViewModel() {
@@ -176,9 +197,11 @@ class GroupInfoFragment : SecureFragment<ChatRoomGroupInfoFragmentBinding>() {
                 if (exists != null) {
                     list.add(exists)
                 } else {
-                    list.add(GroupInfoParticipantData(
-                        GroupChatRoomMember(address, false, hasLimeX3DHCapability = viewModel.isEncrypted.value == true)
-                    ))
+                    list.add(
+                        GroupInfoParticipantData(
+                            GroupChatRoomMember(address, false, hasLimeX3DHCapability = viewModel.isEncrypted.value == true)
+                        )
+                    )
                 }
             }
 
@@ -208,5 +231,10 @@ class GroupInfoFragment : SecureFragment<ChatRoomGroupInfoFragmentBinding>() {
 
         dialog.show()
         meAdminStatusChangedDialog = dialog
+    }
+
+    private fun goToChatRoom(chatRoom: ChatRoom, created: Boolean) {
+        sharedViewModel.selectedChatRoom.value = chatRoom
+        navigateToChatRoom(AppUtils.createBundleWithSharedTextAndFiles(sharedViewModel), created)
     }
 }

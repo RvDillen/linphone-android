@@ -26,6 +26,7 @@ import androidx.security.crypto.MasterKey
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
+import java.security.KeyStoreException
 import org.linphone.LinphoneApplication.Companion.coreContext
 import org.linphone.compatibility.Compatibility
 import org.linphone.core.tools.Log
@@ -46,26 +47,38 @@ class CorePreferences constructor(private val context: Context) {
         private const val encryptedSharedPreferencesFile = "encrypted.pref"
     }
 
-    val encryptedSharedPreferences: SharedPreferences by lazy {
+    val encryptedSharedPreferences: SharedPreferences? by lazy {
         val masterKey: MasterKey = MasterKey.Builder(
             context,
             MasterKey.DEFAULT_MASTER_KEY_ALIAS
         ).setKeyScheme(MasterKey.KeyScheme.AES256_GCM).build()
-        EncryptedSharedPreferences.create(
-            context, encryptedSharedPreferencesFile, masterKey,
-            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-        )
+        try {
+            EncryptedSharedPreferences.create(
+                context, encryptedSharedPreferencesFile, masterKey,
+                EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+            )
+        } catch (kse: KeyStoreException) {
+            Log.e("[VFS] Keystore exception: $kse")
+            null
+        }
     }
 
     var vfsEnabled: Boolean
-        get() = encryptedSharedPreferences.getBoolean("vfs_enabled", false)
+        get() = encryptedSharedPreferences?.getBoolean("vfs_enabled", false) ?: false
         set(value) {
-            if (!value && encryptedSharedPreferences.getBoolean("vfs_enabled", false)) {
+            val preferences = encryptedSharedPreferences
+            if (preferences == null) {
+                Log.e("[VFS] Failed to get encrypted SharedPreferences")
+                return
+            }
+
+            if (!value && preferences.getBoolean("vfs_enabled", false)) {
                 Log.w("[VFS] It is not possible to disable VFS once it has been enabled")
                 return
             }
-            encryptedSharedPreferences.edit().putBoolean("vfs_enabled", value).apply()
+
+            preferences.edit().putBoolean("vfs_enabled", value)?.apply()
             // When VFS is enabled we disable logcat output for linphone logs
             // TODO: decide if we do it
             // logcatLogsOutput = false
@@ -133,6 +146,13 @@ class CorePreferences constructor(private val context: Context) {
             config.setInt("app", "dark_mode", value)
         }
 
+    /** Allow to make screenshots of encrypted chat rooms, disables fragment's secure mode */
+    var disableSecureMode: Boolean
+        get() = config.getBool("app", "disable_fragment_secure_mode", false)
+        set(value) {
+            config.setBool("app", "disable_fragment_secure_mode", value)
+        }
+
     /* Audio */
 
     /* Video */
@@ -142,13 +162,6 @@ class CorePreferences constructor(private val context: Context) {
         set(value) = config.setBool("app", "video_preview", value)
 
     /* Chat */
-
-    // TODO: Remove for 4.6 release
-    var ephemeralMessagesEnabled: Boolean
-        get() = config.getBool("app", "ephemeral", false)
-        set(value) {
-            config.setBool("app", "ephemeral", value)
-        }
 
     var preventMoreThanOneFilePerMessage: Boolean
         get() = config.getBool("app", "prevent_more_than_one_file_per_message", false)
@@ -203,6 +216,20 @@ class CorePreferences constructor(private val context: Context) {
             config.setBool("app", "chat_room_shortcuts", value)
         }
 
+    /* Voice Recordings */
+
+    var voiceRecordingMaxDuration: Int
+        get() = config.getInt("app", "voice_recording_max_duration", 600000) // in ms
+        set(value) = config.setInt("app", "voice_recording_max_duration", value)
+
+    var holdToRecordVoiceMessage: Boolean
+        get() = config.getBool("app", "voice_recording_hold_and_release_mode", false)
+        set(value) = config.setBool("app", "voice_recording_hold_and_release_mode", value)
+
+    var sendVoiceRecordingRightAway: Boolean
+        get() = config.getBool("app", "voice_recording_send_right_away", false)
+        set(value) = config.setBool("app", "voice_recording_send_right_away", value)
+
     /* Contacts */
 
     var storePresenceInNativeContact: Boolean
@@ -230,6 +257,12 @@ class CorePreferences constructor(private val context: Context) {
         }
 
     /* Call */
+
+    var sendEarlyMedia: Boolean
+        get() = config.getBool("sip", "outgoing_calls_early_media", false)
+        set(value) {
+            config.setBool("sip", "outgoing_calls_early_media", value)
+        }
 
     var acceptEarlyMedia: Boolean
         get() = config.getBool("sip", "incoming_calls_early_media", false)
@@ -269,8 +302,30 @@ class CorePreferences constructor(private val context: Context) {
             config.setBool("app", "call_right_away", value)
         }
 
+    var automaticallyStartCallRecording: Boolean
+        get() = config.getBool("app", "auto_start_call_record", false)
+        set(value) {
+            config.setBool("app", "auto_start_call_record", value)
+        }
+
+    var useTelecomManager: Boolean
+        // Some permissions are required, so keep it to false so user has to manually enable it and give permissions
+        get() = config.getBool("app", "use_self_managed_telecom_manager", false)
+        set(value) {
+            config.setBool("app", "use_self_managed_telecom_manager", value)
+            // We need to disable audio focus requests when enabling telecom manager, otherwise it creates conflicts
+            config.setBool("audio", "android_disable_audio_focus_requests", value)
+        }
+
+    // We will try to auto enable Telecom Manager feature, but in case user disables it don't try again
+    var manuallyDisabledTelecomManager: Boolean
+        get() = config.getBool("app", "user_disabled_self_managed_telecom_manager", false)
+        set(value) {
+            config.setBool("app", "user_disabled_self_managed_telecom_manager", value)
+        }
+
     var fullScreenCallUI: Boolean
-        get() = config.getBool("app", "full_screen_call", true)
+        get() = config.getBool("app", "full_screen_call", false)
         set(value) {
             config.setBool("app", "full_screen_call", value)
         }
@@ -389,6 +444,11 @@ class CorePreferences constructor(private val context: Context) {
     val fetchContactsFromDefaultDirectory: Boolean
         get() = config.getBool("app", "fetch_contacts_from_default_directory", true)
 
+    // From Android Contact APIs we can also retrieve the internationalized phone number
+    // By default we display the same value as the native address book app
+    val preferNormalizedPhoneNumbersFromAddressBook: Boolean
+        get() = config.getBool("app", "prefer_normalized_phone_numbers_from_address_book", false)
+
     val hideStaticImageCamera: Boolean
         get() = config.getBool("app", "hide_static_image_camera", true)
 
@@ -404,6 +464,19 @@ class CorePreferences constructor(private val context: Context) {
     // This will prevent UI from showing up, except for the launcher & the foreground service notification
     val preventInterfaceFromShowingUp: Boolean
         get() = config.getBool("app", "keep_app_invisible", false)
+
+    // By default we will record voice messages using MKV format and Opus audio encoding
+    // If disabled, WAV format will be used instead. Warning: files will be heavier!
+    val voiceMessagesFormatMkv: Boolean
+        get() = config.getBool("app", "record_voice_messages_in_mkv_format", true)
+
+    val useEphemeralPerDeviceMode: Boolean
+        get() = config.getBool("app", "ephemeral_chat_messages_settings_per_device", true)
+
+    // If enabled user will see all ringtones bundled in our SDK
+    // and will be able to choose which one to use if not using it's device's default
+    val showAllRingtones: Boolean
+        get() = config.getBool("app", "show_all_available_ringtones", false)
 
     /* Default values related */
 
@@ -523,8 +596,11 @@ class CorePreferences constructor(private val context: Context) {
     val defaultValuesPath: String
         get() = context.filesDir.absolutePath + "/assistant_default_values"
 
-    val ringtonePath: String
-        get() = context.filesDir.absolutePath + "/share/sounds/linphone/rings/notes_of_the_optimistic.mkv"
+    val ringtonesPath: String
+        get() = context.filesDir.absolutePath + "/share/sounds/linphone/rings/"
+
+    val defaultRingtonePath: String
+        get() = ringtonesPath + "notes_of_the_optimistic.mkv"
 
     val userCertificatesPath: String
         get() = context.filesDir.absolutePath + "/user-certs"

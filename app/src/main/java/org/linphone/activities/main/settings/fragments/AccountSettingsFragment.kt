@@ -21,19 +21,18 @@ package org.linphone.activities.main.settings.fragments
 
 import android.os.Bundle
 import android.view.View
+import androidx.core.view.doOnPreDraw
 import androidx.lifecycle.ViewModelProvider
-import androidx.navigation.fragment.findNavController
 import org.linphone.R
-import org.linphone.activities.GenericFragment
 import org.linphone.activities.main.settings.viewmodels.AccountSettingsViewModel
 import org.linphone.activities.main.settings.viewmodels.AccountSettingsViewModelFactory
-import org.linphone.activities.main.viewmodels.SharedMainViewModel
+import org.linphone.activities.navigateToEmptySetting
 import org.linphone.activities.navigateToPhoneLinking
 import org.linphone.core.tools.Log
 import org.linphone.databinding.SettingsAccountFragmentBinding
+import org.linphone.utils.Event
 
-class AccountSettingsFragment : GenericFragment<SettingsAccountFragmentBinding>() {
-    private lateinit var sharedViewModel: SharedMainViewModel
+class AccountSettingsFragment : GenericSettingFragment<SettingsAccountFragmentBinding>() {
     private lateinit var viewModel: AccountSettingsViewModel
 
     override fun getLayoutId(): Int = R.layout.settings_account_fragment
@@ -41,34 +40,31 @@ class AccountSettingsFragment : GenericFragment<SettingsAccountFragmentBinding>(
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        binding.lifecycleOwner = this
-
-        sharedViewModel = requireActivity().run {
-            ViewModelProvider(this).get(SharedMainViewModel::class.java)
-        }
+        binding.lifecycleOwner = viewLifecycleOwner
+        binding.sharedMainViewModel = sharedViewModel
 
         val identity = arguments?.getString("Identity")
         if (identity == null) {
             Log.e("[Account Settings] Identity is null, aborting!")
             // (activity as MainActivity).showSnackBar(R.string.error)
-            findNavController().navigateUp()
+            goBack()
             return
         }
 
         try {
-            viewModel = ViewModelProvider(this, AccountSettingsViewModelFactory(identity)).get(
-                AccountSettingsViewModel::class.java)
+            viewModel = ViewModelProvider(this, AccountSettingsViewModelFactory(identity))[AccountSettingsViewModel::class.java]
         } catch (nsee: NoSuchElementException) {
             Log.e("[Account Settings] Failed to find Account object, aborting!")
-            findNavController().navigateUp()
+            goBack()
             return
         }
         binding.viewModel = viewModel
 
-        binding.setBackClickListener { findNavController().popBackStack() }
-        binding.back.visibility = if (resources.getBoolean(R.bool.isTablet)) View.INVISIBLE else View.VISIBLE
+        binding.setBackClickListener { goBack() }
 
-        viewModel.linkPhoneNumberEvent.observe(viewLifecycleOwner, {
+        viewModel.linkPhoneNumberEvent.observe(
+            viewLifecycleOwner
+        ) {
             it.consume {
                 val authInfo = viewModel.account.findAuthInfo()
                 if (authInfo == null) {
@@ -81,13 +77,28 @@ class AccountSettingsFragment : GenericFragment<SettingsAccountFragmentBinding>(
                     navigateToPhoneLinking(args)
                 }
             }
-        })
+        }
 
-        viewModel.accountRemovedEvent.observe(viewLifecycleOwner, {
+        viewModel.accountRemovedEvent.observe(
+            viewLifecycleOwner
+        ) {
             it.consume {
                 sharedViewModel.accountRemoved.value = true
-                findNavController().navigateUp()
+                goBack()
             }
-        })
+        }
+
+        view.doOnPreDraw {
+            // Notifies fragment is ready to be drawn
+            sharedViewModel.accountSettingsFragmentOpenedEvent.value = Event(true)
+        }
+    }
+
+    override fun goBack() {
+        if (sharedViewModel.isSlidingPaneSlideable.value == true) {
+            sharedViewModel.closeSlidingPaneEvent.value = Event(true)
+        } else {
+            navigateToEmptySetting()
+        }
     }
 }

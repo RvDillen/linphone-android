@@ -35,7 +35,6 @@ import org.linphone.activities.*
 import org.linphone.activities.assistant.viewmodels.WelcomeViewModel
 import org.linphone.activities.navigateToAccountLogin
 import org.linphone.activities.navigateToEmailAccountCreation
-import org.linphone.activities.navigateToGenericLogin
 import org.linphone.activities.navigateToRemoteProvisioning
 import org.linphone.databinding.AssistantWelcomeFragmentBinding
 
@@ -47,9 +46,9 @@ class WelcomeFragment : GenericFragment<AssistantWelcomeFragmentBinding>() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        binding.lifecycleOwner = this
+        binding.lifecycleOwner = viewLifecycleOwner
 
-        viewModel = ViewModelProvider(this).get(WelcomeViewModel::class.java)
+        viewModel = ViewModelProvider(this)[WelcomeViewModel::class.java]
         binding.viewModel = viewModel
 
         binding.setCreateAccountClickListener {
@@ -65,16 +64,18 @@ class WelcomeFragment : GenericFragment<AssistantWelcomeFragmentBinding>() {
         }
 
         binding.setGenericAccountLoginClickListener {
-            navigateToGenericLogin()
+            navigateToGenericLoginWarning()
         }
 
         binding.setRemoteProvisioningClickListener {
             navigateToRemoteProvisioning()
         }
 
-        viewModel.termsAndPrivacyAccepted.observe(viewLifecycleOwner, {
+        viewModel.termsAndPrivacyAccepted.observe(
+            viewLifecycleOwner
+        ) {
             if (it) corePreferences.readAndAgreeTermsAndPrivacy = true
-        })
+        }
 
         setUpTermsAndPrivacyLinks()
     }

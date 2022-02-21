@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <layout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:linphone="http://schemas.android.com/apk/res-auto">
+    xmlns:linphone="http://schemas.android.com/apk/res-auto"
+    xmlns:bind="http://schemas.android.com/tools">
 
     <data>
         <import type="android.view.View"/>
@@ -11,6 +12,9 @@
         <variable
             name="viewModel"
             type="org.linphone.activities.main.settings.viewmodels.AdvancedSettingsViewModel"/>
+        <variable
+            name="sharedMainViewModel"
+            type="org.linphone.activities.main.viewmodels.SharedMainViewModel" />
     </data>
 
     <RelativeLayout
@@ -28,6 +32,7 @@
             <ImageView
                 android:id="@+id/back"
                 android:onClick="@{backClickListener}"
+                android:visibility="@{sharedMainViewModel.isSlidingPaneSlideable ? View.VISIBLE : View.GONE}"
                 android:contentDescription="@string/content_description_go_back"
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
@@ -51,7 +56,7 @@
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
                 android:layout_weight="0.2"
-                android:visibility="invisible" />
+                android:visibility="@{sharedMainViewModel.isSlidingPaneSlideable ? View.INVISIBLE : View.GONE}" />
 
         </LinearLayout>
 
@@ -158,6 +163,13 @@
                     linphone:listener="@{viewModel.vfsListener}"
                     linphone:checked="@={viewModel.vfs}"
                     linphone:enabled="@{!viewModel.vfs}"/>
+
+                <include
+                    layout="@layout/settings_widget_switch"
+                    linphone:title="@{@string/advanced_settings_disable_fragment_security_title}"
+                    linphone:subtitle="@{@string/advanced_settings_disable_fragment_security_summary}"
+                    linphone:listener="@{viewModel.disableSecureFragmentListener}"
+                    linphone:checked="@={viewModel.disableSecureFragment}"/>
 
                 <TextView
                     style="@style/settings_category_font"

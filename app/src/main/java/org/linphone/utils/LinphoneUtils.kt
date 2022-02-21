@@ -41,6 +41,15 @@ class LinphoneUtils {
         private const val RECORDING_DATE_PATTERN = "dd-MM-yyyy-HH-mm-ss"
 
         fun getDisplayName(address: Address): String {
+            if (address.displayName == null) {
+                val account = coreContext.core.accountList.find { account ->
+                    account.params.identityAddress?.asStringUriOnly() == address.asStringUriOnly()
+                }
+                val localDisplayName = account?.params?.identityAddress?.displayName
+                if (localDisplayName != null) {
+                    return localDisplayName
+                }
+            }
             return address.displayName ?: address.username ?: ""
         }
 
@@ -57,9 +66,9 @@ class LinphoneUtils {
 
         fun isLimeAvailable(): Boolean {
             val core = coreContext.core
-            return core.limeX3DhAvailable() && core.limeX3DhEnabled() &&
-                    core.limeX3DhServerUrl != null &&
-                    core.defaultAccount?.params?.conferenceFactoryUri != null
+            return core.limeX3DhAvailable() && core.isLimeX3DhEnabled &&
+                core.limeX3DhServerUrl != null &&
+                core.defaultAccount?.params?.conferenceFactoryUri != null
         }
 
         fun isGroupChatAvailable(): Boolean {
@@ -72,11 +81,11 @@ class LinphoneUtils {
             val defaultAccount = core.defaultAccount
 
             val params = core.createDefaultChatRoomParams()
-            params.enableGroup(false)
+            params.isGroupEnabled = false
             params.backend = ChatRoomBackend.Basic
             if (isSecured) {
                 params.subject = AppUtils.getString(R.string.chat_room_dummy_subject)
-                params.enableEncryption(true)
+                params.isEncryptionEnabled = true
                 params.backend = ChatRoomBackend.FlexisipChat
             }
 
@@ -113,6 +122,15 @@ class LinphoneUtils {
             return FileUtils.getFileStoragePath(fileName).absolutePath
         }
 
+        fun getRecordingFilePathForConference(): String {
+            val dateFormat: DateFormat = SimpleDateFormat(
+                RECORDING_DATE_PATTERN,
+                Locale.getDefault()
+            )
+            val fileName = "conference_${dateFormat.format(Date())}.mkv"
+            return FileUtils.getFileStoragePath(fileName).absolutePath
+        }
+
         fun getRecordingDateFromFileName(name: String): Date {
             return SimpleDateFormat(RECORDING_DATE_PATTERN, Locale.getDefault()).parse(name)
         }
@@ -134,14 +152,22 @@ class LinphoneUtils {
         }
 
         fun isCallLogMissed(callLog: CallLog): Boolean {
-            return (callLog.dir == Call.Dir.Incoming &&
-                (callLog.status == Call.Status.Missed ||
-                callLog.status == Call.Status.Aborted ||
-                callLog.status == Call.Status.EarlyAborted))
+            return (
+                callLog.dir == Call.Dir.Incoming &&
+                    (
+                        callLog.status == Call.Status.Missed ||
+                            callLog.status == Call.Status.Aborted ||
+                            callLog.status == Call.Status.EarlyAborted
+                        )
+                )
         }
 
-        fun getChatRoomId(localAddress: String, remoteAddress: String): String {
-            return "$localAddress~$remoteAddress"
+        fun getChatRoomId(localAddress: Address, remoteAddress: Address): String {
+            val localSipUri = localAddress.clone()
+            localSipUri.clean()
+            val remoteSipUri = remoteAddress.clone()
+            remoteSipUri.clean()
+            return "${localSipUri.asStringUriOnly()}~${remoteSipUri.asStringUriOnly()}"
         }
     }
 }

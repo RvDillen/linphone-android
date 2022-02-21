@@ -23,13 +23,13 @@ import android.os.Bundle
 import android.view.MotionEvent
 import android.view.View
 import androidx.lifecycle.ViewModelProvider
-import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
 import org.linphone.R
 import org.linphone.activities.main.fragments.MasterFragment
 import org.linphone.activities.main.recordings.adapters.RecordingsListAdapter
 import org.linphone.activities.main.recordings.data.RecordingData
 import org.linphone.activities.main.recordings.viewmodels.RecordingsViewModel
+import org.linphone.core.tools.Log
 import org.linphone.databinding.RecordingsFragmentBinding
 import org.linphone.utils.AppUtils
 import org.linphone.utils.RecyclerViewHeaderDecoration
@@ -50,9 +50,9 @@ class RecordingsFragment : MasterFragment<RecordingsFragmentBinding, RecordingsL
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        binding.lifecycleOwner = this
+        binding.lifecycleOwner = viewLifecycleOwner
 
-        viewModel = ViewModelProvider(this).get(RecordingsViewModel::class.java)
+        viewModel = ViewModelProvider(this)[RecordingsViewModel::class.java]
         binding.viewModel = viewModel
 
         _adapter = RecordingsListAdapter(listSelectionViewModel, viewLifecycleOwner)
@@ -66,14 +66,16 @@ class RecordingsFragment : MasterFragment<RecordingsFragmentBinding, RecordingsL
         binding.recordingsList.addItemDecoration(AppUtils.getDividerDecoration(requireContext(), layoutManager))
 
         // Displays the first letter header
-        val headerItemDecoration = RecyclerViewHeaderDecoration(adapter)
+        val headerItemDecoration = RecyclerViewHeaderDecoration(requireContext(), adapter)
         binding.recordingsList.addItemDecoration(headerItemDecoration)
 
-        viewModel.recordingsList.observe(viewLifecycleOwner, { recordings ->
+        viewModel.recordingsList.observe(
+            viewLifecycleOwner
+        ) { recordings ->
             adapter.submitList(recordings)
-        })
+        }
 
-        binding.setBackClickListener { findNavController().popBackStack() }
+        binding.setBackClickListener { goBack() }
 
         binding.setEditClickListener { listSelectionViewModel.isEditionEnabled.value = true }
 
@@ -108,5 +110,14 @@ class RecordingsFragment : MasterFragment<RecordingsFragmentBinding, RecordingsL
             list.add(recording)
         }
         viewModel.deleteRecordings(list)
+    }
+
+    override fun onResume() {
+        if (this::viewModel.isInitialized) {
+            viewModel.udpdateRecordingsList()
+        } else {
+            Log.e("[Recordings] Fragment resuming but viewModel lateinit property isn't initialized!")
+        }
+        super.onResume()
     }
 }

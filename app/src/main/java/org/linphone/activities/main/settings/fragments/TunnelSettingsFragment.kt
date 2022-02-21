@@ -22,13 +22,13 @@ package org.linphone.activities.main.settings.fragments
 import android.os.Bundle
 import android.view.View
 import androidx.lifecycle.ViewModelProvider
-import androidx.navigation.fragment.findNavController
 import org.linphone.R
-import org.linphone.activities.GenericFragment
 import org.linphone.activities.main.settings.viewmodels.TunnelSettingsViewModel
+import org.linphone.activities.navigateToEmptySetting
 import org.linphone.databinding.SettingsTunnelFragmentBinding
+import org.linphone.utils.Event
 
-class TunnelSettingsFragment : GenericFragment<SettingsTunnelFragmentBinding>() {
+class TunnelSettingsFragment : GenericSettingFragment<SettingsTunnelFragmentBinding>() {
     private lateinit var viewModel: TunnelSettingsViewModel
 
     override fun getLayoutId(): Int = R.layout.settings_tunnel_fragment
@@ -36,12 +36,20 @@ class TunnelSettingsFragment : GenericFragment<SettingsTunnelFragmentBinding>() 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        binding.lifecycleOwner = this
+        binding.lifecycleOwner = viewLifecycleOwner
+        binding.sharedMainViewModel = sharedViewModel
 
-        viewModel = ViewModelProvider(this).get(TunnelSettingsViewModel::class.java)
+        viewModel = ViewModelProvider(this)[TunnelSettingsViewModel::class.java]
         binding.viewModel = viewModel
 
-        binding.setBackClickListener { findNavController().popBackStack() }
-        binding.back.visibility = if (resources.getBoolean(R.bool.isTablet)) View.INVISIBLE else View.VISIBLE
+        binding.setBackClickListener { goBack() }
+    }
+
+    override fun goBack() {
+        if (sharedViewModel.isSlidingPaneSlideable.value == true) {
+            sharedViewModel.closeSlidingPaneEvent.value = Event(true)
+        } else {
+            navigateToEmptySetting()
+        }
     }
 }

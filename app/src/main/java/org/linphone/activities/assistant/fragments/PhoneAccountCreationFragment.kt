@@ -29,8 +29,10 @@ import org.linphone.activities.assistant.viewmodels.PhoneAccountCreationViewMode
 import org.linphone.activities.assistant.viewmodels.SharedAssistantViewModel
 import org.linphone.activities.navigateToPhoneAccountValidation
 import org.linphone.databinding.AssistantPhoneAccountCreationFragmentBinding
+import org.linphone.mediastream.Version
 
-class PhoneAccountCreationFragment : AbstractPhoneFragment<AssistantPhoneAccountCreationFragmentBinding>() {
+class PhoneAccountCreationFragment :
+    AbstractPhoneFragment<AssistantPhoneAccountCreationFragmentBinding>() {
     private lateinit var sharedViewModel: SharedAssistantViewModel
     override lateinit var viewModel: PhoneAccountCreationViewModel
 
@@ -39,13 +41,16 @@ class PhoneAccountCreationFragment : AbstractPhoneFragment<AssistantPhoneAccount
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        binding.lifecycleOwner = this
+        binding.lifecycleOwner = viewLifecycleOwner
 
         sharedViewModel = requireActivity().run {
-            ViewModelProvider(this).get(SharedAssistantViewModel::class.java)
+            ViewModelProvider(this)[SharedAssistantViewModel::class.java]
         }
 
-        viewModel = ViewModelProvider(this, PhoneAccountCreationViewModelFactory(sharedViewModel.getAccountCreator())).get(PhoneAccountCreationViewModel::class.java)
+        viewModel = ViewModelProvider(
+            this,
+            PhoneAccountCreationViewModelFactory(sharedViewModel.getAccountCreator())
+        )[PhoneAccountCreationViewModel::class.java]
         binding.viewModel = viewModel
 
         binding.setInfoClickListener {
@@ -56,21 +61,27 @@ class PhoneAccountCreationFragment : AbstractPhoneFragment<AssistantPhoneAccount
             CountryPickerFragment(viewModel).show(childFragmentManager, "CountryPicker")
         }
 
-        viewModel.goToSmsValidationEvent.observe(viewLifecycleOwner, {
+        viewModel.goToSmsValidationEvent.observe(
+            viewLifecycleOwner
+        ) {
             it.consume {
                 val args = Bundle()
                 args.putBoolean("IsCreation", true)
                 args.putString("PhoneNumber", viewModel.accountCreator.phoneNumber)
                 navigateToPhoneAccountValidation(args)
             }
-        })
+        }
 
-        viewModel.onErrorEvent.observe(viewLifecycleOwner, {
+        viewModel.onErrorEvent.observe(
+            viewLifecycleOwner
+        ) {
             it.consume { message ->
                 (requireActivity() as AssistantActivity).showSnackBar(message)
             }
-        })
+        }
 
-        checkPermission()
+        if (Version.sdkAboveOrEqual(Version.API23_MARSHMALLOW_60)) {
+            checkPermissions()
+        }
     }
 }

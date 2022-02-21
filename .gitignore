@@ -24,6 +24,7 @@ linphone-sdk-android/*.aar
 app/debug
 app/release
 app/releaseAppBundle
+app/releaseWithCrashlytics
 keystore.properties
 app/src/main/res/xml/contacts.xml
 linphone-android-release\.apk
