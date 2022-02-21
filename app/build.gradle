@@ -9,7 +9,7 @@ apply plugin: "org.jlleitschuh.gradle.ktlint"
 // Used to set the package version name and version code
 ext.versionMajor = 4
 ext.versionMinor = 5
-ext.versionRelease = 2
+ext.versionRelease = 6
 
 static def getPackageName() {
     return "nl.clb.linphone"
@@ -52,7 +52,7 @@ def gitBranch = new ByteArrayOutputStream()
 task getGitVersion() {
     def versionBuild = Integer.valueOf(System.env.BUILD_NUMBER ?: 0)
     project.version = String.format('%d.%d.%d.%d', versionMajor, versionMinor, versionRelease, versionBuild)
-/*  def gitVersion = "4.5.2"
+/*  def gitVersion = "4.5.6"
     def gitVersionStream = new ByteArrayOutputStream()
     def gitCommitsCount = new ByteArrayOutputStream()
     def gitCommitHash = new ByteArrayOutputStream()
