@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
     package="org.linphone">
 
     <uses-permission android:name="android.permission.DISABLE_KEYGUARD" />
@@ -32,7 +33,6 @@
 
     <!-- Needed for overlay -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
-
     <application
         android:name=".LinphoneApplication"
         android:allowBackup="false"
@@ -45,17 +45,26 @@
 
         <!-- Restrictions/AppConfig -->
         <meta-data android:name="android.content.APP_RESTRICTIONS" android:resource="@xml/restrictions" />
+        <activity
+        android:exported="true"
+        android:name=".activities.launcher.LauncherActivity"
+        android:noHistory="true"
+        android:showWhenLocked="true"
+        android:turnScreenOn="true"
+        android:theme="@style/AppTheme">
+
+        <intent-filter>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent-filter>
+        </activity>
+
         <activity android:name=".activities.main.MainActivity"
             android:exported="true"
             android:launchMode="singleTask"
             android:windowSoftInputMode="adjustResize"
             android:theme="@style/AppSplashScreenTheme">
             <nav-graph android:value="@navigation/main_nav_graph" />
-
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
 
             <meta-data
                 android:name="android.app.shortcuts"
@@ -84,7 +93,7 @@
                 <data android:mimeType="application/*" />
             </intent-filter>
 
-            <intent-filter>
+            <intent-filter tools:ignore="AppLinkUrlError">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <category android:name="android.intent.category.DEFAULT" />

@@ -4,6 +4,8 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 
+import org.linphone.core.Account;
+import org.linphone.core.AccountParams;
 import org.linphone.core.Address;
 import org.linphone.core.AuthInfo;
 import org.linphone.core.Core;
@@ -43,59 +45,56 @@ public class LoginReceiver extends BroadcastReceiver {
 
         // Default hangup behaviour (no uri or terminate uri failed)
         Core lc = coreContext.getCore();
-        ProxyConfig mProxyConfig = lc.getDefaultProxyConfig();
-        if (mProxyConfig == null) {
+        Account mAccount = lc.getDefaultAccount();
+        if (mAccount == null) {
             Log.e("[Login Receiver] No proxy config !");
             android.util.Log.w(TAG, "[Login Receiver] No proxy config !");
             return;
         }
-        AuthInfo mAuthInfo = mProxyConfig.findAuthInfo();
-
+        AuthInfo mAuthInfo = mAccount.findAuthInfo();
+        AuthInfo newAuthInfo = mAuthInfo;
         if (mAuthInfo == null) {
             // Create new Authentication
-            mAuthInfo =
+            newAuthInfo =
                     Factory.instance()
                             .createAuthInfo(sipUsername, null, sipPassword, null, null, null);
         } else {
-            ProxyConfig proxyConfig = lc.getDefaultProxyConfig();
+            newAuthInfo = mAuthInfo.clone();
 
-            proxyConfig.edit();
-
+            AccountParams accountParams = mAccount.getParams().clone();
             // Kill current connection
-            proxyConfig.setExpires(0);
-            proxyConfig.setPublishExpires(0);
-            proxyConfig.refreshRegister();
-            lc.refreshRegisters();
-
-            proxyConfig.done();
+            accountParams.setExpires(0);
+            accountParams.setPublishExpires(0);
+            accountParams.setRegisterEnabled(false);
+            mAccount.setParams(accountParams);
             lc.refreshRegisters();
         }
 
-        mAuthInfo.setUserid(sipUsername);
+        newAuthInfo.setUserid(sipUsername);
 
-        mAuthInfo.setUsername(sipUsername);
+        newAuthInfo.setUsername(sipUsername);
+        AccountParams accountParams = mAccount.getParams().clone();
+        accountParams.setExpires(3600);
+        accountParams.setPublishExpires(3600);
 
-        mProxyConfig.edit();
-        mProxyConfig.setExpires(3600);
-        mProxyConfig.setPublishExpires(3600);
+        accountParams.setRegisterEnabled(true);
 
-        mProxyConfig.enableRegister(true);
-
-        Address identity = mProxyConfig.getIdentityAddress();
+        Address identity = accountParams.getIdentityAddress();
         if (identity != null) {
             identity.setUsername(sipUsername);
             identity.setDisplayName(sipUsername);
         }
-        mProxyConfig.setIdentityAddress(identity);
-        mProxyConfig.done();
+        accountParams.setIdentityAddress(identity);
 
-        mAuthInfo.setHa1(null);
-        mAuthInfo.setPassword(sipPassword);
+        newAuthInfo.setHa1(null);
+        newAuthInfo.setPassword(sipPassword);
         // Reset algorithm to generate correct hash depending on
         // algorithm set in next to come 401
-        mAuthInfo.setAlgorithm(null);
+        newAuthInfo.setAlgorithm(null);
 
-        lc.addAuthInfo(mAuthInfo);
+        lc.removeAuthInfo(mAuthInfo);
+        lc.addAuthInfo(newAuthInfo);
+        mAccount.setParams(accountParams);
         lc.refreshRegisters();
 
         // Publish Login

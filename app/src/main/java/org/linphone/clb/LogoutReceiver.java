@@ -4,6 +4,8 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 
+import org.linphone.core.Account;
+import org.linphone.core.AccountParams;
 import org.linphone.core.Core;
 import org.linphone.core.ProxyConfig;
 
@@ -24,17 +26,13 @@ public class LogoutReceiver extends BroadcastReceiver {
     public void onReceive(Context context, Intent intent) {
 
         Core lc = coreContext.getCore();
-        ProxyConfig proxyConfig = lc.getDefaultProxyConfig();
-
-        proxyConfig.edit();
-
+        Account account = lc.getDefaultAccount();
+        AccountParams accountParams = account.getParams().clone();
         // Kill current connection
-        proxyConfig.setExpires(0);
-        proxyConfig.setPublishExpires(0);
-        proxyConfig.refreshRegister();
-        lc.refreshRegisters();
-
-        proxyConfig.done();
+        accountParams.setExpires(0);
+        accountParams.setPublishExpires(0);
+        accountParams.setRegisterEnabled(false);
+        account.setParams(accountParams);
         lc.refreshRegisters();
 
         // Publish logout state
