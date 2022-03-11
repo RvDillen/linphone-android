@@ -7,7 +7,7 @@ import android.os.Build
 import androidx.core.content.ContextCompat
 import org.linphone.LinphoneApplication
 import org.linphone.LinphoneApplication.Companion.coreContext
-import org.linphone.activities.launcher.LauncherActivity
+import org.linphone.activities.main.MainActivity
 import org.linphone.core.CoreService
 import org.linphone.mediastream.Version
 
@@ -28,7 +28,7 @@ class CoreContextExt() {
         // A11(+): Show activity briefly, otherwise microphone is blocked by android (BG-12130).
         if (Build.VERSION.SDK_INT > Version.API29_ANDROID_10) {
 
-            val intent = Intent(coreContext.context, LauncherActivity::class.java)
+            val intent = Intent(coreContext.context, MainActivity::class.java)
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             intent.addFlags(Intent.FLAG_ACTIVITY_NO_USER_ACTION)
             intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)

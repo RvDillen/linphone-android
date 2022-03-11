@@ -54,12 +54,14 @@ public class DirectCallReceiver extends BroadcastReceiver {
         CoreContextExt coreExt = new CoreContextExt();
 
         if (coreExt.IsServiceReady()) {
+            coreExt.OnOutgoingStarted(false);
             onServiceReady();
         } else {
             Log.i(TAG, "Start linphone as foreground");
 
             // start linphone as foreground service
             coreExt.StartCoreService(context);
+            coreExt.OnOutgoingStarted(false);
 
             mServiceThread = new ServiceWaitThread();
             mServiceThread.start();
@@ -68,7 +70,6 @@ public class DirectCallReceiver extends BroadcastReceiver {
     }
 
     protected void onServiceReady() {
-
         mHandler.postDelayed(
                 new Runnable() {
                     @Override
