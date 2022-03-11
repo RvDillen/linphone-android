@@ -128,7 +128,7 @@ class NotificationsManager(private val context: Context) {
                         */
                     }
                 }
-                else -> displayCallNotification(call)
+                else -> displayCallNotification(call, true)
             }
         }
 
