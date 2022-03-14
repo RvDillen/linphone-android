@@ -35,6 +35,24 @@ import androidx.emoji.bundled.BundledEmojiCompatConfig
 import androidx.emoji.text.EmojiCompat
 import androidx.lifecycle.MutableLiveData
 import com.google.firebase.crashlytics.FirebaseCrashlytics
+import kotlinx.coroutines.*
+import org.linphone.BuildConfig
+import org.linphone.LinphoneApplication.Companion.corePreferences
+import org.linphone.R
+import org.linphone.activities.call.CallActivity
+import org.linphone.activities.call.IncomingCallActivity
+import org.linphone.activities.call.OutgoingCallActivity
+import org.linphone.clb.CallStateCLB
+import org.linphone.compatibility.Compatibility
+import org.linphone.compatibility.PhoneStateInterface
+import org.linphone.contact.Contact
+import org.linphone.contact.ContactsManager
+import org.linphone.core.tools.Log
+import org.linphone.mediastream.Version
+import org.linphone.notifications.NotificationsManager
+import org.linphone.telecom.TelecomHelper
+import org.linphone.utils.*
+import org.linphone.utils.Event
 import java.io.File
 import java.math.BigInteger
 import java.nio.charset.StandardCharsets
@@ -47,25 +65,7 @@ import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 import kotlin.math.abs
-import kotlinx.coroutines.*
-import org.linphone.BuildConfig
-import org.linphone.LinphoneApplication.Companion.corePreferences
-import org.linphone.R
-import org.linphone.activities.call.CallActivity
-import org.linphone.activities.call.IncomingCallActivity
-import org.linphone.activities.call.OutgoingCallActivity
-import org.linphone.clb.CallStateCLB
-import org.linphone.clb.kt.CoreContextExt
-import org.linphone.compatibility.Compatibility
-import org.linphone.compatibility.PhoneStateInterface
-import org.linphone.contact.Contact
-import org.linphone.contact.ContactsManager
-import org.linphone.core.tools.Log
-import org.linphone.mediastream.Version
-import org.linphone.notifications.NotificationsManager
-import org.linphone.telecom.TelecomHelper
-import org.linphone.utils.*
-import org.linphone.utils.Event
+
 
 class CoreContext(val context: Context, coreConfig: Config) {
     var stopped = false
@@ -558,6 +558,13 @@ class CoreContext(val context: Context, coreConfig: Config) {
             val call = core.inviteAddress(address)
             Log.w("[Context] Starting call $call without params")
             return
+        }
+
+        // CLB => Secure audio
+        val sipUri = address.asStringUriOnly().lowercase()
+        if (sipUri.contains("clbsessionid") && sipUri.contains("transport=tls")) {
+            params.isLowBandwidthEnabled = true
+            params.mediaEncryption = MediaEncryption.SRTP
         }
 
         if (forceZRTP) {
