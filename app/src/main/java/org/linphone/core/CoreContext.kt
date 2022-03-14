@@ -35,6 +35,18 @@ import androidx.emoji.bundled.BundledEmojiCompatConfig
 import androidx.emoji.text.EmojiCompat
 import androidx.lifecycle.MutableLiveData
 import com.google.firebase.crashlytics.FirebaseCrashlytics
+import java.io.File
+import java.math.BigInteger
+import java.nio.charset.StandardCharsets
+import java.security.KeyStore
+import java.security.MessageDigest
+import java.text.Collator
+import java.util.*
+import javax.crypto.Cipher
+import javax.crypto.KeyGenerator
+import javax.crypto.SecretKey
+import javax.crypto.spec.GCMParameterSpec
+import kotlin.math.abs
 import kotlinx.coroutines.*
 import org.linphone.BuildConfig
 import org.linphone.LinphoneApplication.Companion.corePreferences
@@ -53,19 +65,6 @@ import org.linphone.notifications.NotificationsManager
 import org.linphone.telecom.TelecomHelper
 import org.linphone.utils.*
 import org.linphone.utils.Event
-import java.io.File
-import java.math.BigInteger
-import java.nio.charset.StandardCharsets
-import java.security.KeyStore
-import java.security.MessageDigest
-import java.text.Collator
-import java.util.*
-import javax.crypto.Cipher
-import javax.crypto.KeyGenerator
-import javax.crypto.SecretKey
-import javax.crypto.spec.GCMParameterSpec
-import kotlin.math.abs
-
 
 class CoreContext(val context: Context, coreConfig: Config) {
     var stopped = false
