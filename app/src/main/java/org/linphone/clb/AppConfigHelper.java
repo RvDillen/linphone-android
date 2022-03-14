@@ -36,9 +36,9 @@ public class AppConfigHelper {
         _corePreferences = corePreferences;
 
         _rcString = "";
-        _rcHash = "";
+        _rcHash = null;
         _rcXmlString = "";
-        _rcXmlHash = "";
+        _rcXmlHash = null;
     }
 
     public void checkAppConfig() {
@@ -167,22 +167,22 @@ public class AppConfigHelper {
             log("parsing linphoneRc config");
             _rcString = bundle.getString(linphoneRc_key);
             log("_rcString: " + _rcString);
+            _rcHash = calculateHash(linphoneRc_key, _rcString);
         } else {
             log("Bundle does not contain linphoneRc key. Return empty string.");
             _rcString = "";
         }
-        _rcHash = calculateHash(linphoneRc_key, _rcString);
 
         // Intended use: Partial configuration, missing values will fall back to defaults
         if (bundle.containsKey(linphoneRcXml_key)) {
             log("parsing linphoneRc XML config");
             _rcXmlString = bundle.getString(linphoneRcXml_key);
             log("_rcXmlString: " + _rcXmlString);
+            _rcXmlHash = calculateHash(linphoneRcXml_key, _rcXmlString);
         } else {
             log("Bundle does not contain linphoneRcXml key. Return empty string.");
             _rcXmlString = "";
         }
-        _rcXmlHash = calculateHash(linphoneRcXml_key, _rcXmlString);
     }
 
     private void storeHash(String key) {
