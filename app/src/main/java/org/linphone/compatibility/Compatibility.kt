@@ -22,6 +22,7 @@ package org.linphone.compatibility
 import android.app.Activity
 import android.app.Notification
 import android.app.PendingIntent
+import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -46,6 +47,8 @@ import org.linphone.telecom.NativeCallWrapper
 @Suppress("DEPRECATION")
 class Compatibility {
     companion object {
+        const val BLUETOOTH_CONNECT = "android.permission.BLUETOOTH_CONNECT"
+
         fun hasPermission(context: Context, permission: String): Boolean {
             return when (Version.sdkAboveOrEqual(Version.API23_MARSHMALLOW_60)) {
                 true -> Api23Compatibility.hasPermission(context, permission)
@@ -69,6 +72,13 @@ class Compatibility {
             } else {
                 Api23Compatibility.requestReadPhoneStatePermission(fragment, code)
             }
+        }
+
+        fun hasBluetoothConnectPermission(context: Context): Boolean {
+            if (Version.sdkAboveOrEqual(Version.API31_ANDROID_12)) {
+                return Api31Compatibility.hasBluetoothConnectPermission(context)
+            }
+            return true
         }
 
         // See https://developer.android.com/about/versions/11/privacy/permissions#phone-numbers
@@ -202,10 +212,20 @@ class Compatibility {
         }
 
         fun startForegroundService(context: Context, intent: Intent) {
-            if (Version.sdkAboveOrEqual(Version.API26_O_80)) {
+            if (Version.sdkAboveOrEqual(Version.API31_ANDROID_12)) {
+                Api31Compatibility.startForegroundService(context, intent)
+            } else if (Version.sdkAboveOrEqual(Version.API26_O_80)) {
                 Api26Compatibility.startForegroundService(context, intent)
             } else {
                 Api21Compatibility.startForegroundService(context, intent)
+            }
+        }
+
+        fun startForegroundService(service: Service, notifId: Int, notif: Notification?) {
+            if (Version.sdkAboveOrEqual(Version.API31_ANDROID_12)) {
+                Api31Compatibility.startForegroundService(service, notifId, notif)
+            } else {
+                Api21Compatibility.startForegroundService(service, notifId, notif)
             }
         }
 

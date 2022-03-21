@@ -342,7 +342,7 @@ class NotificationsManager(private val context: Context) {
         }
         currentForegroundServiceNotificationId = SERVICE_NOTIF_ID
         Log.i("[Notifications Manager] Starting service as foreground [$currentForegroundServiceNotificationId]")
-        coreService.startForeground(currentForegroundServiceNotificationId, serviceNotification)
+        Compatibility.startForegroundService(coreService, currentForegroundServiceNotificationId, serviceNotification)
         service = coreService
     }
 
@@ -446,6 +446,17 @@ class NotificationsManager(private val context: Context) {
             Log.w("[Notifications Manager] Call will be declined, do not show incoming call notification")
             return
         }
+        try {
+            val showLockScreenNotification = android.provider.Settings.Secure.getInt(
+                context.contentResolver,
+                "lock_screen_show_notifications",
+                0
+            )
+            Log.i("[Notifications Manager] Are notifications allowed on lock screen? ${showLockScreenNotification != 0} ($showLockScreenNotification)")
+        } catch (e: Exception) {
+            Log.e("[Notifications Manager] Failed to get android.provider.Settings.Secure.getInt(lock_screen_show_notifications): $e")
+        }
+
         try {
             val showLockScreenNotification = android.provider.Settings.Secure.getInt(
                 context.contentResolver,

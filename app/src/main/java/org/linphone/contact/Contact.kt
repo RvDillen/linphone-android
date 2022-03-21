@@ -59,6 +59,7 @@ open class Contact() : Comparable<Contact> {
 
     constructor(searchResult: SearchResult) : this() {
         friend = searchResult.friend
+        fullName = friend?.name
         addAddressAndPhoneNumberFromSearchResult(searchResult)
     }
 
@@ -78,6 +79,9 @@ open class Contact() : Comparable<Contact> {
                 fullName = friend?.name ?: phoneNumber.orEmpty()
             }
 
+            if (address != null && address.username == phoneNumber) {
+                sipAddresses.remove(address)
+            }
             phoneNumbers.add(PhoneNumber(phoneNumber, ""))
         }
     }

@@ -118,6 +118,7 @@ class IncomingCallActivity : GenericActivity() {
         if (incomingCall == null) {
             Log.e("[Incoming Call Activity] Couldn't find call in state Incoming")
             if (isTaskRoot) {
+                Log.i("[Incoming Call Activity] Task is root, starting MainActivity")
                 // When resuming app from recent tasks make sure MainActivity will be launched if there is no call
                 val intent = Intent()
                 intent.setClass(this, MainActivity::class.java)
@@ -131,6 +132,7 @@ class IncomingCallActivity : GenericActivity() {
     @TargetApi(Version.API23_MARSHMALLOW_60)
     private fun checkPermissions() {
         val permissionsRequiredList = arrayListOf<String>()
+
         if (!PermissionHelper.get().hasRecordAudioPermission()) {
             Log.i("[Incoming Call Activity] Asking for RECORD_AUDIO permission")
             permissionsRequiredList.add(Manifest.permission.RECORD_AUDIO)
@@ -139,6 +141,11 @@ class IncomingCallActivity : GenericActivity() {
         if (viewModel.call.currentParams.isVideoEnabled && !PermissionHelper.get().hasCameraPermission()) {
             Log.i("[Incoming Call Activity] Asking for CAMERA permission")
             permissionsRequiredList.add(Manifest.permission.CAMERA)
+        }
+
+        if (Version.sdkAboveOrEqual(Version.API31_ANDROID_12) && !PermissionHelper.get().hasBluetoothConnectPermission()) {
+            Log.i("[Incoming Call Activity] Asking for BLUETOOTH_CONNECT permission")
+            permissionsRequiredList.add(Compatibility.BLUETOOTH_CONNECT)
         }
 
         if (permissionsRequiredList.isNotEmpty()) {
@@ -162,6 +169,9 @@ class IncomingCallActivity : GenericActivity() {
                     Manifest.permission.CAMERA -> if (grantResults[i] == PackageManager.PERMISSION_GRANTED) {
                         Log.i("[Incoming Call Activity] CAMERA permission has been granted")
                         coreContext.core.reloadVideoDevices()
+                    }
+                    Compatibility.BLUETOOTH_CONNECT -> if (grantResults[i] == PackageManager.PERMISSION_GRANTED) {
+                        Log.i("[Incoming Call Activity] BLUETOOTH_CONNECT permission has been granted")
                     }
                 }
             }

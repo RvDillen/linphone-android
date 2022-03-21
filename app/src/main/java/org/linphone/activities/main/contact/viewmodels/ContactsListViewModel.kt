@@ -23,53 +23,105 @@ import android.content.ContentProviderOperation
 import android.provider.ContactsContract
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import java.util.*
+import kotlinx.coroutines.*
 import org.linphone.LinphoneApplication.Companion.coreContext
+import org.linphone.LinphoneApplication.Companion.corePreferences
 import org.linphone.contact.Contact
 import org.linphone.contact.ContactsUpdatedListenerStub
 import org.linphone.contact.NativeContact
-import org.linphone.core.SearchResult
+import org.linphone.core.*
 import org.linphone.core.tools.Log
+import org.linphone.utils.Event
 
 class ContactsListViewModel : ViewModel() {
     val sipContactsSelected = MutableLiveData<Boolean>()
 
     val contactsList = MutableLiveData<ArrayList<ContactViewModel>>()
 
+    val fetchInProgress = MutableLiveData<Boolean>()
+    private var searchResultsPending: Boolean = false
+    private var fastFetchJob: Job? = null
+
     val filter = MutableLiveData<String>()
     private var previousFilter = "NotSet"
+
+    val moreResultsAvailableEvent: MutableLiveData<Event<Boolean>> by lazy {
+        MutableLiveData<Event<Boolean>>()
+    }
 
     private val contactsUpdatedListener = object : ContactsUpdatedListenerStub() {
         override fun onContactsUpdated() {
             Log.i("[Contacts] Contacts have changed")
-            updateContactsList()
+            updateContactsList(true)
+        }
+    }
+
+    private val magicSearchListener = object : MagicSearchListenerStub() {
+        override fun onSearchResultsReceived(magicSearch: MagicSearch) {
+            searchResultsPending = false
+            processMagicSearchResults(magicSearch.lastSearch)
+            fetchInProgress.value = false
+        }
+
+        override fun onLdapHaveMoreResults(magicSearch: MagicSearch, ldap: Ldap) {
+            moreResultsAvailableEvent.value = Event(true)
         }
     }
 
     init {
         sipContactsSelected.value = coreContext.contactsManager.shouldDisplaySipContactsList()
+        fetchInProgress.value = false
 
         coreContext.contactsManager.addListener(contactsUpdatedListener)
+        coreContext.contactsManager.magicSearch.addListener(magicSearchListener)
     }
 
     override fun onCleared() {
         contactsList.value.orEmpty().forEach(ContactViewModel::destroy)
+        coreContext.contactsManager.magicSearch.removeListener(magicSearchListener)
         coreContext.contactsManager.removeListener(contactsUpdatedListener)
 
         super.onCleared()
     }
 
-    fun updateContactsList() {
+    fun updateContactsList(clearCache: Boolean) {
         val filterValue = filter.value.orEmpty()
-        contactsList.value.orEmpty().forEach(ContactViewModel::destroy)
 
-        if (previousFilter.isNotEmpty() && previousFilter.length > filterValue.length) {
+        if (clearCache || (
+            previousFilter.isNotEmpty() && (
+                previousFilter.length > filterValue.length ||
+                    (previousFilter.length == filterValue.length && previousFilter != filterValue)
+                )
+            )
+        ) {
             coreContext.contactsManager.magicSearch.resetSearchCache()
         }
         previousFilter = filterValue
 
         val domain = if (sipContactsSelected.value == true) coreContext.core.defaultAccount?.params?.domain ?: "" else ""
-        val results = coreContext.contactsManager.magicSearch.getContactListFromFilter(filterValue, domain)
+        val filter = MagicSearchSource.Friends.toInt() or MagicSearchSource.LdapServers.toInt()
+        searchResultsPending = true
+        fastFetchJob?.cancel()
+        coreContext.contactsManager.magicSearch.getContactsAsync(filterValue, domain, filter)
+
+        val spinnerDelay = corePreferences.delayBeforeShowingContactsSearchSpinner.toLong()
+        fastFetchJob = viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                delay(spinnerDelay)
+                withContext(Dispatchers.Main) {
+                    if (searchResultsPending) {
+                        fetchInProgress.value = true
+                    }
+                }
+            }
+        }
+    }
+
+    private fun processMagicSearchResults(results: Array<SearchResult>) {
+        Log.i("[Contacts] Processing ${results.size} results")
+        contactsList.value.orEmpty().forEach(ContactViewModel::destroy)
 
         val list = arrayListOf<ContactViewModel>()
         for (result in results) {
@@ -164,15 +216,28 @@ class ContactsListViewModel : ViewModel() {
     }
 
     private fun searchMatchingContact(searchResult: SearchResult): Contact? {
-        val address = searchResult.address
-
-        if (address != null) {
-            val contact = coreContext.contactsManager.findContactByAddress(address, ignoreLocalContact = true)
+        val friend = searchResult.friend
+        var displayName = ""
+        if (friend != null) {
+            displayName = friend.name ?: ""
+            val contact: Contact? = friend.userData as? Contact
             if (contact != null) return contact
+
+            val friendContact = coreContext.contactsManager.findContactByFriend(friend)
+            if (friendContact != null) return friendContact
         }
 
-        if (searchResult.phoneNumber != null) {
-            return coreContext.contactsManager.findContactByPhoneNumber(searchResult.phoneNumber.orEmpty())
+        val address = searchResult.address
+        if (address != null) {
+            if (displayName.isEmpty()) displayName = address.displayName ?: ""
+            val contact = coreContext.contactsManager.findContactByAddress(address, ignoreLocalContact = true)
+            if (contact != null && (displayName.isEmpty() || contact.fullName == displayName)) return contact
+        }
+
+        val phoneNumber = searchResult.phoneNumber
+        if (phoneNumber != null && address?.username != phoneNumber) {
+            val contact = coreContext.contactsManager.findContactByPhoneNumber(phoneNumber)
+            if (contact != null && (displayName.isEmpty() || contact.fullName == displayName)) return contact
         }
 
         return null

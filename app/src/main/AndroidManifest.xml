@@ -33,6 +33,12 @@
 
     <!-- Needed for overlay -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+
+    <!-- Needed starting Android 12 for broadcast receiver
+    to be triggered when BT device is connected / disconnected
+    (https://developer.android.com/guide/topics/connectivity/bluetooth/permissions) -->
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+
     <application
         android:name=".LinphoneApplication"
         android:allowBackup="false"
@@ -156,6 +162,7 @@
             android:label="@string/app_name" />
 
         <service android:name="org.linphone.core.tools.firebase.FirebaseMessaging"
+            android:enabled="${firebaseServiceEnabled}"
             android:exported="false">
             <intent-filter>
                 <action android:name="com.google.firebase.MESSAGING_EVENT" />

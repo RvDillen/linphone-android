@@ -129,6 +129,11 @@ class CoreContext(val context: Context, coreConfig: Config) {
             }
         }
 
+        override fun onLastCallEnded(core: Core) {
+            Log.i("[Context] Last call ended")
+            removeCallOverlay()
+        }
+
         override fun onCallStateChanged(
             core: Core,
             call: Call,
@@ -201,10 +206,6 @@ class CoreContext(val context: Context, coreConfig: Config) {
                     }
                 }
             } else if (state == Call.State.End || state == Call.State.Error || state == Call.State.Released) {
-                if (core.callsNb == 0) {
-                    removeCallOverlay()
-                }
-
                 if (state == Call.State.Error) {
                     Log.w("[Context] Call error reason is ${call.errorInfo.protocolCode} / ${call.errorInfo.reason} / ${call.errorInfo.phrase}")
                     val message = when (call.errorInfo.reason) {

@@ -10,13 +10,39 @@ Group changes to describe their impact on the project, as follows:
     Fixed for any bug fixes.
     Security to invite users to upgrade in case of vulnerabilities.
 
-## [4.6.2] - Unreleased
+## [4.6.3] - 2022-03-08
 
 ### Added
-- LDAP settings if SDK is built with OpenLDAP (requires 5.1.1 or higher linphone-sdk), will add contacts if any
+- Improvements in contacts matching
 
 ### Changed
-- Contacts lists now show LDAP contacts if any, as well as "generated" contacts from SIP addresses you have interacted with
+- "Operation in progress" spinner hidden when contacts display/filter takes less than 200ms
+
+### Fixed
+- Contacts order when multiple address book contacts share the same number / SIP address
+- Wrongly formatted phone numbers not displayed anymore
+- Incoming call activity not displayed on LineageOS sometimes
+- Various crashes related to Telecom Manager exceptions not being caught
+
+## [4.6.2] - 2022-03-01
+
+### Added
+- Request BLUETOOTH_CONNECT permission on Android 12+ devices, if not we won't be notified when a BT device is being connected/disconnected while app is alive.
+- LDAP settings if SDK is built with OpenLDAP (requires 5.1.1 or higher linphone-sdk), will add contacts if any
+- SIP addresses & phone numbers can be selected in history & contact details view
+- Text can be selected in file viewer & config viewer
+- Prevent screen to turn off while recording a voice message
+
+### Changed
+- Contacts lists now show LDAP contacts if any
+
+### Fixed
+- Negative gain in audio settings is allowed again
+- STUN server URL setting not enabling it for non sip.linphone.org accounts
+- Contacts list header case comparison
+- Stop voice recording playback when sending chat message
+- Call activity not finishing when hanging up sometimes
+- Auto start setting disabled not working if background mode setting was enabled
 
 ## [4.6.1] - 2022-02-14
 
