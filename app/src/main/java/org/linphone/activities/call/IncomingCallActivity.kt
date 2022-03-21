@@ -49,10 +49,10 @@ class IncomingCallActivity : GenericActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        Compatibility.setShowWhenLocked(this, true)
-        Compatibility.setTurnScreenOn(this, true)
         // Leaks on API 27+: https://stackoverflow.com/questions/60477120/keyguardmanager-memory-leak
         Compatibility.requestDismissKeyguard(this)
+        Compatibility.setShowWhenLocked(this, true)
+        Compatibility.setTurnScreenOn(this, true)
 
         binding = DataBindingUtil.setContentView(this, R.layout.call_incoming_activity)
         binding.lifecycleOwner = this
@@ -61,14 +61,14 @@ class IncomingCallActivity : GenericActivity() {
         if (incomingCall == null) {
             Log.e("[Incoming Call Activity] Couldn't find call in state Incoming")
             if (isTaskRoot) {
+                Log.i("[Incoming Call Activity] Task is root, starting MainActivity")
                 // When resuming app from recent tasks make sure MainActivity will be launched if there is no call
                 val intent = Intent()
                 intent.setClass(this, MainActivity::class.java)
                 intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
                 startActivity(intent)
-            } else {
-                finish()
             }
+            finish()
             return
         }
 
@@ -123,9 +123,8 @@ class IncomingCallActivity : GenericActivity() {
                 intent.setClass(this, MainActivity::class.java)
                 intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
                 startActivity(intent)
-            } else {
-                finish()
             }
+            finish()
         }
     }
 
