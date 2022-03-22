@@ -7,6 +7,7 @@ import android.telephony.TelephonyManager;
 import android.widget.Toast;
 
 import org.linphone.R;
+import org.linphone.core.Address;
 import org.linphone.core.Call;
 import org.linphone.core.Core;
 import org.linphone.core.CoreListenerStub;
@@ -174,6 +175,7 @@ public class CallStateCLB {
 
         Log.i("[Manager] Call state is [", state, "]");
         String newCallState = null;
+        String address = GetAddressString(call);
         if (state == Call.State.IncomingReceived
                 && !call.equals(core.getCurrentCall())) {
             if (call.getReplacedCall() != null) {
@@ -183,7 +185,7 @@ public class CallStateCLB {
             newCallState = "ringing";
         }
 
-        if ((state == Call.State.IncomingReceived || state == Call.State.IncomingEarlyMedia)  && getCallGsmON()) {
+        if ((state == Call.State.IncomingReceived || state == Call.State.IncomingEarlyMedia) && getCallGsmON()) {
             // Nothing
         } else if (state == Call.State.IncomingReceived
                 && !getCallGsmON()) {
@@ -196,12 +198,22 @@ public class CallStateCLB {
                 Call[] calls = core.getCalls();
                 if (calls != null && calls.length > 0) {
                     Call call1 = calls[0];
+                    address = GetAddressString(call1);
                     Call.State call1State = call1.getState();
                     if (call1State == Call.State.Paused) {
                         call1.resume();
                         newCallState = "connected";
                     } else if (call1State == Call.State.End || call1State == Call.State.Error) {
-                        newCallState = "idle";    // New: 4.5.2:  when call fails, nr of callNB == 1 (was 0);
+                        if (calls.length > 1) {
+                           call1 = calls[1];
+                            call1State = call1.getState();
+                            if (call1State == Call.State.End || call1State == Call.State.Error) {
+                                newCallState = "idle";
+                            } else {
+                                newCallState = "idle_inactive";
+                            }
+                        }
+                        //newCallState = "idle";    // New: 4.5.2:  when call fails, nr of callNB == 1 (was 0);
                     }
                 }
             }
@@ -221,10 +233,20 @@ public class CallStateCLB {
 
             Intent intentMessage = new Intent(STATE_SIPSTATE);
             intentMessage.putExtra("state", newCallState);
+            intentMessage.putExtra("address", address);
             mContext.sendBroadcast(intentMessage);
         }
     }
 
+    private String GetAddressString(Call call) {
+
+        Address remoteAddress = call.getRemoteAddress();
+        String remAddress = "";
+        if (remoteAddress != null) {
+            remAddress = remoteAddress.asStringUriOnly().toLowerCase();
+        }
+        return remAddress;
+    }
 
     private void DisplayErrorToastFor (Call call) {
         // Convert Core message for internalization
