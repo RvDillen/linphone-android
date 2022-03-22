@@ -25,6 +25,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.graphics.drawable.Icon
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.telecom.PhoneAccount
 import android.telecom.PhoneAccountHandle
@@ -84,6 +85,8 @@ class TelecomHelper private constructor(context: Context) {
     }
 
     fun isIncomingCallPermitted(): Boolean {
+        if (Build.MODEL.contains("Myco"))
+            return true
         val incomingCallPermitted = telecomManager.isIncomingCallPermitted(account.accountHandle)
         Log.i("[Telecom Helper] Is incoming call permitted? $incomingCallPermitted")
         return incomingCallPermitted
@@ -180,7 +183,6 @@ class TelecomHelper private constructor(context: Context) {
             .setShortDescription(context.getString(R.string.app_description))
             .setSupportedUriSchemes(listOf(PhoneAccount.SCHEME_SIP))
             .build()
-
         telecomManager.registerPhoneAccount(account)
         Log.i("[Telecom Helper] Phone account created: $account")
         return account
