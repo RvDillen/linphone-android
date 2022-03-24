@@ -230,7 +230,7 @@ public class CallStateCLB {
                     Call.State call1State = call1.getState();
                     if (call1State == Call.State.Paused) {
                         call1.resume();
-                        if(secondCallFromClb) {
+                        if(!fromClb && secondCallFromClb) {
                             newCallState = "connected";
                         } else {
                             newCallState = "connected_inactive";
