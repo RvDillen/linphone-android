@@ -17,6 +17,9 @@ import org.linphone.core.tools.Log;
 import static org.linphone.LinphoneApplication.coreContext;
 import static org.linphone.core.Reason.Declined;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * CallStateCLB: CLB class to store call state from CLB. <br>
  * Used to Prevent Linphone activities to start when activated from CLB
@@ -31,6 +34,7 @@ public class CallStateCLB {
     private static final String STATE_SIPSTATE = "org.linphone.state.SIPSTATE";
 
     private String callUri = null;
+    private List<String> lastCallUris = new ArrayList<>();
     private String callState = null;
     private CoreListenerStub mListener = null;
     private Context mContext = null;
@@ -47,12 +51,23 @@ public class CallStateCLB {
         return instance;
     }
 
+    public boolean IsCallFromCLB(String tmpCallUri) {
+        for (int i = 0; i < lastCallUris.size(); i++) {
+            String lastCallUri = lastCallUris.get(i);
+            //do something with i
+            if (tmpCallUri.contains(lastCallUri))
+                return true;
+        }
+        return false;
+    }
+
     public boolean IsCallFromCLB() {
         return (callUri != null);
     }
 
     public void SetCallUri(String uri) {
         callUri = uri;
+        lastCallUris.add((callUri));
     }
 
     public void SetCallState(String state) {
@@ -60,6 +75,9 @@ public class CallStateCLB {
         if (callState != "ringing") {
             // Reset uri
             callUri = null;
+        }
+        if(callState == "idle"){
+            lastCallUris.clear();
         }
     }
 
@@ -70,7 +88,7 @@ public class CallStateCLB {
     public boolean IsJustHangUp() {
         long now = System.currentTimeMillis();
         long period = now - lastHanugUp;
-        //        android.util.Log.i(tag, "Periode is: " + period);
+        //        android.util.Log.i(tag, "Period is: " + period);
         boolean result = (period) < 5000; // (< 5 sec ago)
         return result;
     }
@@ -176,6 +194,9 @@ public class CallStateCLB {
         Log.i("[Manager] Call state is [", state, "]");
         String newCallState = null;
         String address = GetAddressString(call);
+        String newCallState1 = null;
+        String address1 = null;
+        Boolean fromClb = IsCallFromCLB(address);
         if (state == Call.State.IncomingReceived
                 && !call.equals(core.getCurrentCall())) {
             if (call.getReplacedCall() != null) {
@@ -197,17 +218,28 @@ public class CallStateCLB {
                 // CLB: Still first call in pause mode => Activate .
                 Call[] calls = core.getCalls();
                 if (calls != null && calls.length > 0) {
+                    address1 = address;
+                    if(fromClb) {
+                        newCallState1 = "idle";
+                    } else {
+                        newCallState1 = "idle_inactive";
+                    }
                     Call call1 = calls[0];
                     address = GetAddressString(call1);
+                    Boolean secondCallFromClb = IsCallFromCLB(address);
                     Call.State call1State = call1.getState();
                     if (call1State == Call.State.Paused) {
                         call1.resume();
-                        newCallState = "connected";
+                        if(secondCallFromClb) {
+                            newCallState = "connected";
+                        } else {
+                            newCallState = "connected_inactive";
+                        }
                     } else if (call1State == Call.State.End || call1State == Call.State.Error) {
                         if (calls.length > 1) {
                            call1 = calls[1];
                             call1State = call1.getState();
-                            if (call1State == Call.State.End || call1State == Call.State.Error) {
+                            if ((call1State == Call.State.End || call1State == Call.State.Error) && secondCallFromClb) {
                                 newCallState = "idle";
                             } else {
                                 newCallState = "idle_inactive";
@@ -219,14 +251,22 @@ public class CallStateCLB {
             }
         } else if (state == Call.State.UpdatedByRemote) {
             // If the correspondent proposes video while audio call
-        } else if (state == Call.State.OutgoingInit) {
+        } else if (state == Call.State.OutgoingInit && fromClb) {
             newCallState = "ringing";
-        } else if (state == Call.State.StreamsRunning) {
+        } else if (state == Call.State.StreamsRunning && fromClb) {
             newCallState = "connected";
         }
 
         android.util.Log.i("CLBState", "state: " + state + " clb: " + newCallState);
 
+        if(newCallState1 != null) {
+
+            Intent intentMessage = new Intent(STATE_SIPSTATE);
+            intentMessage.putExtra("state", newCallState1);
+            intentMessage.putExtra("address", address1);
+            mContext.sendBroadcast(intentMessage);
+        }
+        
         // Callstate changed? => Broadcast
         if (newCallState != null) {
             SetCallState(newCallState);
