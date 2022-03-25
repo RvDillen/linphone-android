@@ -255,6 +255,8 @@ public class CallStateCLB {
             newCallState = "ringing";
         } else if (state == Call.State.StreamsRunning && fromClb) {
             newCallState = "connected";
+        } else if (state == Call.State.Paused && fromClb) {
+            newCallState = "paused";
         }
 
         android.util.Log.i("CLBState", "state: " + state + " clb: " + newCallState);
