@@ -58,8 +58,10 @@ public class CallStateCLB {
         int index = tmpCallUri.indexOf("@");
         int index2 = tmpCallUri.indexOf(";");
 
-        if(index != -1){
+        if (index2 != -1) {
             index = Math.min(index, index2);
+        }
+        if (index != -1) {
             tmpCallUri = tmpCallUri.substring(0, index);
         }
         for (int i = 0; i < lastCallUris.size(); i++) {
