@@ -52,10 +52,20 @@ public class CallStateCLB {
     }
 
     public boolean IsCallFromCLB(String tmpCallUri) {
+        if (tmpCallUri.startsWith("sip:")) {
+            tmpCallUri = tmpCallUri.substring("sip:".length());
+        }
+        int index = tmpCallUri.indexOf("@");
+        int index2 = tmpCallUri.indexOf(";");
+
+        if(index != -1){
+            index = Math.min(index, index2);
+            tmpCallUri = tmpCallUri.substring(0, index);
+        }
         for (int i = 0; i < lastCallUris.size(); i++) {
             String lastCallUri = lastCallUris.get(i);
             //do something with i
-            if (tmpCallUri.contains(lastCallUri))
+            if (lastCallUri.contains(tmpCallUri))
                 return true;
         }
         return false;
