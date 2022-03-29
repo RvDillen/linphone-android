@@ -214,21 +214,29 @@ public class CallStateCLB {
                     Call call1 = calls[0];
                     address = GetAddressString(call1);
                     Call.State call1State = call1.getState();
+                    Log.i("[Manager] call 1 state: " + call1State);
                     if (call1State == Call.State.Paused) {
                         call1.resume();
                         newCallState = "connected";
-                    } else if (call1State == Call.State.End || call1State == Call.State.Error) {
-                        if (calls.length > 1) {
-                           call1 = calls[1];
-                            call1State = call1.getState();
-                            if (call1State == Call.State.End || call1State == Call.State.Error) {
-                                newCallState = "idle";
-                            } else {
-                                newCallState = "idle_inactive";
-                            }
+                    } else if ((call1State == Call.State.End || call1State == Call.State.Error) && calls.length > 1) {
+                        call1 = calls[1];
+                        call1State = call1.getState();
+                        Log.i("[Manager] call 2 state: " + call1State);
+                        if (call1State == Call.State.End || call1State == Call.State.Error) {
+                            newCallState = "idle";
+                        } else if (call1State == Call.State.Paused) {
+                            call1.resume();
+                            newCallState = "connected";
+                        } else if (call1State == Call.State.StreamsRunning) {
+                            newCallState = "connected";
+                        } else {
+                            newCallState = "idle_inactive";
                         }
-                        //newCallState = "idle";    // New: 4.5.2:  when call fails, nr of callNB == 1 (was 0);
+                    } else {
+                        newCallState = "idle";    // New: 4.5.2:  when call fails, nr of callNB == 1 (was 0);
                     }
+                } else {
+                    newCallState = "idle";    // New: 4.5.2:  when call fails, nr of callNB == 1 (was 0);
                 }
             }
         } else if (state == Call.State.UpdatedByRemote) {
