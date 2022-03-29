@@ -84,7 +84,11 @@ public class CallStateCLB {
     }
 
     CallStateCLB(){
+        Restart();
+    }
 
+    public void Restart() {
+        Log.i("[Manager] Creating CallStateCLB");
         mContext = coreContext.getContext().getApplicationContext();
 
         AddGsmListener();
@@ -93,7 +97,6 @@ public class CallStateCLB {
     }
 
     private void AddGsmListener() {
-
         mTelephonyManager = (TelephonyManager) mContext.getSystemService(Context.TELEPHONY_SERVICE);
         mPhoneStateListener =
                 new PhoneStateListener() {
@@ -139,31 +142,42 @@ public class CallStateCLB {
 
     private void AddCoreListener(){
 
+        if(mListener != null) {
+            coreContext.getCore().removeListener(mListener);
+            mListener = null;
+        }
         mListener =
                 new CoreListenerStub() {
                     @Override
                     public void onCallStateChanged(
                             Core core, Call call, Call.State state, String message) {
 
-                        // NotifySipState (formerly in mLinphoneManager (Linphone 4.2)
-                        NotifySipStateStateChanged(core, call, state, message);
+                        try {
 
-                        if (IsCallFromCLB() == false)
-                            return;
+                            // NotifySipState (formerly in mLinphoneManager (Linphone 4.2)
+                            NotifySipStateStateChanged(core, call, state, message);
 
-                        // CLB call => Notify Errors with Toast
-                        if (state == Call.State.Error) {
-                            DisplayErrorToastFor(call);
-                        }
-                        else if (state == Call.State.End) {
-                            // Convert Core message for internalization
-                            if (call.getErrorInfo().getReason() == Declined) {
-                                ShowToast(mContext.getString(R.string.call_error_declined));
+                            if (IsCallFromCLB() == false)
+                                return;
+
+                            // CLB call => Notify Errors with Toast
+                            if (state == Call.State.Error) {
+                                DisplayErrorToastFor(call);
                             }
+                            else if (state == Call.State.End) {
+                                // Convert Core message for internalization
+                                if (call.getErrorInfo().getReason() == Declined) {
+                                    ShowToast(mContext.getString(R.string.call_error_declined));
+                                }
+                            }
+                        }
+                        catch (Exception ex) {
+                            Log.e("[Manager] Error in Notify SIP state change. " , ex.getMessage());
                         }
                     }
                 };
 
+        Log.i("[Manager] Registering call state listener");
         coreContext.getCore().addListener(mListener);
     }
 
@@ -225,7 +239,7 @@ public class CallStateCLB {
             newCallState = "connected";
         }
 
-        android.util.Log.i("CLBState", "state: " + state + " clb: " + newCallState);
+        Log.i("[Manager] state: " + state + " clb: " + newCallState);
 
         // Callstate changed? => Broadcast
         if (newCallState != null) {

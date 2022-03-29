@@ -46,6 +46,7 @@ import org.linphone.activities.call.IncomingCallActivity
 import org.linphone.activities.call.OutgoingCallActivity
 import org.linphone.activities.chat_bubble.ChatBubbleActivity
 import org.linphone.activities.main.MainActivity
+import org.linphone.clb.CallStateCLB
 import org.linphone.compatibility.Compatibility
 import org.linphone.contact.Contact
 import org.linphone.core.*
@@ -344,6 +345,9 @@ class NotificationsManager(private val context: Context) {
         Log.i("[Notifications Manager] Starting service as foreground [$currentForegroundServiceNotificationId]")
         Compatibility.startForegroundService(coreService, currentForegroundServiceNotificationId, serviceNotification)
         service = coreService
+
+        // CLB Forcing init of Callstate
+        CallStateCLB.instance().Restart()
     }
 
     private fun startForeground(notificationId: Int, callNotification: Notification) {
