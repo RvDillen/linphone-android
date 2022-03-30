@@ -10,6 +10,7 @@ import org.linphone.R;
 import org.linphone.core.Address;
 import org.linphone.core.Call;
 import org.linphone.core.Core;
+import org.linphone.core.CoreContext;
 import org.linphone.core.CoreListenerStub;
 import org.linphone.core.Reason;
 import org.linphone.core.tools.Log;
@@ -246,7 +247,12 @@ public class CallStateCLB {
         } else if (state == Call.State.StreamsRunning) {
             newCallState = "connected";
         }
-
+        if(newCallState == "idle") {
+            Core currentCore = coreContext.getCore();
+            if(!currentCore.isMicEnabled()) {
+                currentCore.setMicEnabled(true);
+            }
+        }
         Log.i("[Manager] state: " + state + " clb: " + newCallState);
 
         // Callstate changed? => Broadcast
