@@ -52,7 +52,7 @@ class ContactAvatarView : LinearLayout {
     }
 
     fun setData(data: ContactDataInterface) {
-        val contact: Contact? = data.contact.value
+        val contact: Contact? = data?.contact?.value
         val initials = if (contact != null) {
             AppUtils.getInitials(contact.fullName ?: contact.firstName + " " + contact.lastName)
         } else {

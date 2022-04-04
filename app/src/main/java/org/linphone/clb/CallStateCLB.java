@@ -99,6 +99,10 @@ public class CallStateCLB {
 
     private void AddGsmListener() {
         mTelephonyManager = (TelephonyManager) mContext.getSystemService(Context.TELEPHONY_SERVICE);
+        if(mPhoneStateListener != null) {
+            mTelephonyManager.listen(mPhoneStateListener, PhoneStateListener.LISTEN_NONE);
+        }
+
         mPhoneStateListener =
                 new PhoneStateListener() {
                     @Override
@@ -145,7 +149,6 @@ public class CallStateCLB {
 
         if(mListener != null) {
             coreContext.getCore().removeListener(mListener);
-            mListener = null;
         }
         mListener =
                 new CoreListenerStub() {
@@ -246,12 +249,6 @@ public class CallStateCLB {
             newCallState = "ringing";
         } else if (state == Call.State.StreamsRunning) {
             newCallState = "connected";
-        }
-        if(newCallState == "idle") {
-            Core currentCore = coreContext.getCore();
-            if(!currentCore.isMicEnabled()) {
-                currentCore.setMicEnabled(true);
-            }
         }
         Log.i("[Manager] state: " + state + " clb: " + newCallState);
 
