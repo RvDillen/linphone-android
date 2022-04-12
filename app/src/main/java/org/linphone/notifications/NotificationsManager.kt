@@ -445,7 +445,7 @@ class NotificationsManager(private val context: Context) {
         }
     }
 
-    private fun displayIncomingCallNotification(call: Call, useAsForeground: Boolean = false) {
+    fun displayIncomingCallNotification(call: Call, useAsForeground: Boolean = false) {
         if (coreContext.declineCallDueToGsmActiveCall()) {
             Log.w("[Notifications Manager] Call will be declined, do not show incoming call notification")
             return

@@ -69,6 +69,9 @@ class IncomingCallViewModel(call: Call) : CallViewModel(call) {
     override fun onCleared() {
         coreContext.core.removeListener(listener)
         super.onCleared()
+        if (call.state == Call.State.IncomingEarlyMedia || call.state == Call.State.IncomingReceived) {
+            coreContext.notificationsManager.displayIncomingCallNotification(call, true)
+        }
     }
 
     fun answer(doAction: Boolean) {
