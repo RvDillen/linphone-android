@@ -25,6 +25,7 @@ import androidx.lifecycle.ViewModelProvider
 import org.linphone.LinphoneApplication.Companion.coreContext
 import org.linphone.LinphoneApplication.Companion.corePreferences
 import org.linphone.core.*
+import org.linphone.core.tools.Log
 import org.linphone.utils.Event
 
 class IncomingCallViewModelFactory(private val call: Call) :
@@ -69,7 +70,9 @@ class IncomingCallViewModel(call: Call) : CallViewModel(call) {
     override fun onCleared() {
         coreContext.core.removeListener(listener)
         super.onCleared()
+        Log.i("Incoming call on clear, state: " + call.state)
         if (call.state == Call.State.IncomingEarlyMedia || call.state == Call.State.IncomingReceived) {
+            Log.i("Incoming call on clear, display incoming call notification again.")
             coreContext.notificationsManager.displayIncomingCallNotification(call, true)
         }
     }
