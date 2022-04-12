@@ -79,23 +79,34 @@ public class AppConfigHelper {
         return false;
     }
 
-    public boolean linphoneRcXmlHasChanges() {
+    public boolean linphoneRcXmlHasChanges(String config) {
         try {
             String storedHash = getHash(linphoneRcXml_key);
+            boolean areEqual = true;
 
-            if (!_rcXmlString.isEmpty()) {
-
+            if (! _rcXmlString.isEmpty()) {
                 log("RcXml Hash compare ["+storedHash+"] with ["+_rcXmlHash+"]");
 
-                boolean areEqual = _rcXmlHash.equals(storedHash);
+                areEqual = _rcXmlHash.equals(storedHash);
 
                 String hasChanges = areEqual ? "no": "yes";
                 log("linphoneRcXml has changes: " + hasChanges);
 
-                return ! areEqual;
+            } else if (config != null && !config.isEmpty()) {
+                String fileHash = getHash(config);
+                log("RcXml passed as string. Compare ["+storedHash+"] with ["+fileHash+"]");
+
+                areEqual = _rcXmlHash.equals(fileHash);
+
+                String hasChanges = areEqual ? "no" : "yes";
+                log("linphoneRcXml has changes: " + hasChanges);
+
             } else {
                 log("linphoneRcXml is empty, ignoring configuration.");
             }
+
+            return ( ! areEqual);
+
         } catch (Exception ex) {
             logError("Exception: " + ex.getMessage());
         }
@@ -117,7 +128,7 @@ public class AppConfigHelper {
     }
 
     public void storeRcXmlHash() {
-        if (linphoneRcXmlHasChanges()) {
+        if (linphoneRcXmlHasChanges(null)) {
             storeHash(linphoneRcXml_key);
         }
     }
