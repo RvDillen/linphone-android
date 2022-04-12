@@ -52,13 +52,15 @@
 
         <!-- Restrictions/AppConfig -->
         <meta-data android:name="android.content.APP_RESTRICTIONS" android:resource="@xml/restrictions" />
+        <!-- requestLegacyExternalStorage ONLY works for Android 10 (API 29) -->
         <activity
-        android:exported="true"
-        android:name=".activities.launcher.LauncherActivity"
-        android:noHistory="true"
-        android:showWhenLocked="true"
-        android:turnScreenOn="true"
-        android:theme="@style/AppTheme">
+            android:exported="true"
+            android:name=".activities.launcher.LauncherActivity"
+            android:noHistory="true"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:requestLegacyExternalStorage="true"
+            android:theme="@style/AppTheme">
 
         <intent-filter>
             <action android:name="android.intent.action.MAIN" />
