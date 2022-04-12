@@ -32,6 +32,7 @@ public class CallStateCLB {
     private static final String STATE_SIPSTATE = "org.linphone.state.SIPSTATE";
 
     private String callUri = null;
+    private String callUriAll = null;
     private String callState = null;
     private CoreListenerStub mListener = null;
     private Context mContext = null;
@@ -52,8 +53,13 @@ public class CallStateCLB {
         return (callUri != null);
     }
 
+    public boolean IsAnyCallFromCLB() {
+        return (callUriAll != null);
+    }
+
     public void SetCallUri(String uri) {
         callUri = uri;
+        callUriAll = uri;
     }
 
     public void SetCallState(String state) {
@@ -62,6 +68,8 @@ public class CallStateCLB {
             // Reset uri
             callUri = null;
         }
+        if(callState == "idle")
+            callUriAll = null;
     }
 
     public void RegisterHangUpTime() {
@@ -89,12 +97,14 @@ public class CallStateCLB {
     }
 
     public void Restart() {
-        Log.i("[Manager] Creating CallStateCLB");
+        Context currentContext = mContext;
+
         mContext = coreContext.getContext().getApplicationContext();
-
-        AddGsmListener();
-
-        AddCoreListener();
+        if(currentContext != mContext) {
+            Log.i("[Manager] Creating CallStateCLB");
+            AddGsmListener();
+            AddCoreListener();
+        }
     }
 
     private void AddGsmListener() {
@@ -249,6 +259,9 @@ public class CallStateCLB {
             newCallState = "ringing";
         } else if (state == Call.State.StreamsRunning) {
             newCallState = "connected";
+        } else if (state == Call.State.Paused && IsAnyCallFromCLB()) {
+            Log.i("[Manager] end call, cause pause is not allowed.");
+            call.terminate();
         }
         Log.i("[Manager] state: " + state + " clb: " + newCallState);
 
