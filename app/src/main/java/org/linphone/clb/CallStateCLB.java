@@ -58,8 +58,23 @@ public class CallStateCLB {
     }
 
     public void SetCallUri(String uri) {
+        uri = GetShortCallUri(uri);
         callUri = uri;
         callUriAll = uri;
+    }
+
+
+    public String GetShortCallUri(String tmpCallUri) {
+        int index = tmpCallUri.indexOf("@");
+        int index2 = tmpCallUri.indexOf(";");
+
+        if (index2 != -1) {
+            index = Math.min(index, index2);
+        }
+        if (index != -1) {
+            tmpCallUri = tmpCallUri.substring(0, index);
+        }
+        return tmpCallUri;
     }
 
     public void SetCallState(String state) {
@@ -219,8 +234,9 @@ public class CallStateCLB {
                 && !getCallGsmON()) {
             newCallState = "ringing";
         } else if (state == Call.State.End || state == Call.State.Error) {
-            if (core.getCallsNb() == 0) {
+            if (core.getCallsNb() == 0 || (callUriAll != null && !callUriAll.isEmpty() && address.contains(callUriAll))) {
                 newCallState = "idle";
+                callUriAll = null;
             } else {
                 // CLB: Still first call in pause mode => Activate .
                 Call[] calls = core.getCalls();
