@@ -1,7 +1,11 @@
 package org.linphone.clb;
 
+import android.Manifest;
+import android.app.Activity;
 import android.content.Context;
+import android.content.pm.PackageManager;
 import android.os.Build;
+import android.os.Environment;
 
 import org.linphone.LinphoneApplication;
 import org.linphone.core.Config;
@@ -12,13 +16,22 @@ import org.xmlpull.v1.XmlPullParserFactory;
 
 import java.io.ByteArrayInputStream;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
+import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.BufferedReader;
+import java.nio.channels.FileChannel;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
+
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 
 /**
  * LinphonePreferencesCLB: CLB class to overwrite settings when starting up app.<br>
@@ -55,6 +68,81 @@ public class LinphonePreferencesCLB {
 
     private LinphonePreferencesCLB() {}
 
+    public void CheckPermissions(Activity context) {
+
+        List<String> permissions = new ArrayList<String>();
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O // Oreo == API26 == Android 8
+            && Build.VERSION.SDK_INT <= Build.VERSION_CODES.Q) { // Q == API29 == Android 10
+            LogLine("O <= Android <= Q. Request write external storage permission.");
+
+            // WRITE_EXTERNAL_STORAGE
+            if (ContextCompat.checkSelfPermission(
+                    context, Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                    != PackageManager.PERMISSION_GRANTED) {
+                permissions.add(Manifest.permission.WRITE_EXTERNAL_STORAGE);
+            }
+        }
+
+        if (permissions.size() > 0)
+            ActivityCompat.requestPermissions(context, permissions.toArray(new String[0]), 0);
+    }
+
+    public void MoveLinphoneRcFromDownloads(Context context, AppConfigHelper ach) {
+        // Try to read linephoneRc (i.e. old config file method)
+        try {
+            LogLine("Check if there is a LinphoneRc file in 'downloads' folder...");
+            File downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
+            String rcConfigFile = downloadsDir.getAbsolutePath() + "/linphonerc";
+
+            // Try to read LinphoneRcXml from file (the 'old' way)
+            File configFile = new File(rcConfigFile);
+            if (configFile.exists()) {
+                LogLine("File (" + rcConfigFile + ") exists. Try to parse and load configuration.");
+                try {
+                    LinphonePreferencesCLB.instance().HandleLocalRcFile(context, configFile);
+                } catch (Exception ex) {
+                    LogLine("Failed to read config file (" + configFile + "). Ex:" + ex.getLocalizedMessage() + ". If permission was not yet granted, please restart the app.");
+                } finally {
+                    LogLine("Erase config file from disk.");
+                    configFile.delete();
+                }
+            } else {
+                LogLine("File (" + rcConfigFile + ") not found. Continue...");
+            }
+        } catch (Exception ex) {
+            LogLine("Reading config XML file failed: " + ex.getLocalizedMessage());
+        }
+    }
+
+    public void HandleLocalRcFile(Context context, File linphonerc) {
+
+        String local = linphonerc.getAbsolutePath();
+        String origin = context.getFilesDir().getAbsolutePath() + "/linphonerc";
+        LogLine("HandleLocalRcFile for: " + local);
+
+        FileChannel sourceChannel = null;
+        FileChannel destChannel = null;
+        try {
+            sourceChannel = new FileInputStream(local).getChannel();
+            destChannel = new FileOutputStream(origin).getChannel();
+            destChannel.transferFrom(sourceChannel, 0, sourceChannel.size());
+            sourceChannel.close();
+            sourceChannel = null;
+            destChannel.close();
+
+            TryDeleteFile(linphonerc);
+
+        } catch (FileNotFoundException e) {
+            LogLine("HandleLocalRcFile failed, not found: " + e.getLocalizedMessage());
+        } catch (IOException e) {
+            LogLine("HandleLocalRcFile failed, IO: " + e.getLocalizedMessage());
+        } catch (Exception e) {
+            LogLine("HandleLocalRcFile failed: " + e.getLocalizedMessage());
+        } finally {
+        }
+    }
+
     public boolean UpdateFromLinphoneRcData(String linphonercText, String configPath) {
 
         LogLine(" ** Start linphonerc changed => update settings **");
@@ -80,6 +168,13 @@ public class LinphonePreferencesCLB {
         largeLog(export);
 
         WriteLogLines();
+    }
+
+    private void TryDeleteFile(File linphonerc) {
+
+        String path = linphonerc.getAbsolutePath();
+        if (linphonerc.delete()) LogLine("Successfull removed file: " + path);
+        else LogLine("Failed Remove file: " + path);
     }
 
     /* HandleLocalRcFile
@@ -120,6 +215,32 @@ public class LinphonePreferencesCLB {
     }
 
 
+    public void ParseLocalXmlFileConfig(Config config) {
+        LogLine("Check if there is a LinphoneRc.xml file in 'downloads' folder...");
+
+        File downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
+        String rcXmlConfigFile = downloadsDir.getAbsolutePath() + "/linphonerc.xml";
+
+        // Try to read LinphoneRcXml from file (the 'old' way)
+        File configFile = new File(rcXmlConfigFile);
+        if (configFile.exists()) {
+            LogLine("File (" + rcXmlConfigFile + ") exists. Trying to parse and load configuration.");
+            try {
+                BufferedReader br = new BufferedReader(new FileReader(configFile));
+                String data = new String();
+                for (String line; (line = br.readLine()) != null; data += line); // Read all lines into 'data'
+                UpdateFromLinphoneXmlData(data, config);
+            } catch (Exception ex) {
+                LogLine("Failed to read config file (" + configFile + "). Ex:" + ex.getLocalizedMessage() + ". If permission was not yet granted, please restart the app.");
+            } finally {
+                LogLine("Erase config file from disk.");
+                configFile.delete();
+            }
+        } else {
+            LogLine("File (" + rcXmlConfigFile + ") not found. Continue...");
+        }
+    }
+
     public boolean UpdateFromLinphoneXmlData(String linphonercXml, Config config) {
 
         LogLine(" ** Start linphonerc Xml changed => update settings **");
@@ -134,7 +255,7 @@ public class LinphonePreferencesCLB {
      */
     private boolean HandleXmlChanges(String linphoneXml, Config config) {
 
-        LogLine("Update Linphonerd from XML");
+        LogLine("Update Linphonerc from XML");
         boolean result = false;
         if (config == null) {
             LogLine("HandleLocal Xml data: config is null");

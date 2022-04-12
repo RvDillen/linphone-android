@@ -52,9 +52,9 @@ class LinphoneApplication : Application() {
                 CoreContext.activateVFS()
             }
 
-            if (false) {
-                TestConfigClbParsing()
-            }
+            // if (false) {
+            //    TestConfigClbParsing()
+            // }
 
             // CLB CreateConfigCLB replaces: val config = Factory.instance().createConfigWithFactory()
             val config = CreateConfigCLB(context)
@@ -105,7 +105,10 @@ class LinphoneApplication : Application() {
                     ach.storeRcHash()
                 }
             } else {
-                LogConfig("Hashes are equal, no changes... skipping config.")
+                LogConfig("Hashes are equal, no changes... skipping config from bundle.")
+
+                // Verify the 'old' method (i.e. linphonerc file in '/Downloads' folder)
+                LinphonePreferencesCLB.instance().MoveLinphoneRcFromDownloads(context, ach)
             }
 
             android.util.Log.i("[CLB]", "Create Linphone Config")
@@ -115,21 +118,25 @@ class LinphoneApplication : Application() {
                 corePreferences.factoryConfigPath
             )
 
-            // Parse/execute RC XML
-            if (ach.linphoneRcXmlHasChanges()) {
+            // Parse/execute RC XML (pass 'null' to use AppConfig bundle check)
+            if (ach.linphoneRcXmlHasChanges(null)) {
                 LogConfig("Apply AppConfig Linphone Rc XML changes.")
                 val linphonercXmlData = ach.linphoneRcXml
 
-                // CLB LinphoneRC XML changes? => Update
-                // val linphonercXmlData =
-                //    this::class.java.classLoader.getResource("assets/clb_linphonerc_xml_test")
-                //        .readText()
                 if (LinphonePreferencesCLB.instance().UpdateFromLinphoneXmlData(linphonercXmlData, config)) {
                     LogConfig("Store AppConfig linphoneRc XML hash")
                     ach.storeRcXmlHash()
                 }
             } else {
-                LogConfig("Hashes are equal. Linphone Rc XML has no changes. Skipping config.")
+                LogConfig("Hashes are equal. Linphone Rc XML from bundle has no changes.")
+
+                // TEST: CLB LinphoneRC XML changes? => Update
+                // val linphonercXmlData =
+                //    this::class.java.classLoader.getResource("assets/clb_linphonerc_xml_test")
+                //        .readText()
+
+                // Try 'old' method (i.e. parse linphonerc.xml file and apply changes)
+                LinphonePreferencesCLB.instance().ParseLocalXmlFileConfig(config)
             }
             return config
         }
