@@ -73,7 +73,7 @@ public class LinphonePreferencesCLB {
         List<String> permissions = new ArrayList<String>();
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O // Oreo == API26 == Android 8
-            && Build.VERSION.SDK_INT <= Build.VERSION_CODES.Q) { // Q == API29 == Android 10
+            && Build.VERSION.SDK_INT <= Build.VERSION_CODES.P) { // P == API28 == Android 9
             LogLine("O <= Android <= Q. Request write external storage permission.");
 
             // WRITE_EXTERNAL_STORAGE
