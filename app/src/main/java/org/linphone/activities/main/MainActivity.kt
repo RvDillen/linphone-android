@@ -55,7 +55,6 @@ import org.linphone.activities.assistant.AssistantActivity
 import org.linphone.activities.main.viewmodels.CallOverlayViewModel
 import org.linphone.activities.main.viewmodels.SharedMainViewModel
 import org.linphone.activities.navigateToDialer
-import org.linphone.clb.LinphonePreferencesCLB
 import org.linphone.compatibility.Compatibility
 import org.linphone.contact.ContactsUpdatedListenerStub
 import org.linphone.core.CorePreferences
@@ -172,7 +171,6 @@ class MainActivity : GenericActivity(), SnackBarActivity, NavController.OnDestin
 
     override fun onResume() {
         super.onResume()
-        LinphonePreferencesCLB.instance().CheckPermissions(this)
         coreContext.contactsManager.addListener(listener)
     }
 

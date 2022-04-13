@@ -26,6 +26,7 @@ import org.linphone.LinphoneApplication.Companion.corePreferences
 import org.linphone.R
 import org.linphone.activities.GenericActivity
 import org.linphone.activities.main.MainActivity
+import org.linphone.clb.LinphonePreferencesCLB
 import org.linphone.clb.LockHelperExt
 import org.linphone.clb.PermissionHelperCLB
 import org.linphone.core.tools.Log
@@ -77,6 +78,8 @@ class LauncherActivity : GenericActivity() {
         // CLB : OnOutgoingStarted => just display launch screen so microphone keeps enabled (on A11)
         if (clbCall)
             return
+
+        LinphonePreferencesCLB.instance().CheckPermissions(this)
 
         val intent = Intent()
         intent.setClass(this, MainActivity::class.java)

@@ -9,6 +9,7 @@ import android.os.Environment;
 
 import org.linphone.LinphoneApplication;
 import org.linphone.core.Config;
+import org.linphone.core.CorePreferences;
 import org.linphone.core.tools.Log;
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
@@ -24,7 +25,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.BufferedReader;
+import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -52,6 +55,9 @@ import androidx.core.content.ContextCompat;
  */
 public class LinphonePreferencesCLB {
 
+    private final String linphoneRc_key = "Linphonerc";
+    private final String linphoneRcXml_key = "LinphonercXml";
+
     private static LinphonePreferencesCLB instance;
 
     private String tag = "ClbConfig";
@@ -73,7 +79,7 @@ public class LinphonePreferencesCLB {
         List<String> permissions = new ArrayList<String>();
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O // Oreo == API26 == Android 8
-            && Build.VERSION.SDK_INT <= Build.VERSION_CODES.P) { // P == API28 == Android 9
+            && Build.VERSION.SDK_INT <= Build.VERSION_CODES.Q) { // Q == API29 == Android 10
             LogLine("O <= Android <= Q. Request write external storage permission.");
 
             // WRITE_EXTERNAL_STORAGE
@@ -88,7 +94,7 @@ public class LinphonePreferencesCLB {
             ActivityCompat.requestPermissions(context, permissions.toArray(new String[0]), 0);
     }
 
-    public void MoveLinphoneRcFromDownloads(Context context, AppConfigHelper ach) {
+    public void MoveLinphoneRcFromDownloads(Context context, CorePreferences corePreferences) {
         // Try to read linephoneRc (i.e. old config file method)
         try {
             LogLine("Check if there is a LinphoneRc file in 'downloads' folder...");
@@ -100,12 +106,12 @@ public class LinphonePreferencesCLB {
             if (configFile.exists()) {
                 LogLine("File (" + rcConfigFile + ") exists. Try to parse and load configuration.");
                 try {
-                    LinphonePreferencesCLB.instance().HandleLocalRcFile(context, configFile);
+                    LinphonePreferencesCLB.instance().HandleLocalRcFile(context, configFile, corePreferences);
                 } catch (Exception ex) {
                     LogLine("Failed to read config file (" + configFile + "). Ex:" + ex.getLocalizedMessage() + ". If permission was not yet granted, please restart the app.");
                 } finally {
                     LogLine("Erase config file from disk.");
-                    configFile.delete();
+                    boolean result = configFile.delete();
                 }
             } else {
                 LogLine("File (" + rcConfigFile + ") not found. Continue...");
@@ -115,7 +121,21 @@ public class LinphonePreferencesCLB {
         }
     }
 
-    public void HandleLocalRcFile(Context context, File linphonerc) {
+    public String ComputeHasCode(FileChannel channel, String key){
+
+        String hash = "";
+        ByteBuffer buff = ByteBuffer.allocate(1024);
+        try {
+            int noOfBytesRead = channel.read(buff);
+            String fileContent = new String(buff.array(), StandardCharsets.UTF_8);
+            hash = HashUtil.calculateHash(key,fileContent);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return hash;
+    }
+
+    public void HandleLocalRcFile(Context context, File linphonerc, CorePreferences corePreferences) {
 
         String local = linphonerc.getAbsolutePath();
         String origin = context.getFilesDir().getAbsolutePath() + "/linphonerc";
@@ -125,6 +145,12 @@ public class LinphonePreferencesCLB {
         FileChannel destChannel = null;
         try {
             sourceChannel = new FileInputStream(local).getChannel();
+            String hash = ComputeHasCode(sourceChannel, linphoneRc_key);
+            String oldHash = corePreferences.getLinphoneRcHash();
+            if (hash.equals(oldHash))
+                return; // File alreay imported so ready
+
+            // Copy file
             destChannel = new FileOutputStream(origin).getChannel();
             destChannel.transferFrom(sourceChannel, 0, sourceChannel.size());
             sourceChannel.close();
@@ -132,6 +158,7 @@ public class LinphonePreferencesCLB {
             destChannel.close();
 
             TryDeleteFile(linphonerc);
+            corePreferences.setLinphoneRcHash(hash);
 
         } catch (FileNotFoundException e) {
             LogLine("HandleLocalRcFile failed, not found: " + e.getLocalizedMessage());
@@ -215,7 +242,7 @@ public class LinphonePreferencesCLB {
     }
 
 
-    public void ParseLocalXmlFileConfig(Config config) {
+    public void ParseLocalXmlFileConfig(Config config, CorePreferences corePreferences) {
         LogLine("Check if there is a LinphoneRc.xml file in 'downloads' folder...");
 
         File downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
@@ -226,10 +253,20 @@ public class LinphonePreferencesCLB {
         if (configFile.exists()) {
             LogLine("File (" + rcXmlConfigFile + ") exists. Trying to parse and load configuration.");
             try {
+                // Hash check (already imported ?
+                FileChannel sourceChannel = new FileInputStream(configFile).getChannel();
+                String hash = ComputeHasCode(sourceChannel, linphoneRcXml_key);
+                String oldHash = corePreferences.getLinphoneRcXmlHash();
+                if (hash.equals(oldHash))
+                    return; // File alreay imported so ready
+
+                // Import
                 BufferedReader br = new BufferedReader(new FileReader(configFile));
                 String data = new String();
                 for (String line; (line = br.readLine()) != null; data += line); // Read all lines into 'data'
                 UpdateFromLinphoneXmlData(data, config);
+
+                corePreferences.setLinphoneRcXmlHash(hash);
             } catch (Exception ex) {
                 LogLine("Failed to read config file (" + configFile + "). Ex:" + ex.getLocalizedMessage() + ". If permission was not yet granted, please restart the app.");
             } finally {

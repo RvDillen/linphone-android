@@ -108,7 +108,7 @@ class LinphoneApplication : Application() {
                 LogConfig("Hashes are equal, no changes... skipping config from bundle.")
 
                 // Verify the 'old' method (i.e. linphonerc file in '/Downloads' folder)
-                LinphonePreferencesCLB.instance().MoveLinphoneRcFromDownloads(context, ach)
+                LinphonePreferencesCLB.instance().MoveLinphoneRcFromDownloads(context, corePreferences)
             }
 
             android.util.Log.i("[CLB]", "Create Linphone Config")
@@ -136,7 +136,7 @@ class LinphoneApplication : Application() {
                 //        .readText()
 
                 // Try 'old' method (i.e. parse linphonerc.xml file and apply changes)
-                LinphonePreferencesCLB.instance().ParseLocalXmlFileConfig(config)
+                LinphonePreferencesCLB.instance().ParseLocalXmlFileConfig(config, corePreferences)
             }
             return config
         }
