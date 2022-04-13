@@ -262,7 +262,11 @@ public class CallStateCLB {
                         } else {
                             newCallState = "idle_inactive";
                         }
-                    } else {
+                    }
+                    else if(address.contains(callUriAll) && call1State == Call.State.StreamsRunning) {
+                        newCallState = "connected"; // Happens when an incoming sip call is ignored.
+                    }
+                    else {
                         newCallState = "idle";    // New: 4.5.2:  when call fails, nr of callNB == 1 (was 0);
                     }
                 } else {
