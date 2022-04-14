@@ -249,17 +249,20 @@ public class CallStateCLB {
                         call1.resume();
                         newCallState = "connected";
                     } else if ((call1State == Call.State.End || call1State == Call.State.Error) && calls.length > 1) {
-                        call1 = calls[1];
-                        call1State = call1.getState();
-                        Log.i("[Manager] call 2 state: " + call1State);
-                        if (call1State == Call.State.End || call1State == Call.State.Error) {
+                        Call call2 = calls[1];
+                        Call.State call2State = call2.getState();
+                        address = GetAddressString(call2);
+                        Log.i("[Manager] call 2 state: " + call2State);
+                        if (call2State == Call.State.End || call2State == Call.State.Error) {
+                            address = GetAddressString(call1); // Get the address of the previous call.
                             newCallState = "idle";
-                        } else if (call1State == Call.State.Paused) {
-                            call1.resume();
+                        } else if (call2State == Call.State.Paused) {
+                            call2.resume();
                             newCallState = "connected";
-                        } else if (call1State == Call.State.StreamsRunning) {
+                        } else if (address.contains(callUriAll) && call2State == Call.State.StreamsRunning) {
                             newCallState = "connected";
                         } else {
+                            address = GetAddressString(call1); // Get the address of the previous call.
                             newCallState = "idle_inactive";
                         }
                     }
