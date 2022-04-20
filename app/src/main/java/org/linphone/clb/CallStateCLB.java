@@ -245,7 +245,7 @@ public class CallStateCLB {
                     address = GetAddressString(call1);
                     Call.State call1State = call1.getState();
                     Log.i("[Manager] call 1 state: " + call1State);
-                    if (call1State == Call.State.Paused) {
+                    if (call1State == Call.State.Paused && state == Call.State.End) {
                         call1.resume();
                         newCallState = "connected";
                     } else if ((call1State == Call.State.End || call1State == Call.State.Error) && calls.length > 1) {
@@ -259,14 +259,14 @@ public class CallStateCLB {
                         } else if (call2State == Call.State.Paused) {
                             call2.resume();
                             newCallState = "connected";
-                        } else if (address.contains(callUriAll) && call2State == Call.State.StreamsRunning) {
+                        } else if (callUriAll != null && address.contains(callUriAll) && call2State == Call.State.StreamsRunning) {
                             newCallState = "connected";
                         } else {
                             address = GetAddressString(call1); // Get the address of the previous call.
                             newCallState = "idle_inactive";
                         }
                     }
-                    else if(address.contains(callUriAll) && call1State == Call.State.StreamsRunning) {
+                    else if(callUriAll != null && address.contains(callUriAll) && call1State == Call.State.StreamsRunning) {
                         newCallState = "connected"; // Happens when an incoming sip call is ignored.
                     }
                     else {
