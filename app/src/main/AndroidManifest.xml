@@ -144,6 +144,8 @@
 
         <activity android:name=".activities.call.IncomingCallActivity"
             android:launchMode="singleTask"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
             android:noHistory="true" />
 
         <activity android:name=".activities.call.OutgoingCallActivity"
