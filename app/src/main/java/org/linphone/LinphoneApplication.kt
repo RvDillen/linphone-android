@@ -95,6 +95,7 @@ class LinphoneApplication : Application() {
             // Handle changes in LinphoneRc
             if (ach.linphoneRcHasChanges()) {
                 android.util.Log.i("[CLB]", "Applying AppConfig linphoneRc changes")
+                corePreferences.firstStart = false
                 val linphonercData = ach.linphoneRc
 
                 // CLB LinphoneRC changes? => Update
@@ -121,6 +122,7 @@ class LinphoneApplication : Application() {
             // Parse/execute RC XML (pass 'null' to use AppConfig bundle check)
             if (ach.linphoneRcXmlHasChanges(null)) {
                 LogConfig("Apply AppConfig Linphone Rc XML changes.")
+                corePreferences.firstStart = false
                 val linphonercXmlData = ach.linphoneRcXml
 
                 if (LinphonePreferencesCLB.instance().UpdateFromLinphoneXmlData(linphonercXmlData, config)) {
