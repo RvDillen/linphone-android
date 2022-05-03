@@ -81,6 +81,7 @@ public class LoginReceiver extends BroadcastReceiver {
 
         Address identity = accountParams.getIdentityAddress();
         if (identity != null) {
+            identity = identity.clone();
             identity.setUsername(sipUsername);
             identity.setDisplayName(sipUsername);
         }
