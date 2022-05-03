@@ -149,6 +149,9 @@ class MainActivity : GenericActivity(), SnackBarActivity, NavController.OnDestin
                 startActivity(Intent(this, AssistantActivity::class.java))
             }
         }
+        else {
+            corePreferences.firstStart = false
+        }
 
         tabsFragment = findViewById(R.id.tabs_fragment)
         statusFragment = findViewById(R.id.status_fragment)
