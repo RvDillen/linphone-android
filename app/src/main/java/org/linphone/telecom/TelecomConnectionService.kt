@@ -118,7 +118,18 @@ class TelecomConnectionService : ConnectionService() {
             }
 
             val connection = NativeCallWrapper(callId)
-            if (connection.state != Connection.STATE_ACTIVE) {
+            val call = coreContext.core.calls.find { it.callLog.callId == callId }
+            if (call != null) {
+                val callState = call.state
+                Log.i("[Telecom Connection Service] Found outgoing call from ID [$callId] with state [$callState]")
+                when (callState) {
+                    Call.State.OutgoingEarlyMedia, Call.State.OutgoingInit, Call.State.OutgoingProgress, Call.State.OutgoingRinging -> connection.setDialing()
+                    Call.State.Paused, Call.State.PausedByRemote, Call.State.Pausing -> connection.setOnHold()
+                    Call.State.End, Call.State.Error, Call.State.Released -> connection.setDisconnected(DisconnectCause(DisconnectCause.ERROR))
+                    else -> connection.setActive()
+                }
+            } else {
+                Log.w("[Telecom Connection Service] Outgoing call not found for cal ID [$callId], assuming it's state is dialing")
                 connection.setDialing()
             }
 
@@ -128,14 +139,6 @@ class TelecomConnectionService : ConnectionService() {
             Log.i("[Telecom Connection Service] Address is $providedHandle")
 
             TelecomHelper.get().connections.add(connection)
-            // CLB: Added setting the call state changed from creating, because the call can be directly accepted, and the state wouldn't be set correctly.
-            Handler().postDelayed(
-                {
-                    Log.i("[Telecom Connection Service] onCallStateChanged delayed")
-                    onCallStateChanged(coreContext.core.currentCall, coreContext.core.currentCall?.state, coreContext.core)
-                },
-                100
-            )
             connection
         } else {
             Log.e("[Telecom Connection Service] Error: $accountHandle $componentName")
@@ -172,7 +175,20 @@ class TelecomConnectionService : ConnectionService() {
             Log.i("[Telecom Connection Service] Incoming connection is for call [$callId] with display name [$displayName]")
 
             val connection = NativeCallWrapper(callId)
-            connection.setRinging()
+            val call = coreContext.core.calls.find { it.callLog.callId == callId }
+            if (call != null) {
+                val callState = call.state
+                Log.i("[Telecom Connection Service] Found incoming call from ID [$callId] with state [$callState]")
+                when (callState) {
+                    Call.State.IncomingEarlyMedia, Call.State.IncomingReceived -> connection.setRinging()
+                    Call.State.Paused, Call.State.PausedByRemote, Call.State.Pausing -> connection.setOnHold()
+                    Call.State.End, Call.State.Error, Call.State.Released -> connection.setDisconnected(DisconnectCause(DisconnectCause.ERROR))
+                    else -> connection.setActive()
+                }
+            } else {
+                Log.w("[Telecom Connection Service] Incoming call not found for cal ID [$callId], assuming it's state is ringing")
+                connection.setRinging()
+            }
 
             val providedHandle =
                 incomingExtras?.getParcelable<Uri>(TelecomManager.EXTRA_INCOMING_CALL_ADDRESS)
