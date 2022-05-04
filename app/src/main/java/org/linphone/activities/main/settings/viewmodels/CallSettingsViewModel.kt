@@ -36,6 +36,9 @@ class CallSettingsViewModel : GenericSettingsViewModel() {
     val deviceRingtoneListener = object : SettingListenerStub() {
         override fun onBoolValueChanged(newValue: Boolean) {
             core.ring = if (newValue) null else prefs.defaultRingtonePath
+            prefs.isDeviceRingtoneEnabled = newValue
+            showRingtonesList.value = !newValue
+            ringtoneIndex.value = if (core.ring == null) 0 else ringtoneValues.indexOf(core.ring)
         }
     }
     val deviceRingtone = MutableLiveData<Boolean>()
@@ -44,6 +47,7 @@ class CallSettingsViewModel : GenericSettingsViewModel() {
         override fun onListValueChanged(position: Int) {
             if (position == 0) {
                 core.ring = null
+                deviceRingtone.value = true
             } else {
                 core.ring = ringtoneValues[position]
             }
@@ -231,8 +235,8 @@ class CallSettingsViewModel : GenericSettingsViewModel() {
 
     init {
         initRingtonesList()
-        deviceRingtone.value = core.ring == null
-        showRingtonesList.value = prefs.showAllRingtones
+        deviceRingtone.value = prefs.isDeviceRingtoneEnabled
+        showRingtonesList.value = core.ring != null
 
         vibrateOnIncomingCall.value = core.isVibrationOnIncomingCallEnabled
 

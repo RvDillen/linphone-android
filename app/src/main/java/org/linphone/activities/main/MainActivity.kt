@@ -148,9 +148,11 @@ class MainActivity : GenericActivity(), SnackBarActivity, NavController.OnDestin
             if (corePreferences.firstStart) {
                 startActivity(Intent(this, AssistantActivity::class.java))
             }
-        }
-        else {
+        } else {
             corePreferences.firstStart = false
+            if(corePreferences.isDeviceRingtoneEnabled) {
+                coreContext.core.ring = null
+            }
         }
 
         tabsFragment = findViewById(R.id.tabs_fragment)

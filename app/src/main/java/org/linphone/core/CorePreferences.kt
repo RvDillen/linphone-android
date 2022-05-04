@@ -23,13 +23,13 @@ import android.content.Context
 import android.content.SharedPreferences
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
+import org.linphone.LinphoneApplication.Companion.coreContext
+import org.linphone.compatibility.Compatibility
+import org.linphone.core.tools.Log
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.security.KeyStoreException
-import org.linphone.LinphoneApplication.Companion.coreContext
-import org.linphone.compatibility.Compatibility
-import org.linphone.core.tools.Log
 
 class CorePreferences constructor(private val context: Context) {
     private var _config: Config? = null
@@ -105,9 +105,9 @@ class CorePreferences constructor(private val context: Context) {
         }
 
     var keepServiceAlive: Boolean
-        get() = config.getBool("app", "keep_service_alive", false)
+        get() = config.getBool("app", "show_service_notification", false)
         set(value) {
-            config.setBool("app", "keep_service_alive", value)
+            config.setBool("app", "show_service_notification", value)
         }
 
     var readAndAgreeTermsAndPrivacy: Boolean
@@ -257,6 +257,12 @@ class CorePreferences constructor(private val context: Context) {
         }
 
     /* Call */
+
+    var isDeviceRingtoneEnabled: Boolean
+        get() = config.getBool("app", "device_ringtone", true)
+        set(value) {
+            config.setBool("app", "device_ringtone", value)
+        }
 
     var sendEarlyMedia: Boolean
         get() = config.getBool("sip", "outgoing_calls_early_media", false)
@@ -479,7 +485,7 @@ class CorePreferences constructor(private val context: Context) {
     // If enabled user will see all ringtones bundled in our SDK
     // and will be able to choose which one to use if not using it's device's default
     val showAllRingtones: Boolean
-        get() = config.getBool("app", "show_all_available_ringtones", false)
+        get() = config.getBool("app", "show_all_available_ringtones", true)
 
     /* Default values related */
 
