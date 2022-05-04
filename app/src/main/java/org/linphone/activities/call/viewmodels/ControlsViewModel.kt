@@ -276,7 +276,10 @@ class ControlsViewModel : ViewModel() {
         val core = coreContext.core
         when {
             core.currentCall != null -> core.currentCall?.terminate()
-            core.conference?.isIn == true -> core.terminateConference()
+            core.conference?.isIn == true -> {
+                core.terminateConference()
+                core.conference?.participantList?.forEach { core.conference?.removeParticipant(it) }
+            }
             else -> core.terminateAllCalls()
         }
     }
