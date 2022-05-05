@@ -61,6 +61,7 @@ class CallSettingsViewModel : GenericSettingsViewModel() {
     val vibrateOnIncomingCallListener = object : SettingListenerStub() {
         override fun onBoolValueChanged(newValue: Boolean) {
             core.isVibrationOnIncomingCallEnabled = newValue
+            prefs.isIncomingCallVibrationEnabled = newValue
         }
     }
     val vibrateOnIncomingCall = MutableLiveData<Boolean>()

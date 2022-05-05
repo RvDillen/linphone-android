@@ -150,8 +150,19 @@ class MainActivity : GenericActivity(), SnackBarActivity, NavController.OnDestin
             }
         } else {
             corePreferences.firstStart = false
-            if(corePreferences.isDeviceRingtoneEnabled) {
+            if (corePreferences.isDeviceRingtoneEnabled) {
                 coreContext.core.ring = null
+            }
+            coreContext.core.isVibrationOnIncomingCallEnabled =
+                corePreferences.isIncomingCallVibrationEnabled
+
+            // Only change if it's not defaulted.
+            if (corePreferences.codecBitrateLimit != 36) {
+                for (payloadType in coreContext.core.audioPayloadTypes) {
+                    if (payloadType.isVbr) {
+                        payloadType.normalBitrate = corePreferences.codecBitrateLimit
+                    }
+                }
             }
         }
 

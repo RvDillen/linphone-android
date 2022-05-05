@@ -23,13 +23,13 @@ import android.content.Context
 import android.content.SharedPreferences
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
-import org.linphone.LinphoneApplication.Companion.coreContext
-import org.linphone.compatibility.Compatibility
-import org.linphone.core.tools.Log
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.security.KeyStoreException
+import org.linphone.LinphoneApplication.Companion.coreContext
+import org.linphone.compatibility.Compatibility
+import org.linphone.core.tools.Log
 
 class CorePreferences constructor(private val context: Context) {
     private var _config: Config? = null
@@ -155,6 +155,12 @@ class CorePreferences constructor(private val context: Context) {
 
     /* Audio */
 
+    var codecBitrateLimit: Int
+        get() = config.getInt("audio", "codec_bitrate_limit", 36)
+        set(value) {
+            config.setInt("audio", "codec_bitrate_limit", value)
+        }
+
     /* Video */
 
     var videoPreview: Boolean
@@ -262,6 +268,12 @@ class CorePreferences constructor(private val context: Context) {
         get() = config.getBool("app", "device_ringtone", true)
         set(value) {
             config.setBool("app", "device_ringtone", value)
+        }
+
+    var isIncomingCallVibrationEnabled: Boolean
+        get() = config.getBool("app", "incoming_call_vibration", true)
+        set(value) {
+            config.setBool("app", "incoming_call_vibration", value)
         }
 
     var sendEarlyMedia: Boolean

@@ -124,6 +124,8 @@ class AudioSettingsViewModel : GenericSettingsViewModel() {
                     payloadType.normalBitrate = codecBitrateValues[position]
                 }
             }
+            // always reset this to the default value.
+            prefs.codecBitrateLimit = 36
         }
     }
     val codecBitrateIndex = MutableLiveData<Int>()
