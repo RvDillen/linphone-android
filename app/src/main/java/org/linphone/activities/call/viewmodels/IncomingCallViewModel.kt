@@ -73,7 +73,8 @@ class IncomingCallViewModel(call: Call) : CallViewModel(call) {
         Log.i("Incoming call on clear, state: " + call.state)
         if (call.state == Call.State.IncomingEarlyMedia || call.state == Call.State.IncomingReceived) {
             Log.i("Incoming call on clear, display incoming call notification again.")
-            coreContext.notificationsManager.displayIncomingCallNotification(call,
+            coreContext.notificationsManager.displayIncomingCallNotification(
+                call,
                 useAsForeground = true,
                 skipDeclineCheck = true
             )
