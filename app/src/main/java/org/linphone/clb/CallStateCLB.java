@@ -216,9 +216,9 @@ public class CallStateCLB {
             final Call.State state,
             final String message) {
 
-        Log.i("[Manager] Call state is [", state, "]");
         String newCallState = null;
         String address = GetAddressString(call);
+        Log.i("[Manager] Call state is [", state, "]" + " address: " + address);
         if (state == Call.State.IncomingReceived
                 && !call.equals(core.getCurrentCall())) {
             if (call.getReplacedCall() != null) {
@@ -234,40 +234,47 @@ public class CallStateCLB {
                 && !getCallGsmON()) {
             newCallState = "ringing";
         } else if (state == Call.State.End || state == Call.State.Error) {
-            if (core.getCallsNb() == 0 || (callUriAll != null && !callUriAll.isEmpty() && address.contains(callUriAll))) {
+            if (core.getCallsNb() == 0) {
                 newCallState = "idle";
                 callUriAll = null;
             } else {
+                newCallState = "idle";
                 // CLB: Still first call in pause mode => Activate .
                 Call[] calls = core.getCalls();
+                boolean originalIsClb = (callUriAll != null && !callUriAll.isEmpty() && address.contains(callUriAll));
                 if (calls != null && calls.length > 0) {
                     Call call1 = calls[0];
-                    address = GetAddressString(call1);
+                    String address1 = GetAddressString(call1);
                     Call.State call1State = call1.getState();
-                    Log.i("[Manager] call 1 state: " + call1State);
+                    Log.i("[Manager] call 1 state: " + call1State + " address: " + address1);
                     if (call1State == Call.State.Paused && state == Call.State.End) {
                         call1.resume();
-                        newCallState = "connected";
+                        if(!originalIsClb) {
+                            newCallState = "connected";
+                            address = address1;
+                        }
                     } else if ((call1State == Call.State.End || call1State == Call.State.Error) && calls.length > 1) {
+                        boolean call1IsClb = (callUriAll != null && !callUriAll.isEmpty() && address1.contains(callUriAll));
                         Call call2 = calls[1];
                         Call.State call2State = call2.getState();
-                        address = GetAddressString(call2);
+                        String address2 = GetAddressString(call2);
                         Log.i("[Manager] call 2 state: " + call2State);
-                        if (call2State == Call.State.End || call2State == Call.State.Error) {
-                            address = GetAddressString(call1); // Get the address of the previous call.
-                            newCallState = "idle";
-                        } else if (call2State == Call.State.Paused) {
+                        newCallState = "idle";
+                        if (call2State == Call.State.Paused) {
                             call2.resume();
+                            if(!originalIsClb && !call1IsClb) {
+                                newCallState = "connected";
+                                address = address2;
+                            }
+                        } else if (callUriAll != null && address2.contains(callUriAll) && call2State == Call.State.StreamsRunning) {
                             newCallState = "connected";
-                        } else if (callUriAll != null && address.contains(callUriAll) && call2State == Call.State.StreamsRunning) {
-                            newCallState = "connected";
+                            address = address2;
                         } else {
-                            address = GetAddressString(call1); // Get the address of the previous call.
-                            newCallState = "idle_inactive";
                         }
                     }
-                    else if(callUriAll != null && address.contains(callUriAll) && call1State == Call.State.StreamsRunning) {
+                    else if(callUriAll != null && address1.contains(callUriAll) && call1State == Call.State.StreamsRunning) {
                         newCallState = "connected"; // Happens when an incoming sip call is ignored.
+                        address = address1;
                     }
                     else {
                         newCallState = "idle";    // New: 4.5.2:  when call fails, nr of callNB == 1 (was 0);
@@ -282,8 +289,8 @@ public class CallStateCLB {
             newCallState = "ringing";
         } else if (state == Call.State.StreamsRunning) {
             newCallState = "connected";
-        } else if (state == Call.State.Paused && IsAnyCallFromCLB()) {
-            Log.i("[Manager] end call, cause pause is not allowed.");
+        } else if (state == Call.State.Paused && callUriAll != null && address.contains(callUriAll)) {
+            Log.i("[Manager] end call, cause a CLB call with pause is not allowed.");
             call.terminate();
         }
         Log.i("[Manager] state: " + state + " clb: " + newCallState);
