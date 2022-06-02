@@ -2,6 +2,7 @@ package org.linphone.clb;
 
 import android.content.Context;
 import android.content.Intent;
+import android.os.Handler;
 import android.telephony.PhoneStateListener;
 import android.telephony.TelephonyManager;
 import android.widget.Toast;
@@ -248,7 +249,19 @@ public class CallStateCLB {
                     Call.State call1State = call1.getState();
                     Log.i("[Manager] call 1 state: " + call1State + " address: " + address1);
                     if (call1State == Call.State.Paused && state == Call.State.End) {
-                        call1.resume();
+                        Handler mHandler = new Handler();
+                        mHandler.postDelayed(
+                                new Runnable() {
+                                    @Override
+                                    public void run() {
+                                        Call.State call1State = call1.getState();
+                                        if (call1State == Call.State.Paused) {
+                                            Log.i("[Manager] call 1 resume");
+                                            call1.resume();
+                                        }
+                                    }
+                                },
+                                400);
                         if(!originalIsClb) {
                             newCallState = "connected";
                             address = address1;
@@ -258,10 +271,22 @@ public class CallStateCLB {
                         Call call2 = calls[1];
                         Call.State call2State = call2.getState();
                         String address2 = GetAddressString(call2);
-                        Log.i("[Manager] call 2 state: " + call2State);
+                        Log.i("[Manager] call 2 state: " + call2State + " address: " + address2);
                         newCallState = "idle";
                         if (call2State == Call.State.Paused) {
-                            call2.resume();
+                            Handler mHandler = new Handler();
+                            mHandler.postDelayed(
+                                    new Runnable() {
+                                        @Override
+                                        public void run() {
+                                            Call.State call2State = call2.getState();
+                                            if (call2State == Call.State.Paused) {
+                                                Log.i("[Manager] call 2 resume");
+                                                call2.resume();
+                                            }
+                                        }
+                                    },
+                                    400);
                             if(!originalIsClb && !call1IsClb) {
                                 newCallState = "connected";
                                 address = address2;
