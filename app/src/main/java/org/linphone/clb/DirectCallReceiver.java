@@ -4,9 +4,9 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Handler;
-import android.util.Log;
 
 import org.linphone.clb.kt.CoreContextExt;
+import org.linphone.core.tools.Log;
 
 import static org.linphone.LinphoneApplication.coreContext;
 
@@ -22,7 +22,6 @@ import static org.linphone.LinphoneApplication.coreContext;
  */
 
 public class DirectCallReceiver extends BroadcastReceiver {
-    private static final String TAG = "DirectCallReceiver";
     private String addressToCall;
 
     private Handler mHandler;
@@ -40,15 +39,16 @@ public class DirectCallReceiver extends BroadcastReceiver {
                 addressToCall = addressToCall.substring("sip:".length());
             }
         }
-        Log.i(TAG, "onReceive DirectCallReceiver for: " + addressToCall);
 
         // CLB C-Serie Uri ? => Validate if transport is defined, if not set UDP.
         String adressLower = addressToCall.toLowerCase();
         if (adressLower.contains("clbsessionid") && adressLower.contains("transport=?")) {
             addressToCall = addressToCall.replace("transport=?", "transport=udp?");
         }
-
         CallStateCLB.instance().SetCallUri(addressToCall);
+
+        Log.i( "[Manager] DirectCallReceiver for: " + addressToCall + " short: " + CallStateCLB.instance().GetCallUriAll());
+
 
         mHandler = new Handler();
         CoreContextExt coreExt = new CoreContextExt();
@@ -57,7 +57,7 @@ public class DirectCallReceiver extends BroadcastReceiver {
             coreExt.OnOutgoingStarted(false);
             onServiceReady();
         } else {
-            Log.i(TAG, "Start linphone as foreground");
+            Log.i("[Manager] Start linphone as foreground");
 
             // start linphone as foreground service
             coreExt.StartCoreService(context);
@@ -74,7 +74,7 @@ public class DirectCallReceiver extends BroadcastReceiver {
                 new Runnable() {
                     @Override
                     public void run() {
-                        Log.i(TAG, "Start call to " + addressToCall);
+                        Log.i("[Manager] Start call to " + addressToCall);
                         coreContext.startCall(addressToCall);
                     }
                 },
@@ -89,7 +89,7 @@ public class DirectCallReceiver extends BroadcastReceiver {
                 try {
                     sleep(30);
                 } catch (InterruptedException e) {
-                    throw new RuntimeException("waiting thread sleep() has been interrupted");
+                    throw new RuntimeException("[Manager] waiting thread sleep() has been interrupted");
                 }
             }
             mHandler.post(

@@ -64,13 +64,19 @@ public class CallStateCLB {
         callUriAll = uri;
     }
 
+    public String GetCallUriAll(){
+        return callUriAll;
+    }
+
 
     public String GetShortCallUri(String tmpCallUri) {
         int index = tmpCallUri.indexOf("@");
         int index2 = tmpCallUri.indexOf(";");
 
-        if (index2 != -1) {
+        if (index2 != -1 && index != -1) {
             index = Math.min(index, index2);
+        } else if (index2 != -1) {
+            index = index2;
         }
         if (index != -1) {
             tmpCallUri = tmpCallUri.substring(0, index);
