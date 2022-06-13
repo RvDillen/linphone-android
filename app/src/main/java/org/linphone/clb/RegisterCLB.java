@@ -48,6 +48,7 @@ public class RegisterCLB {
 
         if (isRegistered) return;
 
+        Log.i("[Manager] Registering receivers");
         // ACTION_ENDCALL
         mHangupIntentFilter = new IntentFilter(ACTION_ENDCALL);
         mHangupReceiver = new HangupReceiver();
@@ -82,6 +83,7 @@ public class RegisterCLB {
 
         UnRegisterReceiver(mLoginReceiver, "Unregister LoginReceiver");
         UnRegisterReceiver(mLogoutReceiver, "Unregister LogoutReceiver");
+        isRegistered = false;
     }
 
     private void RegisterReceiver(

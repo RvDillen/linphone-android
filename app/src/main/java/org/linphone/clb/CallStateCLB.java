@@ -11,7 +11,6 @@ import org.linphone.R;
 import org.linphone.core.Address;
 import org.linphone.core.Call;
 import org.linphone.core.Core;
-import org.linphone.core.CoreContext;
 import org.linphone.core.CoreListenerStub;
 import org.linphone.core.Reason;
 import org.linphone.core.tools.Log;
@@ -37,6 +36,7 @@ public class CallStateCLB {
     private String callState = null;
     private CoreListenerStub mListener = null;
     private Context mContext = null;
+    private Core mCore = null;
     private TelephonyManager mTelephonyManager;
     private PhoneStateListener mPhoneStateListener;
 
@@ -118,11 +118,15 @@ public class CallStateCLB {
 
     public void Restart() {
         Context currentContext = mContext;
-
+        Core currentCore = mCore;
         mContext = coreContext.getContext().getApplicationContext();
         if(currentContext != mContext) {
             Log.i("[Manager] Creating CallStateCLB");
             AddGsmListener();
+            AddCoreListener();
+        }
+        else if(currentCore != coreContext.getCore()) {
+            Log.i("[Manager] Restarting Core listener");
             AddCoreListener();
         }
     }
@@ -175,11 +179,16 @@ public class CallStateCLB {
     }
 
 
-    private void AddCoreListener(){
+    private void AddCoreListener() {
 
-        if(mListener != null) {
-            coreContext.getCore().removeListener(mListener);
+        if (mListener != null) {
+            try {
+                mCore.removeListener(mListener);
+            } catch (Exception ex) {
+                Log.e("[Manager] Error in removeListener. ", ex.getMessage());
+            }
         }
+        mCore = coreContext.getCore();
         mListener =
                 new CoreListenerStub() {
                     @Override
@@ -197,22 +206,20 @@ public class CallStateCLB {
                             // CLB call => Notify Errors with Toast
                             if (state == Call.State.Error) {
                                 DisplayErrorToastFor(call);
-                            }
-                            else if (state == Call.State.End) {
+                            } else if (state == Call.State.End) {
                                 // Convert Core message for internalization
                                 if (call.getErrorInfo().getReason() == Declined) {
                                     ShowToast(mContext.getString(R.string.call_error_declined));
                                 }
                             }
-                        }
-                        catch (Exception ex) {
-                            Log.e("[Manager] Error in Notify SIP state change. " , ex.getMessage());
+                        } catch (Exception ex) {
+                            Log.e("[Manager] Error in Notify SIP state change. ", ex.getMessage());
                         }
                     }
                 };
 
         Log.i("[Manager] Registering call state listener");
-        coreContext.getCore().addListener(mListener);
+        mCore.addListener(mListener);
     }
 
     public void NotifySipStateStateChanged(
