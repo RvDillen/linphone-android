@@ -114,9 +114,7 @@ public class CallStateCLB {
         mCallGsmON = on;
     }
 
-    CallStateCLB(){
-        Restart();
-    }
+    CallStateCLB(){}
 
     public void Restart() {
         Context currentContext = mContext;

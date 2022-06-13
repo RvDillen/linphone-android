@@ -80,7 +80,7 @@ class LinphoneApplication : Application() {
             registerCLB.RegisterReceivers()
 
             // CLB Forcing init of Callstate
-            CallStateCLB.instance().IsCallFromCLB()
+            CallStateCLB.instance().Restart();
         }
 
         private fun CreateConfigCLB(context: Context): Config {

@@ -8,6 +8,7 @@ import org.linphone.core.Account;
 import org.linphone.core.AccountParams;
 import org.linphone.core.Core;
 import org.linphone.core.ProxyConfig;
+import org.linphone.core.tools.Log;
 
 import static org.linphone.LinphoneApplication.coreContext;
 import static org.linphone.clb.RegisterCLB.STATE_CONNECTSTATE;
@@ -25,6 +26,7 @@ public class LogoutReceiver extends BroadcastReceiver {
     @Override
     public void onReceive(Context context, Intent intent) {
 
+        Log.i("[Logout Receiver] Logout request received");
         Core lc = coreContext.getCore();
         Account account = lc.getDefaultAccount();
         AccountParams accountParams = account.getParams().clone();

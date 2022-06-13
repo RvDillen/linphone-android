@@ -39,7 +39,7 @@ public class LoginReceiver extends BroadcastReceiver {
             sipPassword = intent.getStringExtra("sipPassword");
         }
 
-        android.util.Log.d(TAG, "Login request received from: " + sipUsername);
+        Log.i("[Login Receiver] Login request received from: " + sipUsername);
 
         if ((sipUsername == "") || (sipPassword == "")) return;
 
@@ -101,9 +101,10 @@ public class LoginReceiver extends BroadcastReceiver {
         // Publish Login
         Intent intentMessage = new Intent(STATE_CONNECTSTATE);
         intentMessage.putExtra("connectstate", "LoggedIn");
-        android.util.Log.d(TAG, "Login request, send reponse 'LoggedIn'");
+        Log.i("[Login Receiver] Login request, send response 'LoggedIn'");
 
         Context appContext = coreContext.getContext().getApplicationContext();
         appContext.sendBroadcast(intentMessage);
+        CallStateCLB.instance().Restart();
     }
 }
