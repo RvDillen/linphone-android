@@ -70,26 +70,20 @@ class NativeCallWrapper(var callId: String) : Connection() {
 
         val call = getCall()
         if (call != null) {
-            val muted = state.isMuted
-            val callState =  call.state
-            if(!muted || callState == Call.State.StreamsRunning) {
-                Log.i("[Connection] Call muted state changed: $muted state: $callState with id: $callId")
-                call.microphoneMuted = state.isMuted
-                when (state.route) {
-                    CallAudioState.ROUTE_EARPIECE -> AudioRouteUtils.routeAudioToEarpiece(
-                        call,
-                        true
-                    )
-                    CallAudioState.ROUTE_SPEAKER -> AudioRouteUtils.routeAudioToSpeaker(call, true)
-                    CallAudioState.ROUTE_BLUETOOTH -> AudioRouteUtils.routeAudioToBluetooth(
-                        call,
-                        true
-                    )
-                    CallAudioState.ROUTE_WIRED_HEADSET -> AudioRouteUtils.routeAudioToHeadset(
-                        call,
-                        true
-                    )
-                }
+            when (state.route) {
+                CallAudioState.ROUTE_EARPIECE -> AudioRouteUtils.routeAudioToEarpiece(
+                    call,
+                    true
+                )
+                CallAudioState.ROUTE_SPEAKER -> AudioRouteUtils.routeAudioToSpeaker(call, true)
+                CallAudioState.ROUTE_BLUETOOTH -> AudioRouteUtils.routeAudioToBluetooth(
+                    call,
+                    true
+                )
+                CallAudioState.ROUTE_WIRED_HEADSET -> AudioRouteUtils.routeAudioToHeadset(
+                    call,
+                    true
+                )
             }
         } else {
             selfDestroy()
