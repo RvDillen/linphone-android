@@ -73,7 +73,17 @@ class LinphoneApplication : Application() {
 
             Log.i("[Application] Core context created ${if (pushReceived) "from push" else ""}")
             coreContext = CoreContext(context, config)
+            if (coreContext.core.provisioningUri == null) {
+                // http(s)://clb.config/linphonerc.xml
+                val configUrl = "http://clb.config.nl/linphonerc"
+                coreContext.core.setProvisioningUri(configUrl)
+                Log.i("Provisioning URL is not configured, set to default CLB URL: $configUrl")
+            } else {
+                val configUrl = coreContext.core.provisioningUri
+                Log.i("Provisioning URL already configured: $configUrl")
+            }
             coreContext.start()
+
 
             // CLB Registration
             var registerCLB: RegisterCLB = org.linphone.clb.RegisterCLB(coreContext.context.applicationContext)
