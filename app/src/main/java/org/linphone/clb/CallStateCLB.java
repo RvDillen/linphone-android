@@ -8,6 +8,7 @@ import android.telephony.TelephonyManager;
 import android.widget.Toast;
 
 import org.linphone.R;
+import org.linphone.clb.kt.CoreContextExt;
 import org.linphone.core.Address;
 import org.linphone.core.Call;
 import org.linphone.core.Core;
@@ -269,6 +270,9 @@ public class CallStateCLB {
                                         if (call1State == Call.State.Paused) {
                                             Log.i("[Manager] call 1 resume");
                                             call1.resume();
+                                            // Bring UI to front
+                                            CoreContextExt coreContextExt = new CoreContextExt();
+                                            coreContextExt.OnOutgoingStarted(false);
                                         }
                                     }
                                 },
@@ -294,6 +298,9 @@ public class CallStateCLB {
                                             if (call2State == Call.State.Paused) {
                                                 Log.i("[Manager] call 2 resume");
                                                 call2.resume();
+                                                // Bring UI to front
+                                                CoreContextExt coreContextExt = new CoreContextExt();
+                                                coreContextExt.OnOutgoingStarted(false);
                                             }
                                         }
                                     },

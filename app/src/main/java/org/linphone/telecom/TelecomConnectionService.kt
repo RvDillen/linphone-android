@@ -260,6 +260,7 @@ class TelecomConnectionService : ConnectionService() {
             )
             return
         }
+        Log.i("[Telecom Connection Service] found connection for call id: $callId")
 
         if (connection.state != Connection.STATE_HOLDING) {
             connection.setActive()
