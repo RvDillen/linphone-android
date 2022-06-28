@@ -76,20 +76,19 @@ class LinphoneApplication : Application() {
             if (coreContext.core.provisioningUri == null) {
                 val configUrl = "http://config.clb.nl/linphonerc.xml"
                 coreContext.core.setProvisioningUri(configUrl)
-                Log.i("Provisioning URL is not configured, set to default CLB URL: $configUrl")
+                Log.i("[Application] Provisioning URL is not configured, set to default CLB URL: $configUrl")
             } else {
                 val configUrl = coreContext.core.provisioningUri
-                Log.i("Provisioning URL already configured: $configUrl")
+                Log.i("[Application] Provisioning URL already configured: $configUrl")
             }
             coreContext.start()
-
 
             // CLB Registration
             var registerCLB: RegisterCLB = org.linphone.clb.RegisterCLB(coreContext.context.applicationContext)
             registerCLB.RegisterReceivers()
 
             // CLB Forcing init of Callstate
-            CallStateCLB.instance().Restart();
+            CallStateCLB.instance().Restart()
         }
 
         private fun CreateConfigCLB(context: Context): Config {

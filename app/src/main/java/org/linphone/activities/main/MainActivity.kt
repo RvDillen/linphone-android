@@ -19,17 +19,23 @@
  */
 package org.linphone.activities.main
 
+import android.annotation.SuppressLint
+import android.annotation.TargetApi
 import android.app.Activity
+import android.app.role.RoleManager
 import android.content.ComponentCallbacks2
 import android.content.Intent
 import android.content.res.Configuration
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.os.Parcelable
+import android.telecom.TelecomManager
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
 import android.view.inputmethod.InputMethodManager
+import androidx.appcompat.app.AppCompatActivity
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
@@ -89,6 +95,7 @@ class MainActivity : GenericActivity(), SnackBarActivity, NavController.OnDestin
     private var initPosX = 0f
     private var initPosY = 0f
     private var overlay: View? = null
+    private var REQUEST_CODE_SET_DEFAULT_DIALER: Int = 88
 
     private val componentCallbacks = object : ComponentCallbacks2 {
         override fun onConfigurationChanged(newConfig: Configuration) { }
@@ -209,6 +216,40 @@ class MainActivity : GenericActivity(), SnackBarActivity, NavController.OnDestin
             .show()
     }
 
+    @SuppressLint("QueryPermissionsNeeded")
+    @TargetApi(Build.VERSION_CODES.M)
+    fun launchSetDefaultDialerIntent(activity: AppCompatActivity) {
+        Intent(TelecomManager.ACTION_CHANGE_DEFAULT_DIALER).putExtra(
+            TelecomManager.EXTRA_CHANGE_DEFAULT_DIALER_PACKAGE_NAME,
+            activity.packageName
+        ).apply {
+            if (resolveActivity(activity.packageManager) != null) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    val rm: RoleManager? = activity.getSystemService(RoleManager::class.java)
+                    if (rm?.isRoleAvailable(RoleManager.ROLE_DIALER) == true) {
+                        @Suppress("DEPRECATION")
+                        activity.startActivityForResult(
+                            rm.createRequestRoleIntent(RoleManager.ROLE_DIALER),
+                            REQUEST_CODE_SET_DEFAULT_DIALER
+                        )
+                    }
+                } else {
+                    @Suppress("DEPRECATION")
+                    activity.startActivityForResult(this, REQUEST_CODE_SET_DEFAULT_DIALER)
+                }
+            } else {
+                showSnackBar("this package is not found")
+            }
+        }
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == REQUEST_CODE_SET_DEFAULT_DIALER) {
+            showSnackBar("Result: " + resultCode)
+        }
+    }
+
     override fun showSnackBar(message: String) {
         Snackbar.make(findViewById(R.id.coordinator), message, Snackbar.LENGTH_LONG).show()
     }
@@ -230,6 +271,8 @@ class MainActivity : GenericActivity(), SnackBarActivity, NavController.OnDestin
         initOverlay()
 
         if (intent != null) handleIntentParams(intent)
+
+        // launchSetDefaultDialerIntent(this)
     }
 
     override fun onDestroy() {
