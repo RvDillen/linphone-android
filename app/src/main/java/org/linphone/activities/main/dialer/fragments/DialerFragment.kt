@@ -29,6 +29,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.view.View
 import androidx.lifecycle.ViewModelProvider
@@ -249,7 +250,7 @@ class DialerFragment : SecureFragment<DialerFragmentBinding>() {
 
     @TargetApi(Version.API23_MARSHMALLOW_60)
     private fun checkReadPhoneStatePermission() {
-        if (!PermissionHelper.get().hasReadPhoneStatePermission()) {
+        if (!PermissionHelper.get().hasReadPhoneStatePermission() && !Build.MODEL.contains("Myco")) {
             Log.i("[Dialer] Asking for READ_PHONE_STATE permission")
             requestPermissions(arrayOf(Manifest.permission.READ_PHONE_STATE), 0)
         }

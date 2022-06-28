@@ -23,6 +23,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
 import android.graphics.PixelFormat
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.security.keystore.KeyGenParameterSpec
@@ -300,7 +301,7 @@ class CoreContext(val context: Context, coreConfig: Config) {
 
         // CoreContext listener must be added first!
         if (Version.sdkAboveOrEqual(Version.API26_O_80) && corePreferences.useTelecomManager) {
-            if (Compatibility.hasTelecomManagerPermissions(context)) {
+            if (Compatibility.hasTelecomManagerPermissions(context) && !Build.MODEL.contains("Myco")) {
                 Log.i("[Context] Creating Telecom Helper, disabling audio focus requests in AudioHelper")
                 core.config.setBool("audio", "android_disable_audio_focus_requests", true)
                 val telecomHelper = TelecomHelper.required(context)
@@ -309,6 +310,9 @@ class CoreContext(val context: Context, coreConfig: Config) {
                 Log.w("[Context] Can't create Telecom Helper, permissions have been revoked")
                 corePreferences.useTelecomManager = false
             }
+        } else {
+            core.config.setBool("audio", "android_pause_calls_when_audio_focus_lost", false)
+            core.config.setBool("audio", "android_disable_audio_focus_requests", false)
         }
 
         if (isPush) {

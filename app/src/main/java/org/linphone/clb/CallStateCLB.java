@@ -2,6 +2,7 @@ package org.linphone.clb;
 
 import android.content.Context;
 import android.content.Intent;
+import android.os.Build;
 import android.os.Handler;
 import android.telephony.PhoneStateListener;
 import android.telephony.TelephonyManager;
@@ -146,6 +147,23 @@ public class CallStateCLB {
                             case TelephonyManager.CALL_STATE_OFFHOOK:
                                 Log.i("[Manager] Phone state is off hook");
                                 setCallGsmON(true);
+                                if (Build.MODEL.contains("Myco")) {
+                                    // CLB Always end CLB call when a normal phone call is off hook.
+                                    Core core = coreContext.getCore();
+                                    if (core != null && core.getCallsNb() > 0) {
+                                        Call[] calls = core.getCalls();
+                                        if (calls != null && calls.length > 0) {
+                                            // New 4.6.3  getCallsNb can return values of failed calls
+                                            for (Call call : calls) {
+                                                String address = GetAddressString(call);
+                                                if (callUriAll != null && address.contains(callUriAll)) {
+                                                    Log.i("[Manager] end call, cause a CLB call with pause is not allowed.");
+                                                    call.terminate();
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
                                 break;
                             case TelephonyManager.CALL_STATE_RINGING:
                                 Log.i("[Manager] Phone state is ringing");
