@@ -22,6 +22,8 @@ package org.linphone
 import android.annotation.SuppressLint
 import android.app.Application
 import android.content.Context
+import java.util.*
+import kotlin.concurrent.schedule
 import org.linphone.clb.AppConfigHelper
 import org.linphone.clb.CallStateCLB
 import org.linphone.clb.LinphonePreferencesCLB
@@ -84,17 +86,27 @@ class LinphoneApplication : Application() {
             coreContext.start()
 
             // CLB Registration
-            var registerCLB: RegisterCLB = org.linphone.clb.RegisterCLB(coreContext.context.applicationContext)
+            val registerCLB: RegisterCLB = org.linphone.clb.RegisterCLB(coreContext.context.applicationContext)
             registerCLB.RegisterReceivers()
+// Use
 
-            // CLB Forcing init of Callstate
-            CallStateCLB.instance().Restart()
+            Timer().schedule(2000) {
+                try {
+                    // CLB Forcing init of Callstate
+                    Log.i("[Application] Creating CallStateCLB")
+                    val instance = CallStateCLB.instance()
+                    Log.i("[Application] Restarting CallStateCLB")
+                    instance.Restart()
+                } catch (e: Exception) {
+                    Log.i("[Application] Can't start CallStateCLB $e")
+                }
+            }
         }
 
         private fun CreateConfigCLB(context: Context): Config {
 
             // Get restrictions data (AppConfigHelper)
-            var ach = AppConfigHelper(context, corePreferences)
+            val ach = AppConfigHelper(context, corePreferences)
 
             // Init
             android.util.Log.i("[CLB]", "Checking AppConfig data")

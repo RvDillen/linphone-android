@@ -347,7 +347,10 @@ class NotificationsManager(private val context: Context) {
         service = coreService
 
         // CLB Forcing init of Callstate
-        CallStateCLB.instance().Restart()
+        // (coreContext.core)
+        var instance = CallStateCLB.instance()
+
+        instance.Restart()
     }
 
     private fun startForeground(notificationId: Int, callNotification: Notification) {

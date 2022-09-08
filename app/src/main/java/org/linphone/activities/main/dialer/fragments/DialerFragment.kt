@@ -46,6 +46,7 @@ import org.linphone.activities.main.viewmodels.DialogViewModel
 import org.linphone.activities.main.viewmodels.SharedMainViewModel
 import org.linphone.activities.navigateToConfigFileViewer
 import org.linphone.activities.navigateToContacts
+import org.linphone.clb.CallStateCLB
 import org.linphone.compatibility.Compatibility
 import org.linphone.core.tools.Log
 import org.linphone.databinding.DialerFragmentBinding
@@ -220,6 +221,7 @@ class DialerFragment : SecureFragment<DialerFragmentBinding>() {
             if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 Log.i("[Dialer] READ_PHONE_STATE permission has been granted")
                 coreContext.initPhoneStateListener()
+                CallStateCLB.instance().Restart()
             }
             checkTelecomManagerPermissions()
         } else if (requestCode == 1) {

@@ -1,10 +1,13 @@
 package org.linphone.clb;
 
+import android.Manifest;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Handler;
 import android.telephony.PhoneStateListener;
+import android.telephony.TelephonyCallback;
 import android.telephony.TelephonyManager;
 import android.widget.Toast;
 
@@ -16,9 +19,12 @@ import org.linphone.core.Core;
 import org.linphone.core.CoreListenerStub;
 import org.linphone.core.Reason;
 import org.linphone.core.tools.Log;
+import org.linphone.mediastream.Version;
 
 import static org.linphone.LinphoneApplication.coreContext;
 import static org.linphone.core.Reason.Declined;
+
+import androidx.annotation.RequiresApi;
 
 /**
  * CallStateCLB: CLB class to store call state from CLB. <br>
@@ -40,7 +46,6 @@ public class CallStateCLB {
     private Context mContext = null;
     private Core mCore = null;
     private TelephonyManager mTelephonyManager;
-    private PhoneStateListener mPhoneStateListener;
 
     private long lastHanugUp = 0;
     private boolean mCallGsmON = false;
@@ -122,7 +127,7 @@ public class CallStateCLB {
         Context currentContext = mContext;
         Core currentCore = mCore;
         mContext = coreContext.getContext().getApplicationContext();
-        if(currentContext != mContext) {
+        if(currentContext != mContext || !callStateListenerRegistered) {
             Log.i("[Manager] Creating CallStateCLB");
             AddGsmListener();
             AddCoreListener();
@@ -135,69 +140,111 @@ public class CallStateCLB {
 
     private void AddGsmListener() {
         mTelephonyManager = (TelephonyManager) mContext.getSystemService(Context.TELEPHONY_SERVICE);
-        if(mPhoneStateListener != null) {
-            mTelephonyManager.listen(mPhoneStateListener, PhoneStateListener.LISTEN_NONE);
+
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            if(callStateListenerRegistered) {
+                mTelephonyManager.unregisterTelephonyCallback(callStateListener);
+                callStateListenerRegistered = false;
+                Log.i("[Manager] Unregistered call state listener");
+            }
+            if (mContext.checkSelfPermission(Manifest.permission.READ_PHONE_STATE) == PackageManager.PERMISSION_GRANTED) {
+                mTelephonyManager.registerTelephonyCallback(mContext.getMainExecutor(), callStateListener);
+                callStateListenerRegistered = true;
+                Log.i("[Manager] Registered call state listener");
+            } else {
+                Log.i("[Manager] Can't register phone state listener, permission not granted");
+                return;
+            }
+        } else {
+            if (callStateListenerRegistered) {
+                mTelephonyManager.listen(phoneStateListener, PhoneStateListener.LISTEN_NONE);
+                callStateListenerRegistered = false;
+                Log.i("[Manager] Unregistered phone state listener");
+            }
+            mTelephonyManager.listen(phoneStateListener, PhoneStateListener.LISTEN_CALL_STATE);
+            callStateListenerRegistered = true;
+            Log.i("[Manager] Registered phone state listener");
         }
-
-        mPhoneStateListener =
-                new PhoneStateListener() {
-                    @Override
-                    public void onCallStateChanged(int state, String phoneNumber) {
-                        switch (state) {
-                            case TelephonyManager.CALL_STATE_OFFHOOK:
-                                Log.i("[Manager] Phone state is off hook");
-                                setCallGsmON(true);
-                                if (Build.MODEL.contains("Myco")) {
-                                    // CLB Always end CLB call when a normal phone call is off hook.
-                                    Core core = coreContext.getCore();
-                                    if (core != null && core.getCallsNb() > 0) {
-                                        Call[] calls = core.getCalls();
-                                        if (calls != null && calls.length > 0) {
-                                            // New 4.6.3  getCallsNb can return values of failed calls
-                                            for (Call call : calls) {
-                                                String address = GetAddressString(call);
-                                                if (callUriAll != null && address.contains(callUriAll)) {
-                                                    Log.i("[Manager] end call, cause a CLB call with pause is not allowed.");
-                                                    call.terminate();
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                                break;
-                            case TelephonyManager.CALL_STATE_RINGING:
-                                Log.i("[Manager] Phone state is ringing");
-                                setCallGsmON(true);
-                                break;
-                            case TelephonyManager.CALL_STATE_IDLE:
-                                Log.i("[Manager] Phone state is idle");
-                                setCallGsmON(false);
-
-                                // CLB
-                                Core core = coreContext.getCore();
-                                if (core != null && core.getCallsNb() > 0) {
-                                    Call[] calls = core.getCalls();
-                                    if (calls != null && calls.length > 0) {
-
-                                        // New 4.5.2  getCallsNb can return values of failed calls
-                                        for (Call call : calls) {
-                                            if (call.getState() == Call.State.Paused) {
-                                                call.resume();
-                                                return;
-                                            }
-                                        }
-                                    }
-                                }
-                                break;
-                        }
-                    }
-                };
-
-        Log.i("[Manager] Registering phone state listener");
-        mTelephonyManager.listen(mPhoneStateListener, PhoneStateListener.LISTEN_CALL_STATE);
     }
 
+    @RequiresApi(api = Build.VERSION_CODES.S)
+    private static abstract class CallStateListener extends TelephonyCallback implements TelephonyCallback.CallStateListener {
+        @Override
+        abstract public void onCallStateChanged(int state);
+    }
 
+    private boolean callStateListenerRegistered = false;
+
+    private CallStateListener callStateListener = (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) ?
+            new CallStateListener() {
+                @Override
+                public void onCallStateChanged(int state) {
+                    CallStateChanged(state);
+                }
+            }
+            : null;
+
+    private PhoneStateListener phoneStateListener = (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) ?
+            new PhoneStateListener() {
+                @Override
+                public void onCallStateChanged(int state, String phoneNumber) {
+                    CallStateChanged(state);
+                }
+            }
+            : null;
+
+
+    private void CallStateChanged(int state)
+    {
+        switch (state) {
+            case TelephonyManager.CALL_STATE_OFFHOOK:
+                Log.i("[Manager] Phone state is off hook");
+                setCallGsmON(true);
+                if (Build.MODEL.contains("Myco")) {
+                    // CLB Always end CLB call when a normal phone call is off hook.
+                    Core core = coreContext.getCore();
+                    if (core != null && core.getCallsNb() > 0) {
+                        Call[] calls = core.getCalls();
+                        if (calls != null && calls.length > 0) {
+                            // New 4.6.3  getCallsNb can return values of failed calls
+                            for (Call call : calls) {
+                                String address = GetAddressString(call);
+                                if (callUriAll != null && address.contains(callUriAll)) {
+                                    Log.i("[Manager] end call, cause a CLB call with pause is not allowed.");
+                                    call.terminate();
+                                }
+                            }
+                        }
+                    }
+                }
+                break;
+            case TelephonyManager.CALL_STATE_RINGING:
+                Log.i("[Manager] Phone state is ringing");
+                setCallGsmON(true);
+                break;
+            case TelephonyManager.CALL_STATE_IDLE:
+                Log.i("[Manager] Phone state is idle");
+                setCallGsmON(false);
+
+                // CLB
+                Core core = coreContext.getCore();
+                if (core != null && core.getCallsNb() > 0) {
+                    Call[] calls = core.getCalls();
+                    if (calls != null && calls.length > 0) {
+
+                        // New 4.5.2  getCallsNb can return values of failed calls
+                        for (Call call : calls) {
+                            if (call.getState() == Call.State.Paused) {
+                                call.resume();
+                                return;
+                            }
+                        }
+                    }
+                }
+                break;
+        }
+    }
     private void AddCoreListener() {
 
         if (mListener != null) {
