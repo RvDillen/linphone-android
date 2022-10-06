@@ -30,9 +30,10 @@ pipeline {
 
 		stage('Build') {
 			steps {
-				withCredentials([usernamePassword(credentialsId: 'sign_android', usernameVariable: 'USERNAME', passwordVariable: 'PASSWORD')]) {				
-					bat "gradlew assembleRelease -PkeyPassword='${PASSWORD}' -PstorePassword='${PASSWORD}' -PkeyAlias='${USERNAME}' -PstoreFile='../../../AndroidKey/releasekey.keystore'"
-					bat "gradlew bundleRelease -PkeyPassword='${PASSWORD}' -PstorePassword='${PASSWORD}' -PkeyAlias='${USERNAME}' -PstoreFile='../../../AndroidKey/upload.jks'"
+				withCredentials([certificate(credentialsId: 'releasekey_old', keystoreVariable: 'KEYSTORE_VAR', passwordVariable: 'PASSWORD_VAR'),
+								certificate(credentialsId: 'uploadkey', keystoreVariable: 'KEYSTORE_UPLOAD', passwordVariable: 'PASSWORD_UPLOAD')]) {				
+					bat "gradlew assembleRelease -PkeyPassword='${PASSWORD_VAR}' -PstorePassword='${PASSWORD_VAR}' -PkeyAlias='clb' -PstoreFile='${KEYSTORE_VAR}'"
+					bat "gradlew bundleRelease -PkeyPassword='${PASSWORD_UPLOAD}' -PstorePassword='${PASSWORD_UPLOAD}' -PkeyAlias='clb' -PstoreFile='${KEYSTORE_UPLOAD}'"
 				}
 			}
         }
