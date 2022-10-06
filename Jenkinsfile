@@ -26,12 +26,11 @@ pipeline {
 
 		stage('Build') {
 			steps {
-				withCredentials([certificate(credentialsId: 'releasekey_old', keystoreVariable: 'KEYSTORE_VAR', passwordVariable: 'PASSWORD_VAR'),
-								certificate(credentialsId: 'uploadkey', keystoreVariable: 'KEYSTORE_UPLOAD', passwordVariable: 'PASSWORD_UPLOAD')]) {
-					print 'KEYSTORE_VAR.collect { it }=' + KEYSTORE_VAR.collect { it }	
-					print 'KEYSTORE_UPLOAD.collect { it }=' + KEYSTORE_UPLOAD.collect { it }								
-					bat "gradlew assembleRelease -PkeyPassword=${PASSWORD_VAR} -PstorePassword=${PASSWORD_VAR} -PkeyAlias=clb -PstoreFile=${KEYSTORE_VAR}"
-					bat "gradlew bundleRelease -PkeyPassword=${PASSWORD_UPLOAD} -PstorePassword=${PASSWORD_UPLOAD} -PkeyAlias=clb -PstoreFile=${KEYSTORE_UPLOAD}"
+				withCredentials([usernamePassword(credentialsId: 'sign_android', usernameVariable: 'USERNAME', passwordVariable: 'PASSWORD'),
+								file(credentialsId: 'releasefile_old', variable: 'KEYSTORE_VAR'),
+								file(credentialsId: 'upload_jks', variable: 'KEYSTORE_UPLOAD')]) {						
+					bat "gradlew assembleRelease -PkeyPassword=${PASSWORD} -PstorePassword=${PASSWORD} -PkeyAlias=${USERNAME} -PstoreFile=${KEYSTORE_VAR}"
+					bat "gradlew bundleRelease -PkeyPassword=${PASSWORD} -PstorePassword=${PASSWORD} -PkeyAlias=${USERNAME} -PstoreFile=${KEYSTORE_UPLOAD}"
 				}
 			}
         }		
