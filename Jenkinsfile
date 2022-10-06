@@ -16,9 +16,6 @@ pipeline {
 		ansiColor('xterm')
 		buildDiscarder(logRotator(daysToKeepStr: '30', numToKeepStr: '10'))
 	}
-	
-	environment {
-	}
 
     stages {
 		stage('Administration') {
