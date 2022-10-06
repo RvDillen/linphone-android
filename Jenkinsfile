@@ -34,8 +34,8 @@ pipeline {
 								certificate(credentialsId: 'uploadkey', keystoreVariable: 'KEYSTORE_UPLOAD', passwordVariable: 'PASSWORD_UPLOAD')]) {
 					print 'KEYSTORE_VAR.collect { it }=' + KEYSTORE_VAR.collect { it }	
 					print 'KEYSTORE_UPLOAD.collect { it }=' + KEYSTORE_UPLOAD.collect { it }								
-					bat "gradlew assembleRelease -PkeyPassword='${PASSWORD_VAR}' -PstorePassword='${PASSWORD_VAR}' -PkeyAlias='clb' -PstoreFile='${KEYSTORE_VAR}'"
-					bat "gradlew bundleRelease -PkeyPassword='${PASSWORD_UPLOAD}' -PstorePassword='${PASSWORD_UPLOAD}' -PkeyAlias='clb' -PstoreFile='${KEYSTORE_UPLOAD}'"
+					bat "gradlew assembleRelease -PkeyPassword='${PASSWORD_VAR}' -PstorePassword='${PASSWORD_VAR}' -PkeyAlias='clb' -PstoreFile=${KEYSTORE_VAR}"
+					bat "gradlew bundleRelease -PkeyPassword='${PASSWORD_UPLOAD}' -PstorePassword='${PASSWORD_UPLOAD}' -PkeyAlias='clb' -PstoreFile=${KEYSTORE_UPLOAD}"
 				}
 			}
         }		
