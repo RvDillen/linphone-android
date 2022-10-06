@@ -32,7 +32,7 @@ pipeline {
 			steps {
 				withCredentials([usernamePassword(credentialsId: 'sign_android', usernameVariable: 'USERNAME', passwordVariable: 'PASSWORD'),
 								file(credentialsId: 'releasekey_file_old', variable: 'STORE')]) {				
-					bat "gradlew assembleRelease -PkeyPassword='$PASSWORD' -PstorePassword='$PASSWORD' -PkeyAlias='$USERNAME' -PstoreFile='$STORE'"
+					gradlew assembleRelease -PkeyPassword='$PASSWORD' -PstorePassword='$PASSWORD' -PkeyAlias='$USERNAME' -PstoreFile='$STORE'
 				}
 			}
         }
