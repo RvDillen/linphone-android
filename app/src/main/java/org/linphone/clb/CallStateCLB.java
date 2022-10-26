@@ -358,7 +358,7 @@ public class CallStateCLB {
                                             call1.resume();
                                             // Bring UI to front
                                             CoreContextExt coreContextExt = new CoreContextExt();
-                                            coreContextExt.OnOutgoingStarted(false);
+                                            coreContextExt.OnOutgoingStarted(true);
                                         }
                                     }
                                 },
@@ -386,7 +386,7 @@ public class CallStateCLB {
                                                 call2.resume();
                                                 // Bring UI to front
                                                 CoreContextExt coreContextExt = new CoreContextExt();
-                                                coreContextExt.OnOutgoingStarted(false);
+                                                coreContextExt.OnOutgoingStarted(true);
                                             }
                                         }
                                     },
