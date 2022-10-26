@@ -35,7 +35,7 @@ class CoreContextExt() {
             intent.addFlags(Intent.FLAG_FROM_BACKGROUND)
 
             // Show launcher screen briefly, except when device is locked with pattern/pincode, show all stuff
-            if (isDeviceLocked(coreContext.context) == false)
+            if (!isDeviceLocked(coreContext.context) && !isJustHangup)
                 intent.putExtra("CLB", "OnOutgoingStarted")
 
             coreContext.context.startActivity(intent)

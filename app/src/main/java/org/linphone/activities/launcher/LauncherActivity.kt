@@ -35,13 +35,21 @@ class LauncherActivity : GenericActivity() {
 
     var lockHelper = LockHelperExt(this)
     var clbCall: Boolean = false
+    var endCall: Boolean = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         // Call from CLB Messenger? => show clb waiting screen
-        if (getIntent() != null && getIntent().getStringExtra("CLB") == "OnOutgoingStarted")
+        if (intent?.getStringExtra("CLB") == "OnOutgoingStarted") {
+            Log.i("[Launcher] Starting CLB call")
             clbCall = true
+        } else if (intent?.getStringExtra("CLB") == "OnOutgoingEnded") {
+            Log.i("[Launcher] Stopped CLB call")
+            endCall = true
+        } else {
+            Log.i("[Launcher] Starting...")
+        }
 
         if (clbCall)
             setContentView(R.layout.clb_launcher_activity)
@@ -71,6 +79,10 @@ class LauncherActivity : GenericActivity() {
 
         if (corePreferences.preventInterfaceFromShowingUp) {
             Log.w("[Context] We were asked to not show the user interface")
+            finish()
+            return
+        }
+        if (endCall) {
             finish()
             return
         }

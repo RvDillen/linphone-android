@@ -12,6 +12,7 @@ import android.telephony.TelephonyManager;
 import android.widget.Toast;
 
 import org.linphone.R;
+import org.linphone.activities.launcher.LauncherActivity;
 import org.linphone.clb.kt.CoreContextExt;
 import org.linphone.core.Address;
 import org.linphone.core.Call;
@@ -97,8 +98,28 @@ public class CallStateCLB {
             // Reset uri
             callUri = null;
         }
-        if(callState == "idle")
+        if(callState == "idle") {
             callUriAll = null;
+            FinishLauncher();
+        }
+    }
+
+    private void FinishLauncher() {
+        // A11(+): Finish loader activity.
+        if (Build.VERSION.SDK_INT > Version.API29_ANDROID_10) {
+
+            Intent intent = new Intent(coreContext.getContext(), LauncherActivity.class);
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            intent.addFlags(Intent.FLAG_ACTIVITY_NO_USER_ACTION);
+            intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+            intent.addFlags(Intent.FLAG_FROM_BACKGROUND);
+
+            // Remove launcher screen
+            intent.putExtra("CLB", "OnOutgoingEnded");
+
+            coreContext.getContext().startActivity(intent);
+
+        }
     }
 
     public void RegisterHangUpTime() {

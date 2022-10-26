@@ -166,9 +166,6 @@ android {
         }
     }
 
-    //def keystorePropertiesFile = rootProject.file("keystore.properties")
-    //def keystoreProperties = new Properties()
-    //keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
 
     if (project.hasProperty('storePassword')) {
         signingConfigs {
@@ -181,6 +178,9 @@ android {
         }
     }
     else {
+        def keystorePropertiesFile = rootProject.file("keystore.properties")
+        def keystoreProperties = new Properties()
+        keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
         signingConfigs {
             release {
                 storeFile file(keystoreProperties['storeFile'])
