@@ -35,7 +35,6 @@ class LauncherActivity : GenericActivity() {
 
     var lockHelper = LockHelperExt(this)
     var clbCall: Boolean = false
-    var endCall: Boolean = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -46,7 +45,8 @@ class LauncherActivity : GenericActivity() {
             clbCall = true
         } else if (intent?.getStringExtra("CLB") == "OnOutgoingEnded") {
             Log.i("[Launcher] Stopped CLB call")
-            endCall = true
+            finish()
+            return
         } else {
             Log.i("[Launcher] Starting...")
         }
@@ -79,10 +79,6 @@ class LauncherActivity : GenericActivity() {
 
         if (corePreferences.preventInterfaceFromShowingUp) {
             Log.w("[Context] We were asked to not show the user interface")
-            finish()
-            return
-        }
-        if (endCall) {
             finish()
             return
         }
