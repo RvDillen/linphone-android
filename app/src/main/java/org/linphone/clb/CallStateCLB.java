@@ -317,20 +317,21 @@ public class CallStateCLB {
 
         String newCallState = null;
         String address = GetAddressString(call);
+        boolean A10Min = Build.VERSION.SDK_INT <= Version.API29_ANDROID_10;
+
         Log.i("[Manager] Call state is [", state, "]" + " address: " + address);
         if (state == Call.State.IncomingReceived
-                && !call.equals(core.getCurrentCall())) {
+                && !call.equals(core.getCurrentCall()) && (A10Min || (callUriAll != null && address.contains(callUriAll)))) {
             if (call.getReplacedCall() != null) {
                 // attended transfer will be accepted automatically.
                 return;
             }
             newCallState = "ringing";
         }
-
         if ((state == Call.State.IncomingReceived || state == Call.State.IncomingEarlyMedia) && getCallGsmON()) {
             // Nothing
         } else if (state == Call.State.IncomingReceived
-                && !getCallGsmON()) {
+                && !getCallGsmON() && (A10Min || (callUriAll != null && address.contains(callUriAll)))) {
             newCallState = "ringing";
         } else if (state == Call.State.End || state == Call.State.Error) {
             if (core.getCallsNb() == 0) {
@@ -363,7 +364,7 @@ public class CallStateCLB {
                                     }
                                 },
                                 400);
-                        if(!originalIsClb) {
+                        if(!originalIsClb && (A10Min || (callUriAll != null && address1.contains(callUriAll)))) {
                             newCallState = "connected";
                             address = address1;
                         }
@@ -391,7 +392,7 @@ public class CallStateCLB {
                                         }
                                     },
                                     400);
-                            if(!originalIsClb && !call1IsClb) {
+                            if(!originalIsClb && !call1IsClb && (A10Min || (callUriAll != null && address2.contains(callUriAll)))) {
                                 newCallState = "connected";
                                 address = address2;
                             }
@@ -414,9 +415,9 @@ public class CallStateCLB {
             }
         } else if (state == Call.State.UpdatedByRemote) {
             // If the correspondent proposes video while audio call
-        } else if (state == Call.State.OutgoingInit) {
+        } else if (state == Call.State.OutgoingInit && (A10Min || (callUriAll != null && address.contains(callUriAll)))) {
             newCallState = "ringing";
-        } else if (state == Call.State.StreamsRunning) {
+        } else if (state == Call.State.StreamsRunning && (A10Min || (callUriAll != null && address.contains(callUriAll)))) {
             newCallState = "connected";
         } else if (state == Call.State.Paused && callUriAll != null && address.contains(callUriAll)) {
             Log.i("[Manager] end call, cause a CLB call with pause is not allowed.");
