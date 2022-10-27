@@ -492,6 +492,7 @@ class CoreContext(val context: Context, coreConfig: Config) {
 
     fun answerCall(call: Call) {
         Log.i("[Context] Answering call $call")
+        CallStateCLB.instance().EndAnyCLBCall(core)
         val params = core.createCallParams(call)
         params?.recordFile = LinphoneUtils.getRecordingFilePathForAddress(call.remoteAddress)
         if (LinphoneUtils.checkIfNetworkHasLowBandwidth(context)) {

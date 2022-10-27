@@ -471,4 +471,24 @@ public class CallStateCLB {
     private void ShowToast(String text) {
         Toast.makeText(mContext, text, Toast.LENGTH_SHORT).show();
     }
+
+    public void EndAnyCLBCall(final Core core)
+    {
+        Call[] calls = core.getCalls();
+        if(calls == null)
+            return;
+        for (int i = 0; i < calls.length; i++) {
+            Call call = calls[i];
+            String address = GetAddressString(call);
+            boolean originalIsClb = (callUriAll != null && !callUriAll.isEmpty() && address.contains(callUriAll));
+            Call.State call1State = call.getState();
+            if(originalIsClb) {
+                Log.i("[Manager] call " + i + " state: " + call1State + " address: " + address);
+                Log.i("[Manager] end call before answering new call, cause a CLB call with pause is not allowed.");
+                call.terminate();
+                return;
+            }
+        }
+
+    }
 }
