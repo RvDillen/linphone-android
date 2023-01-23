@@ -31,22 +31,18 @@ import org.linphone.utils.LinphoneUtils
 import org.linphone.utils.TimestampUtils
 
 class CallLogsListViewModel : ViewModel() {
-    val callLogs = MutableLiveData<ArrayList<GroupedCallLogData>>()
-    val missedCallLogs = MutableLiveData<ArrayList<GroupedCallLogData>>()
+    val callLogs = MutableLiveData<List<GroupedCallLogData>>()
 
-    val missedCallLogsSelected = MutableLiveData<Boolean>()
+    val filter = MutableLiveData<CallLogsFilter>()
+
+    val showConferencesFilter = MutableLiveData<Boolean>()
 
     val contactsUpdatedEvent: MutableLiveData<Event<Boolean>> by lazy {
         MutableLiveData<Event<Boolean>>()
     }
 
     private val listener: CoreListenerStub = object : CoreListenerStub() {
-        override fun onCallStateChanged(
-            core: Core,
-            call: Call,
-            state: Call.State,
-            message: String
-        ) {
+        override fun onCallLogUpdated(core: Core, log: CallLog) {
             updateCallLogs()
         }
     }
@@ -59,8 +55,10 @@ class CallLogsListViewModel : ViewModel() {
     }
 
     init {
-        missedCallLogsSelected.value = false
+        filter.value = CallLogsFilter.ALL
         updateCallLogs()
+
+        showConferencesFilter.value = LinphoneUtils.isRemoteConferencingAvailable()
 
         coreContext.core.addListener(listener)
         coreContext.contactsManager.addListener(contactsUpdatedListener)
@@ -68,12 +66,26 @@ class CallLogsListViewModel : ViewModel() {
 
     override fun onCleared() {
         callLogs.value.orEmpty().forEach(GroupedCallLogData::destroy)
-        missedCallLogs.value.orEmpty().forEach(GroupedCallLogData::destroy)
 
         coreContext.contactsManager.removeListener(contactsUpdatedListener)
         coreContext.core.removeListener(listener)
 
         super.onCleared()
+    }
+
+    fun showAllCallLogs() {
+        filter.value = CallLogsFilter.ALL
+        updateCallLogs()
+    }
+
+    fun showOnlyMissedCallLogs() {
+        filter.value = CallLogsFilter.MISSED
+        updateCallLogs()
+    }
+
+    fun showOnlyConferenceCallLogs() {
+        filter.value = CallLogsFilter.CONFERENCE
+        updateCallLogs()
     }
 
     fun deleteCallLogGroup(callLog: GroupedCallLogData?) {
@@ -96,65 +108,59 @@ class CallLogsListViewModel : ViewModel() {
         updateCallLogs()
     }
 
-    private fun updateCallLogs() {
-        callLogs.value.orEmpty().forEach(GroupedCallLogData::destroy)
-        missedCallLogs.value.orEmpty().forEach(GroupedCallLogData::destroy)
-
-        val list = arrayListOf<GroupedCallLogData>()
-        val missedList = arrayListOf<GroupedCallLogData>()
-
+    private fun computeCallLogs(callLogs: Array<CallLog>, missed: Boolean, conference: Boolean): ArrayList<GroupedCallLogData> {
         var previousCallLogGroup: GroupedCallLogData? = null
-        var previousMissedCallLogGroup: GroupedCallLogData? = null
-        for (callLog in coreContext.core.callLogs) {
-            if (previousCallLogGroup == null) {
-                previousCallLogGroup = GroupedCallLogData(callLog)
-            } else if (previousCallLogGroup.lastCallLog.localAddress.weakEqual(callLog.localAddress) &&
-                previousCallLogGroup.lastCallLog.remoteAddress.weakEqual(callLog.remoteAddress)
-            ) {
-                if (TimestampUtils.isSameDay(previousCallLogGroup.lastCallLog.startDate, callLog.startDate)) {
-                    previousCallLogGroup.callLogs.add(callLog)
-                    previousCallLogGroup.lastCallLog = callLog
+        val list = arrayListOf<GroupedCallLogData>()
+
+        for (callLog in callLogs) {
+            if ((!missed && !conference) || (missed && LinphoneUtils.isCallLogMissed(callLog)) || (conference && callLog.wasConference())) {
+                if (previousCallLogGroup == null) {
+                    previousCallLogGroup = GroupedCallLogData(callLog)
+                } else if (!callLog.wasConference() && // Do not group conference call logs
+                    callLog.wasConference() == previousCallLogGroup.lastCallLog.wasConference() && // Check that both are of the same type, if one has a conf-id and not the other the equal method will return true !
+                    previousCallLogGroup.lastCallLog.localAddress.weakEqual(callLog.localAddress) &&
+                    previousCallLogGroup.lastCallLog.remoteAddress.equal(callLog.remoteAddress)
+                ) {
+                    if (TimestampUtils.isSameDay(
+                            previousCallLogGroup.lastCallLog.startDate,
+                            callLog.startDate
+                        )
+                    ) {
+                        previousCallLogGroup.callLogs.add(callLog)
+                        previousCallLogGroup.lastCallLog = callLog
+                    } else {
+                        list.add(previousCallLogGroup)
+                        previousCallLogGroup = GroupedCallLogData(callLog)
+                    }
                 } else {
                     list.add(previousCallLogGroup)
                     previousCallLogGroup = GroupedCallLogData(callLog)
                 }
-            } else {
-                list.add(previousCallLogGroup)
-                previousCallLogGroup = GroupedCallLogData(callLog)
-            }
-
-            if (LinphoneUtils.isCallLogMissed(callLog)) {
-                if (previousMissedCallLogGroup == null) {
-                    previousMissedCallLogGroup = GroupedCallLogData(callLog)
-                } else if (previousMissedCallLogGroup.lastCallLog.localAddress.weakEqual(callLog.localAddress) &&
-                    previousMissedCallLogGroup.lastCallLog.remoteAddress.weakEqual(callLog.remoteAddress)
-                ) {
-                    if (TimestampUtils.isSameDay(previousMissedCallLogGroup.lastCallLog.startDate, callLog.startDate)) {
-                        previousMissedCallLogGroup.callLogs.add(callLog)
-                        previousMissedCallLogGroup.lastCallLog = callLog
-                    } else {
-                        missedList.add(previousMissedCallLogGroup)
-                        previousMissedCallLogGroup = GroupedCallLogData(callLog)
-                    }
-                } else {
-                    missedList.add(previousMissedCallLogGroup)
-                    previousMissedCallLogGroup = GroupedCallLogData(callLog)
-                }
             }
         }
-
         if (previousCallLogGroup != null && !list.contains(previousCallLogGroup)) {
             list.add(previousCallLogGroup)
         }
-        if (previousMissedCallLogGroup != null && !missedList.contains(previousMissedCallLogGroup)) {
-            missedList.add(previousMissedCallLogGroup)
-        }
 
-        // CLB: Remove calls from CLB Hardware out of History
-        val list_NoCSerie = org.linphone.clb.CallFilter.RemoveCallsFromHardware(list)
-        val missedList_NoCSerie = org.linphone.clb.CallFilter.RemoveCallsFromHardware(missedList)
-
-        callLogs.value = ArrayList(list_NoCSerie)
-        missedCallLogs.value = ArrayList(missedList_NoCSerie)
+        return list
     }
+
+    private fun updateCallLogs() {
+        callLogs.value.orEmpty().forEach(GroupedCallLogData::destroy)
+
+        val allCallLogs = coreContext.core.callLogs
+        Log.i("[Call Logs] ${allCallLogs.size} call logs found")
+
+        callLogs.value = when (filter.value) {
+            CallLogsFilter.MISSED -> computeCallLogs(allCallLogs, missed = true, conference = false)
+            CallLogsFilter.CONFERENCE -> computeCallLogs(allCallLogs, missed = false, conference = true)
+            else -> computeCallLogs(allCallLogs, missed = false, conference = false)
+        }
+    }
+}
+
+enum class CallLogsFilter {
+    ALL,
+    MISSED,
+    CONFERENCE
 }

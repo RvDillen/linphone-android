@@ -24,27 +24,28 @@ import android.content.res.Configuration
 import android.os.Bundle
 import android.view.View
 import androidx.core.content.ContextCompat
-import androidx.core.view.doOnPreDraw
 import androidx.lifecycle.ViewModelProvider
 import androidx.navigation.fragment.NavHostFragment
 import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import androidx.slidingpanelayout.widget.SlidingPaneLayout
 import com.google.android.material.transition.MaterialSharedAxis
 import org.linphone.LinphoneApplication.Companion.coreContext
 import org.linphone.LinphoneApplication.Companion.corePreferences
 import org.linphone.R
+import org.linphone.activities.*
 import org.linphone.activities.clearDisplayedCallHistory
+import org.linphone.activities.main.MainActivity
 import org.linphone.activities.main.fragments.MasterFragment
 import org.linphone.activities.main.history.adapters.CallLogsListAdapter
 import org.linphone.activities.main.history.data.GroupedCallLogData
 import org.linphone.activities.main.history.viewmodels.CallLogsListViewModel
 import org.linphone.activities.main.viewmodels.DialogViewModel
-import org.linphone.activities.main.viewmodels.SharedMainViewModel
 import org.linphone.activities.main.viewmodels.TabsViewModel
 import org.linphone.activities.navigateToCallHistory
+import org.linphone.activities.navigateToConferenceCallHistory
 import org.linphone.activities.navigateToDialer
+import org.linphone.core.ConferenceInfo
 import org.linphone.core.tools.Log
 import org.linphone.databinding.HistoryMasterFragmentBinding
 import org.linphone.utils.*
@@ -52,7 +53,6 @@ import org.linphone.utils.*
 class MasterCallLogsFragment : MasterFragment<HistoryMasterFragmentBinding, CallLogsListAdapter>() {
     override val dialogConfirmationMessageBeforeRemoval = R.plurals.history_delete_dialog
     private lateinit var listViewModel: CallLogsListViewModel
-    private lateinit var sharedViewModel: SharedMainViewModel
 
     private val observer = object : RecyclerView.AdapterDataObserver() {
         override fun onItemRangeInserted(positionStart: Int, itemCount: Int) {
@@ -94,21 +94,8 @@ class MasterCallLogsFragment : MasterFragment<HistoryMasterFragmentBinding, Call
 
         /* Shared view model & sliding pane related */
 
-        sharedViewModel = requireActivity().run {
-            ViewModelProvider(this)[SharedMainViewModel::class.java]
-        }
+        setUpSlidingPane(binding.slidingPane)
 
-        view.doOnPreDraw { sharedViewModel.isSlidingPaneSlideable.value = binding.slidingPane.isSlideable }
-
-        sharedViewModel.closeSlidingPaneEvent.observe(
-            viewLifecycleOwner
-        ) {
-            it.consume {
-                if (!binding.slidingPane.closePane()) {
-                    goBack()
-                }
-            }
-        }
         sharedViewModel.layoutChangedEvent.observe(
             viewLifecycleOwner
         ) {
@@ -124,7 +111,6 @@ class MasterCallLogsFragment : MasterFragment<HistoryMasterFragmentBinding, Call
                 }
             }
         }
-        binding.slidingPane.lockMode = SlidingPaneLayout.LOCK_MODE_LOCKED
 
         /* End of shared view model & sliding pane related */
 
@@ -139,7 +125,7 @@ class MasterCallLogsFragment : MasterFragment<HistoryMasterFragmentBinding, Call
             listSelectionViewModel.isEditionEnabled.value = true
         }
 
-        val layoutManager = LinearLayoutManager(activity)
+        val layoutManager = LinearLayoutManager(requireContext())
         binding.callLogsList.layoutManager = layoutManager
 
         // Swipe action
@@ -158,25 +144,30 @@ class MasterCallLogsFragment : MasterFragment<HistoryMasterFragmentBinding, Call
                 val viewModel = DialogViewModel(getString(R.string.history_delete_one_dialog))
                 val dialog: Dialog = DialogUtils.getDialog(requireContext(), viewModel)
 
-                viewModel.showCancelButton {
-                    adapter.notifyItemChanged(viewHolder.bindingAdapterPosition)
-                    dialog.dismiss()
-                }
-
-                viewModel.showDeleteButton(
-                    {
-                        val deletedCallGroup = adapter.currentList[viewHolder.bindingAdapterPosition]
-                        listViewModel.deleteCallLogGroup(deletedCallGroup)
-                        if (!binding.slidingPane.isSlideable &&
-                            deletedCallGroup.lastCallLog.callId == sharedViewModel.selectedCallLogGroup.value?.lastCallLog?.callId
-                        ) {
-                            Log.i("[History] Currently displayed history has been deleted, removing detail fragment")
-                            clearDisplayedCallHistory()
-                        }
+                val index = viewHolder.bindingAdapterPosition
+                if (index < 0 || index >= adapter.currentList.size) {
+                    Log.e("[History] Index is out of bound, can't delete call log")
+                } else {
+                    viewModel.showCancelButton {
+                        adapter.notifyItemChanged(index)
                         dialog.dismiss()
-                    },
-                    getString(R.string.dialog_delete)
-                )
+                    }
+
+                    viewModel.showDeleteButton(
+                        {
+                            val deletedCallGroup = adapter.currentList[index]
+                            listViewModel.deleteCallLogGroup(deletedCallGroup)
+                            if (!binding.slidingPane.isSlideable &&
+                                deletedCallGroup.lastCallLog.callId == sharedViewModel.selectedCallLogGroup.value?.lastCallLog?.callId
+                            ) {
+                                Log.i("[History] Currently displayed history has been deleted, removing detail fragment")
+                                clearDisplayedCallHistory()
+                            }
+                            dialog.dismiss()
+                        },
+                        getString(R.string.dialog_delete)
+                    )
+                }
 
                 dialog.show()
             }
@@ -194,34 +185,14 @@ class MasterCallLogsFragment : MasterFragment<HistoryMasterFragmentBinding, Call
         listViewModel.callLogs.observe(
             viewLifecycleOwner
         ) { callLogs ->
-            if (listViewModel.missedCallLogsSelected.value == false) {
-                adapter.submitList(callLogs)
-            }
-        }
-
-        listViewModel.missedCallLogs.observe(
-            viewLifecycleOwner
-        ) { callLogs ->
-            if (listViewModel.missedCallLogsSelected.value == true) {
-                adapter.submitList(callLogs)
-            }
-        }
-
-        listViewModel.missedCallLogsSelected.observe(
-            viewLifecycleOwner
-        ) {
-            if (it) {
-                adapter.submitList(listViewModel.missedCallLogs.value)
-            } else {
-                adapter.submitList(listViewModel.callLogs.value)
-            }
+            adapter.submitList(callLogs)
         }
 
         listViewModel.contactsUpdatedEvent.observe(
             viewLifecycleOwner
         ) {
             it.consume {
-                adapter.notifyDataSetChanged()
+                adapter.notifyItemRangeChanged(0, adapter.itemCount)
             }
         }
 
@@ -230,37 +201,63 @@ class MasterCallLogsFragment : MasterFragment<HistoryMasterFragmentBinding, Call
         ) {
             it.consume { callLog ->
                 sharedViewModel.selectedCallLogGroup.value = callLog
-                navigateToCallHistory(binding.slidingPane)
-            }
-        }
-
-        adapter.startCallToEvent.observe(
-            viewLifecycleOwner
-        ) {
-            it.consume { callLogGroup ->
-                val remoteAddress = callLogGroup.lastCallLog.remoteAddress
-                if (coreContext.core.callsNb > 0) {
-                    Log.i("[History] Starting dialer with pre-filled URI ${remoteAddress.asStringUriOnly()}, is transfer? ${sharedViewModel.pendingCallTransfer}")
-                    sharedViewModel.updateDialerAnimationsBasedOnDestination.value =
-                        Event(R.id.masterCallLogsFragment)
-                    val args = Bundle()
-                    args.putString("URI", remoteAddress.asStringUriOnly())
-                    args.putBoolean("Transfer", sharedViewModel.pendingCallTransfer)
-                    // If auto start call setting is enabled, ignore it
-                    args.putBoolean("SkipAutoCallStart", true)
-                    navigateToDialer(args)
+                if (callLog.lastCallLog.wasConference()) {
+                    navigateToConferenceCallHistory(binding.slidingPane)
                 } else {
-                    val localAddress = callLogGroup.lastCallLog.localAddress
-                    coreContext.startCall(remoteAddress, localAddress = localAddress)
+                    navigateToCallHistory(binding.slidingPane)
                 }
             }
         }
 
-        binding.setAllCallLogsToggleClickListener {
-            listViewModel.missedCallLogsSelected.value = false
-        }
-        binding.setMissedCallLogsToggleClickListener {
-            listViewModel.missedCallLogsSelected.value = true
+        adapter.startCallToEvent.observe(
+            viewLifecycleOwner,
+        ) {
+            it.consume { callLogGroup ->
+                val callLog = callLogGroup.lastCallLog
+                val conferenceInfo = callLog.conferenceInfo
+                when {
+                    conferenceInfo != null -> {
+                        if (conferenceInfo.state == ConferenceInfo.State.Cancelled) {
+                            var snackRes = R.string.conference_scheduled_cancelled_by_organizer
+
+                            val organizer = conferenceInfo.organizer
+                            if (organizer != null) {
+                                val localAccount = coreContext.core.accountList.find { account ->
+                                    val address = account.params.identityAddress
+                                    address != null && organizer.weakEqual(address)
+                                }
+                                if (localAccount != null) {
+                                    snackRes = R.string.conference_scheduled_cancelled_by_me
+                                }
+                            }
+
+                            val activity = requireActivity() as MainActivity
+                            activity.showSnackBar(snackRes)
+                        } else {
+                            navigateToConferenceWaitingRoom(
+                                conferenceInfo.uri?.asStringUriOnly().orEmpty(),
+                                conferenceInfo.subject
+                            )
+                        }
+                    }
+                    coreContext.core.callsNb > 0 -> {
+                        val cleanAddress = LinphoneUtils.getCleanedAddress(callLog.remoteAddress)
+                        Log.i("[History] Starting dialer with pre-filled URI ${cleanAddress.asStringUriOnly()}, is transfer? ${sharedViewModel.pendingCallTransfer}")
+                        sharedViewModel.updateDialerAnimationsBasedOnDestination.value = Event(R.id.masterCallLogsFragment)
+                        val args = Bundle()
+                        args.putString("URI", cleanAddress.asStringUriOnly())
+                        args.putBoolean("Transfer", sharedViewModel.pendingCallTransfer)
+                        args.putBoolean("SkipAutoCallStart", true) // If auto start call setting is enabled, ignore it
+                        navigateToDialer(args)
+                    }
+                    else -> {
+                        val cleanAddress = LinphoneUtils.getCleanedAddress(callLog.remoteAddress)
+                        val localAddress = callLogGroup.lastCallLog.localAddress
+                        Log.i("[History] Starting call to ${cleanAddress.asStringUriOnly()} with local address ${localAddress.asStringUriOnly()}")
+                        coreContext.startCall(cleanAddress, localAddress = localAddress)
+                    }
+                }
+            }
         }
 
         coreContext.core.resetMissedCallsCount()

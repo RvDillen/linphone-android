@@ -108,14 +108,7 @@ class CallSettingsViewModel : GenericSettingsViewModel() {
     val enableTelecomManagerEvent: MutableLiveData<Event<Boolean>> by lazy {
         MutableLiveData<Event<Boolean>>()
     }
-    val api26OrHigher = MutableLiveData<Boolean>()
-
-    val fullScreenListener = object : SettingListenerStub() {
-        override fun onBoolValueChanged(newValue: Boolean) {
-            prefs.fullScreenCallUI = newValue
-        }
-    }
-    val fullScreen = MutableLiveData<Boolean>()
+    val api29OrHigher = MutableLiveData<Boolean>()
 
     val overlayListener = object : SettingListenerStub() {
         override fun onBoolValueChanged(newValue: Boolean) {
@@ -126,9 +119,7 @@ class CallSettingsViewModel : GenericSettingsViewModel() {
 
     val systemWideOverlayListener = object : SettingListenerStub() {
         override fun onBoolValueChanged(newValue: Boolean) {
-            if (Version.sdkAboveOrEqual(Version.API23_MARSHMALLOW_60)) {
-                if (newValue) systemWideOverlayEnabledEvent.value = Event(true)
-            }
+            if (newValue) systemWideOverlayEnabledEvent.value = Event(true)
             prefs.systemWideCallOverlay = newValue
         }
     }
@@ -155,6 +146,13 @@ class CallSettingsViewModel : GenericSettingsViewModel() {
         }
     }
     val autoStartCallRecording = MutableLiveData<Boolean>()
+
+    val remoteCallRecordingListener = object : SettingListenerStub() {
+        override fun onBoolValueChanged(newValue: Boolean) {
+            core.isRecordAwareEnabled = newValue
+        }
+    }
+    val remoteCallRecording = MutableLiveData<Boolean>()
 
     val autoStartListener = object : SettingListenerStub() {
         override fun onBoolValueChanged(newValue: Boolean) {
@@ -245,14 +243,14 @@ class CallSettingsViewModel : GenericSettingsViewModel() {
         encryptionMandatory.value = core.isMediaEncryptionMandatory
 
         useTelecomManager.value = prefs.useTelecomManager
-        api26OrHigher.value = Version.sdkAboveOrEqual(Version.API26_O_80)
+        api29OrHigher.value = Version.sdkAboveOrEqual(Version.API29_ANDROID_10)
 
-        fullScreen.value = prefs.fullScreenCallUI
         overlay.value = prefs.showCallOverlay
         systemWideOverlay.value = prefs.systemWideCallOverlay
         sipInfoDtmf.value = core.useInfoForDtmf
         rfc2833Dtmf.value = core.useRfc2833ForDtmf
         autoStartCallRecording.value = prefs.automaticallyStartCallRecording
+        remoteCallRecording.value = core.isRecordAwareEnabled
         autoStart.value = prefs.callRightAway
         autoAnswer.value = prefs.autoAnswerEnabled
         autoAnswerDelay.value = prefs.autoAnswerDelay
@@ -297,7 +295,11 @@ class CallSettingsViewModel : GenericSettingsViewModel() {
             encryptionValues.add(MediaEncryption.SRTP.toInt())
         }
         if (core.mediaEncryptionSupported(MediaEncryption.ZRTP)) {
-            labels.add(prefs.getString(R.string.call_settings_media_encryption_zrtp))
+            if (core.postQuantumAvailable) {
+                labels.add(prefs.getString(R.string.call_settings_media_encryption_zrtp_post_quantum))
+            } else {
+                labels.add(prefs.getString(R.string.call_settings_media_encryption_zrtp))
+            }
             encryptionValues.add(MediaEncryption.ZRTP.toInt())
         }
         if (core.mediaEncryptionSupported(MediaEncryption.DTLS)) {

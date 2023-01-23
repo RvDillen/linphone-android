@@ -6,17 +6,14 @@
     <data>
         <import type="android.view.View"/>
         <variable
-            name="backClickListener"
-            type="android.view.View.OnClickListener"/>
-        <variable
             name="titleClickListener"
-            type="android.view.View.OnClickListener"/>
-        <variable
-            name="editClickListener"
             type="android.view.View.OnClickListener"/>
         <variable
             name="menuClickListener"
             type="android.view.View.OnClickListener"/>
+        <variable
+            name="menuLongClickListener"
+            type="android.view.View.OnLongClickListener"/>
         <variable
             name="securityIconClickListener"
             type="android.view.View.OnClickListener"/>
@@ -31,6 +28,9 @@
             type="android.view.View.OnClickListener" />
         <variable
             name="scrollToBottomClickListener"
+            type="android.view.View.OnClickListener"/>
+        <variable
+            name="groupCallListener"
             type="android.view.View.OnClickListener"/>
         <variable
             name="viewModel"
@@ -58,7 +58,6 @@
             <ImageView
                 android:id="@+id/back"
                 android:contentDescription="@string/content_description_go_back"
-                android:onClick="@{backClickListener}"
                 android:visibility="@{sharedMainViewModel.isSlidingPaneSlideable ? View.VISIBLE : View.GONE}"
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
@@ -71,14 +70,14 @@
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
                 android:layout_gravity="center_vertical|left"
-                android:layout_weight="@{viewModel.oneToOneChatRoom ? 0.4f : 0.6f}"
+                android:layout_weight="0.4"
                 android:gravity="center_vertical|left"
                 android:orientation="vertical"
                 android:paddingLeft="15dp">
 
                 <org.linphone.views.MarqueeTextView
                     android:onClick="@{titleClickListener}"
-                    android:text="@{viewModel.oneToOneChatRoom ? (viewModel.contact.fullName ?? viewModel.displayName) : viewModel.subject}"
+                    android:text="@{viewModel.oneToOneChatRoom ? (viewModel.contact.name ?? viewModel.displayName) : viewModel.subject}"
                     style="@style/toolbar_small_title_font"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
@@ -115,27 +114,28 @@
                 android:src="@drawable/call_alt_start" />
 
             <ImageView
+                android:onClick="@{groupCallListener}"
+                android:contentDescription="@string/content_description_start_call"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="0.2"
+                android:background="?attr/button_background_drawable"
+                android:padding="7dp"
+                android:enabled="@{viewModel.groupCallAvailable}"
+                android:visibility="@{viewModel.oneToOneChatRoom ? View.GONE : View.VISIBLE}"
+                android:src="@drawable/icon_video_conf_new" />
+
+            <ImageView
                 android:id="@+id/menu"
-                android:visibility="@{viewModel.hideMenu() || chatSendingViewModel.isReadOnly ? View.GONE : View.VISIBLE}"
                 android:onClick="@{menuClickListener}"
+                android:onLongClick="@{menuLongClickListener}"
                 android:contentDescription="@string/content_description_show_chat_room_menu"
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
                 android:layout_weight="0.2"
                 android:background="?attr/button_background_drawable"
                 android:padding="15dp"
-                android:src="@drawable/menu_more"/>
-
-            <ImageView
-                android:onClick="@{editClickListener}"
-                android:visibility="@{menu.visibility == View.GONE ? View.VISIBLE : View.GONE}"
-                android:contentDescription="@string/content_description_enter_edition_mode"
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="0.2"
-                android:background="?attr/button_background_drawable"
-                android:padding="15dp"
-                android:src="@drawable/delete" />
+                android:src="@drawable/icon_menu_more"/>
 
         </LinearLayout>
 
@@ -207,9 +207,12 @@
                     android:onClick="@{attachFileClickListener}"
                     android:enabled="@{chatSendingViewModel.attachFileEnabled}"
                     android:contentDescription="@string/content_description_attach_file"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:padding="10dp"
+                    android:layout_width="@dimen/chat_message_sending_icons_size"
+                    android:layout_height="@dimen/chat_message_sending_icons_size"
+                    android:paddingTop="@dimen/chat_message_sending_icons_margin"
+                    android:paddingBottom="@dimen/chat_message_sending_icons_margin"
+                    android:layout_marginStart="@dimen/chat_message_sending_icons_margin"
+                    android:layout_marginEnd="@dimen/chat_message_sending_icons_margin"
                     android:src="@drawable/chat_file" />
 
                 <ImageView
@@ -218,11 +221,12 @@
                     android:onClick="@{() -> chatSendingViewModel.toggleVoiceRecording()}"
                     android:selected="@{chatSendingViewModel.isVoiceRecording}"
                     android:contentDescription="@string/content_description_voice_recording"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:paddingTop="10dp"
-                    android:paddingBottom="10dp"
-                    android:paddingRight="10dp"
+                    android:layout_width="@dimen/chat_message_sending_icons_size"
+                    android:layout_height="@dimen/chat_message_sending_icons_size"
+                    android:paddingTop="@dimen/chat_message_sending_icons_margin"
+                    android:paddingBottom="@dimen/chat_message_sending_icons_margin"
+                    android:layout_marginStart="@dimen/chat_message_sending_icons_margin"
+                    android:layout_marginEnd="@dimen/chat_message_sending_icons_margin"
                     android:src="@drawable/record_audio_message" />
 
                 <org.linphone.activities.main.chat.views.RichEditText
@@ -252,9 +256,12 @@
                         android:onClick="@{() -> chatSendingViewModel.sendMessage()}"
                         android:enabled="@{chatSendingViewModel.sendMessageEnabled}"
                         android:contentDescription="@string/content_description_send_message"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:padding="10dp"
+                        android:layout_width="@dimen/chat_message_sending_icons_size"
+                        android:layout_height="@dimen/chat_message_sending_icons_size"
+                        android:paddingTop="@dimen/chat_message_sending_icons_margin"
+                        android:paddingBottom="@dimen/chat_message_sending_icons_margin"
+                        android:layout_marginStart="@dimen/chat_message_sending_icons_margin"
+                        android:layout_marginEnd="@dimen/chat_message_sending_icons_margin"
                         android:src="@drawable/chat_send_message" />
 
                     <ImageView
@@ -302,17 +309,17 @@
             android:visibility="@{viewModel.remoteIsComposing ? View.VISIBLE : View.GONE}" />
 
         <ImageView
-            android:src="@{viewModel.securityLevelIcon, default=@drawable/security_alert_indicator}"
-            android:visibility="@{viewModel.encryptedChatRoom ? View.VISIBLE : View.GONE}"
-            android:onClick="@{securityIconClickListener}"
-            android:contentDescription="@{viewModel.securityLevelContentDescription}"
-            android:adjustViewBounds="true"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_below="@id/top_bar"
             android:layout_alignParentRight="true"
             android:layout_marginTop="8dp"
-            android:layout_marginRight="8dp" />
+            android:layout_marginRight="8dp"
+            android:adjustViewBounds="true"
+            android:contentDescription="@{viewModel.securityLevelContentDescription}"
+            android:onClick="@{securityIconClickListener}"
+            android:src="@{viewModel.securityLevelIcon, default=@drawable/security_alert_indicator}"
+            android:visibility="@{viewModel.encryptedChatRoom ? View.VISIBLE : View.GONE}" />
 
         <RelativeLayout
             android:onClick="@{scrollToBottomClickListener}"

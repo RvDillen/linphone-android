@@ -2,7 +2,7 @@
 <navigation xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    android:id="@+id/settings_nav_graph.xml"
+    android:id="@+id/settings_nav_graph_xml"
     app:startDestination="@id/emptySettingsFragment">
 
     <fragment
@@ -95,6 +95,9 @@
         android:id="@+id/action_global_advancedSettingsFragment"
         app:destination="@id/advancedSettingsFragment" />
     <action
+        android:id="@+id/action_global_conferencesSettingsFragment"
+        app:destination="@id/conferencesSettingsFragment"/>
+    <action
         android:id="@+id/action_global_audioSettingsFragment"
         app:destination="@id/audioSettingsFragment" />
     <fragment
@@ -143,4 +146,9 @@
         android:name="org.linphone.activities.main.settings.fragments.LdapSettingsFragment"
         tools:layout="@layout/settings_ldap_fragment"
         android:label="LdapSettingsFragment" />
+    <fragment
+        android:id="@+id/conferencesSettingsFragment"
+        tools:layout="@layout/settings_conferences_fragment"
+        android:name="org.linphone.activities.main.settings.fragments.ConferencesSettingsFragment"
+        android:label="ConferencesSettingsFragment" />
 </navigation>

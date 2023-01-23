@@ -29,9 +29,9 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.net.Uri
-import android.os.Build
 import android.os.Bundle
 import android.view.View
+import android.widget.Toast
 import androidx.lifecycle.ViewModelProvider
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.transition.MaterialSharedAxis
@@ -43,10 +43,9 @@ import org.linphone.activities.main.MainActivity
 import org.linphone.activities.main.dialer.viewmodels.DialerViewModel
 import org.linphone.activities.main.fragments.SecureFragment
 import org.linphone.activities.main.viewmodels.DialogViewModel
-import org.linphone.activities.main.viewmodels.SharedMainViewModel
+import org.linphone.activities.navigateToConferenceScheduling
 import org.linphone.activities.navigateToConfigFileViewer
 import org.linphone.activities.navigateToContacts
-import org.linphone.clb.CallStateCLB
 import org.linphone.compatibility.Compatibility
 import org.linphone.core.tools.Log
 import org.linphone.databinding.DialerFragmentBinding
@@ -59,7 +58,6 @@ import org.linphone.utils.PermissionHelper
 
 class DialerFragment : SecureFragment<DialerFragmentBinding>() {
     private lateinit var viewModel: DialerViewModel
-    private lateinit var sharedViewModel: SharedMainViewModel
 
     private var uploadLogsInitiatedByUs = false
 
@@ -72,10 +70,6 @@ class DialerFragment : SecureFragment<DialerFragmentBinding>() {
 
         viewModel = ViewModelProvider(this)[DialerViewModel::class.java]
         binding.viewModel = viewModel
-
-        sharedViewModel = requireActivity().run {
-            ViewModelProvider(this)[SharedMainViewModel::class.java]
-        }
 
         useMaterialSharedAxisXForwardAnimation = false
         sharedViewModel.updateDialerAnimationsBasedOnDestination.observe(
@@ -105,11 +99,17 @@ class DialerFragment : SecureFragment<DialerFragmentBinding>() {
             navigateToContacts(viewModel.enteredUri.value)
         }
 
+        binding.setNewConferenceClickListener {
+            sharedViewModel.updateDialerAnimationsBasedOnDestination.value = Event(R.id.conferenceSchedulingFragment)
+            navigateToConferenceScheduling()
+        }
+
         binding.setTransferCallClickListener {
             if (viewModel.transferCall()) {
                 // Transfer has been consumed, otherwise it might have been a "bis" use
                 sharedViewModel.pendingCallTransfer = false
                 viewModel.transferVisibility.value = false
+                coreContext.onCallStarted()
             }
         }
 
@@ -149,6 +149,14 @@ class DialerFragment : SecureFragment<DialerFragmentBinding>() {
             }
         }
 
+        viewModel.onMessageToNotifyEvent.observe(
+            viewLifecycleOwner
+        ) {
+            it.consume { id ->
+                Toast.makeText(requireContext(), id, Toast.LENGTH_SHORT).show()
+            }
+        }
+
         if (corePreferences.firstStart) {
             Log.w("[Dialer] First start detected, wait for assistant to be finished to check for update & request permissions")
             return
@@ -176,12 +184,9 @@ class DialerFragment : SecureFragment<DialerFragmentBinding>() {
         Log.i("[Dialer] Pending call transfer mode = ${sharedViewModel.pendingCallTransfer}")
         viewModel.transferVisibility.value = sharedViewModel.pendingCallTransfer
 
-        // CLB: no check for update
-        // checkForUpdate()
+        checkForUpdate()
 
-        if (Version.sdkAboveOrEqual(Version.API23_MARSHMALLOW_60)) {
-            checkPermissions()
-        }
+        checkPermissions()
     }
 
     override fun onPause() {
@@ -201,17 +206,9 @@ class DialerFragment : SecureFragment<DialerFragmentBinding>() {
         uploadLogsInitiatedByUs = false
 
         viewModel.enteredUri.value = sharedViewModel.dialerUri
-
-        /* CLB Preferences
-        try {
-            PermissionHelper.instance().CheckPermissions(this.activity)
-            PermissionHelper.instance().CheckOverlayPermission(this.activity)
-        } catch (e: Exception) {
-            Log.e("PermissionHelper exception : $e.message") // handlerma
-        }
-         */
     }
 
+    @Deprecated("Deprecated in Java")
     override fun onRequestPermissionsResult(
         requestCode: Int,
         permissions: Array<out String>,
@@ -221,9 +218,10 @@ class DialerFragment : SecureFragment<DialerFragmentBinding>() {
             if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 Log.i("[Dialer] READ_PHONE_STATE permission has been granted")
                 coreContext.initPhoneStateListener()
-                CallStateCLB.instance().Restart()
+                // If first permission has been granted, continue to ask for permissions,
+                // otherwise don't do it or it will loop indefinitely
+                checkPermissions()
             }
-            checkTelecomManagerPermissions()
         } else if (requestCode == 1) {
             var allGranted = true
             for (result in grantResults) {
@@ -237,24 +235,26 @@ class DialerFragment : SecureFragment<DialerFragmentBinding>() {
             } else {
                 Log.w("[Dialer] Telecom Manager permission have been denied (at least one of them)")
             }
+        } else if (requestCode == 2) {
+            if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                Log.i("[Dialer] POST_NOTIFICATIONS permission has been granted")
+            }
+            checkTelecomManagerPermissions()
         }
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
     }
 
-    @TargetApi(Version.API23_MARSHMALLOW_60)
     private fun checkPermissions() {
-        checkReadPhoneStatePermission()
-        if (Version.sdkAboveOrEqual(Version.API26_O_80) && PermissionHelper.get().hasReadPhoneStatePermission()) {
-            // Don't check the following the previous permission is being asked
-            checkTelecomManagerPermissions()
-        }
-    }
-
-    @TargetApi(Version.API23_MARSHMALLOW_60)
-    private fun checkReadPhoneStatePermission() {
-        if (!PermissionHelper.get().hasReadPhoneStatePermission() && !Build.MODEL.contains("Myco")) {
+        if (!PermissionHelper.get().hasReadPhoneStatePermission()) {
             Log.i("[Dialer] Asking for READ_PHONE_STATE permission")
             requestPermissions(arrayOf(Manifest.permission.READ_PHONE_STATE), 0)
+        } else if (!PermissionHelper.get().hasPostNotificationsPermission()) {
+            // Don't check the following the previous permission is being asked
+            Log.i("[Dialer] Asking for POST_NOTIFICATIONS permission")
+            Compatibility.requestPostNotificationsPermission(this, 2)
+        } else if (Version.sdkAboveOrEqual(Version.API26_O_80)) {
+            // Don't check the following the previous permissions are being asked
+            checkTelecomManagerPermissions()
         }
     }
 
@@ -282,10 +282,11 @@ class DialerFragment : SecureFragment<DialerFragmentBinding>() {
         Log.i("[Dialer] Telecom Manager permissions granted")
         if (!TelecomHelper.exists()) {
             Log.i("[Dialer] Creating Telecom Helper")
-            if (requireContext().packageManager.hasSystemFeature(PackageManager.FEATURE_CONNECTION_SERVICE)) {
+            if (Compatibility.hasTelecomManagerFeature(requireContext())) {
                 TelecomHelper.create(requireContext())
             } else {
-                Log.e("[Dialer] Telecom Helper can't be created, device doesn't support connection service")
+                Log.e("[Dialer] Telecom Helper can't be created, device doesn't support connection service!")
+                return
             }
         } else {
             Log.e("[Dialer] Telecom Manager was already created ?!")
@@ -325,17 +326,14 @@ class DialerFragment : SecureFragment<DialerFragmentBinding>() {
     }
 
     private fun checkForUpdate() {
-        val url: String? = corePreferences.checkIfUpdateAvailableUrl
-        if (url != null && url.isNotEmpty()) {
-            val lastTimestamp: Int = corePreferences.lastUpdateAvailableCheckTimestamp
-            val currentTimeStamp = System.currentTimeMillis().toInt()
-            val interval: Int = corePreferences.checkUpdateAvailableInterval
-            if (lastTimestamp == 0 || currentTimeStamp - lastTimestamp >= interval) {
-                val currentVersion = BuildConfig.VERSION_NAME
-                Log.i("[Dialer] Checking for update using url [$url] and current version [$currentVersion]")
-                coreContext.core.checkForUpdate(currentVersion)
-                corePreferences.lastUpdateAvailableCheckTimestamp = currentTimeStamp
-            }
+        val lastTimestamp: Int = corePreferences.lastUpdateAvailableCheckTimestamp
+        val currentTimeStamp = System.currentTimeMillis().toInt()
+        val interval: Int = corePreferences.checkUpdateAvailableInterval
+        if (lastTimestamp == 0 || currentTimeStamp - lastTimestamp >= interval) {
+            val currentVersion = BuildConfig.VERSION_NAME
+            Log.i("[Dialer] Checking for update using current version [$currentVersion]")
+            coreContext.core.checkForUpdate(currentVersion)
+            corePreferences.lastUpdateAvailableCheckTimestamp = currentTimeStamp
         }
     }
 
@@ -349,9 +347,14 @@ class DialerFragment : SecureFragment<DialerFragmentBinding>() {
 
         viewModel.showOkButton(
             {
-                val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-                startActivity(browserIntent)
-                dialog.dismiss()
+                try {
+                    val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                    startActivity(browserIntent)
+                } catch (ise: IllegalStateException) {
+                    Log.e("[Dialer] Can't start ACTION_VIEW intent, IllegalStateException: $ise")
+                } finally {
+                    dialog.dismiss()
+                }
             },
             getString(R.string.dialog_ok)
         )

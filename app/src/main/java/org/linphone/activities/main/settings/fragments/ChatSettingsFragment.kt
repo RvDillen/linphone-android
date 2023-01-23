@@ -26,12 +26,11 @@ import android.provider.Settings
 import android.view.View
 import androidx.lifecycle.ViewModelProvider
 import org.linphone.R
+import org.linphone.activities.main.chat.viewmodels.ChatRoomsListViewModel
 import org.linphone.activities.main.settings.viewmodels.ChatSettingsViewModel
-import org.linphone.activities.navigateToEmptySetting
-import org.linphone.compatibility.Compatibility
 import org.linphone.databinding.SettingsChatFragmentBinding
 import org.linphone.mediastream.Version
-import org.linphone.utils.Event
+import org.linphone.utils.ShortcutsHelper
 
 class ChatSettingsFragment : GenericSettingFragment<SettingsChatFragmentBinding>() {
     private lateinit var viewModel: ChatSettingsViewModel
@@ -47,16 +46,14 @@ class ChatSettingsFragment : GenericSettingFragment<SettingsChatFragmentBinding>
         viewModel = ViewModelProvider(this)[ChatSettingsViewModel::class.java]
         binding.viewModel = viewModel
 
-        binding.setBackClickListener { goBack() }
-
         viewModel.launcherShortcutsEvent.observe(
             viewLifecycleOwner
         ) {
             it.consume { newValue ->
                 if (newValue) {
-                    Compatibility.createShortcutsToChatRooms(requireContext())
+                    ShortcutsHelper.createShortcutsToChatRooms(requireContext())
                 } else {
-                    Compatibility.removeShortcuts(requireContext())
+                    ShortcutsHelper.removeShortcuts(requireContext())
                 }
             }
         }
@@ -81,13 +78,18 @@ class ChatSettingsFragment : GenericSettingFragment<SettingsChatFragmentBinding>
                 }
             }
         }
+
+        viewModel.reloadChatRoomsEvent.observe(viewLifecycleOwner) {
+            it.consume {
+                reloadChatRooms()
+            }
+        }
     }
 
-    override fun goBack() {
-        if (sharedViewModel.isSlidingPaneSlideable.value == true) {
-            sharedViewModel.closeSlidingPaneEvent.value = Event(true)
-        } else {
-            navigateToEmptySetting()
+    private fun reloadChatRooms() {
+        val listViewModel = requireActivity().run {
+            ViewModelProvider(this)[ChatRoomsListViewModel::class.java]
         }
+        listViewModel.updateChatRooms()
     }
 }

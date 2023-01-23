@@ -24,6 +24,7 @@ import android.os.Bundle
 import android.view.View
 import androidx.lifecycle.ViewModelProvider
 import androidx.recyclerview.widget.LinearLayoutManager
+import org.linphone.LinphoneApplication.Companion.corePreferences
 import org.linphone.R
 import org.linphone.activities.main.MainActivity
 import org.linphone.activities.main.chat.GroupChatRoomMember
@@ -33,7 +34,6 @@ import org.linphone.activities.main.chat.viewmodels.GroupInfoViewModel
 import org.linphone.activities.main.chat.viewmodels.GroupInfoViewModelFactory
 import org.linphone.activities.main.fragments.SecureFragment
 import org.linphone.activities.main.viewmodels.DialogViewModel
-import org.linphone.activities.main.viewmodels.SharedMainViewModel
 import org.linphone.activities.navigateToChatRoom
 import org.linphone.activities.navigateToChatRoomCreation
 import org.linphone.core.Address
@@ -45,7 +45,6 @@ import org.linphone.utils.DialogUtils
 
 class GroupInfoFragment : SecureFragment<ChatRoomGroupInfoFragmentBinding>() {
     private lateinit var viewModel: GroupInfoViewModel
-    private lateinit var sharedViewModel: SharedMainViewModel
     private lateinit var adapter: GroupInfoParticipantsAdapter
     private var meAdminStatusChangedDialog: Dialog? = null
 
@@ -55,10 +54,6 @@ class GroupInfoFragment : SecureFragment<ChatRoomGroupInfoFragmentBinding>() {
         super.onViewCreated(view, savedInstanceState)
 
         binding.lifecycleOwner = viewLifecycleOwner
-
-        sharedViewModel = requireActivity().run {
-            ViewModelProvider(this)[SharedMainViewModel::class.java]
-        }
 
         val chatRoom: ChatRoom? = sharedViewModel.selectedGroupChatRoom.value
         isSecure = chatRoom?.currentParams?.isEncryptionEnabled ?: false
@@ -73,11 +68,11 @@ class GroupInfoFragment : SecureFragment<ChatRoomGroupInfoFragmentBinding>() {
 
         adapter = GroupInfoParticipantsAdapter(
             viewLifecycleOwner,
-            chatRoom?.hasCapability(ChatRoomCapabilities.Encrypted.toInt()) ?: viewModel.isEncrypted.value == true
+            chatRoom?.hasCapability(ChatRoomCapabilities.Encrypted.toInt()) ?: (viewModel.isEncrypted.value == true)
         )
         binding.participants.adapter = adapter
 
-        val layoutManager = LinearLayoutManager(activity)
+        val layoutManager = LinearLayoutManager(requireContext())
         binding.participants.layoutManager = layoutManager
 
         // Divider between items
@@ -113,10 +108,6 @@ class GroupInfoFragment : SecureFragment<ChatRoomGroupInfoFragmentBinding>() {
 
         addParticipantsFromSharedViewModel()
 
-        binding.setBackClickListener {
-            goBack()
-        }
-
         viewModel.createdChatRoomEvent.observe(
             viewLifecycleOwner
         ) {
@@ -142,7 +133,7 @@ class GroupInfoFragment : SecureFragment<ChatRoomGroupInfoFragmentBinding>() {
         }
 
         binding.setParticipantsClickListener {
-            sharedViewModel.createEncryptedChatRoom = viewModel.isEncrypted.value == true
+            sharedViewModel.createEncryptedChatRoom = corePreferences.forceEndToEndEncryptedChat || viewModel.isEncrypted.value == true
 
             val list = arrayListOf<Address>()
             for (participant in viewModel.participants.value.orEmpty()) {
@@ -175,7 +166,7 @@ class GroupInfoFragment : SecureFragment<ChatRoomGroupInfoFragmentBinding>() {
             dialog.show()
         }
 
-        viewModel.onErrorEvent.observe(
+        viewModel.onMessageToNotifyEvent.observe(
             viewLifecycleOwner
         ) {
             it.consume { messageResourceId ->

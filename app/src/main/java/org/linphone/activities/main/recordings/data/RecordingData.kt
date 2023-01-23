@@ -29,10 +29,10 @@ import java.util.regex.Pattern
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.ticker
 import org.linphone.LinphoneApplication.Companion.coreContext
-import org.linphone.core.AudioDevice
 import org.linphone.core.Player
 import org.linphone.core.PlayerListener
 import org.linphone.core.tools.Log
+import org.linphone.utils.AudioRouteUtils
 import org.linphone.utils.LinphoneUtils
 
 class RecordingData(val path: String, private val recordingListener: RecordingListener) : Comparable<RecordingData> {
@@ -79,7 +79,7 @@ class RecordingData(val path: String, private val recordingListener: RecordingLi
             width: Int,
             height: Int
         ) {
-            Log.i("[Recording VM] Surface texture should be available now")
+            Log.i("[Recording] Surface texture should be available now")
             player.setWindowId(surface)
         }
     }
@@ -119,16 +119,18 @@ class RecordingData(val path: String, private val recordingListener: RecordingLi
             player.open(path)
             player.seek(0)
         }
-        recordingListener.onPlayingStarted(isVideoAvailable())
 
         player.start()
         isPlaying.value = true
+        recordingListener.onPlayingStarted(isVideoAvailable())
 
         scope.launch {
             withContext(Dispatchers.IO) {
                 for (tick in tickerChannel) {
-                    if (player.state == Player.State.Playing) {
-                        updatePosition()
+                    withContext(Dispatchers.Main) {
+                        if (player.state == Player.State.Playing) {
+                            updatePosition()
+                        }
                     }
                 }
             }
@@ -155,7 +157,7 @@ class RecordingData(val path: String, private val recordingListener: RecordingLi
     }
 
     fun setTextureView(textureView: TextureView) {
-        Log.i("[Recording VM] Is TextureView available? ${textureView.isAvailable}")
+        Log.i("[Recording] Is TextureView available? ${textureView.isAvailable}")
         if (textureView.isAvailable) {
             player.setWindowId(textureView.surfaceTexture)
         } else {
@@ -163,28 +165,17 @@ class RecordingData(val path: String, private val recordingListener: RecordingLi
         }
     }
 
-    private fun initPlayer() {
-        // In case no headphones/headset is connected, use speaker sound card to play recordings, otherwise use earpiece
-        // If none are available, default one will be used
-        var headphonesCard: String? = null
-        var speakerCard: String? = null
-        var earpieceCard: String? = null
-        for (device in coreContext.core.audioDevices) {
-            if (device.hasCapability(AudioDevice.Capabilities.CapabilityPlay)) {
-                if (device.type == AudioDevice.Type.Speaker) {
-                    speakerCard = device.id
-                } else if (device.type == AudioDevice.Type.Earpiece) {
-                    earpieceCard = device.id
-                } else if (device.type == AudioDevice.Type.Headphones || device.type == AudioDevice.Type.Headset) {
-                    headphonesCard = device.id
-                }
-            }
-        }
-        Log.i("[Recording VM] Found headset/headphones sound card [$headphonesCard], speaker sound card [$speakerCard] and earpiece sound card [$earpieceCard]")
+    fun export() {
+        recordingListener.onExportClicked(path)
+    }
 
-        val localPlayer = coreContext.core.createLocalPlayer(headphonesCard ?: speakerCard ?: earpieceCard, null, null)
+    private fun initPlayer() {
+        val playbackSoundCard = AudioRouteUtils.getAudioPlaybackDeviceIdForCallRecordingOrVoiceMessage()
+        Log.i("[Recording] Using device $playbackSoundCard to make the call recording playback")
+
+        val localPlayer = coreContext.core.createLocalPlayer(playbackSoundCard, null, null)
         if (localPlayer != null) player = localPlayer
-        else Log.e("[Recording VM] Couldn't create local player!")
+        else Log.e("[Recording] Couldn't create local player!")
         player.addListener(listener)
 
         player.open(path)
@@ -213,5 +204,6 @@ class RecordingData(val path: String, private val recordingListener: RecordingLi
     interface RecordingListener {
         fun onPlayingStarted(videoAvailable: Boolean)
         fun onPlayingEnded()
+        fun onExportClicked(path: String)
     }
 }

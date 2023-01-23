@@ -21,26 +21,20 @@ package org.linphone.activities.main.history.fragments
 
 import android.os.Bundle
 import android.view.View
-import androidx.lifecycle.ViewModelProvider
 import androidx.navigation.fragment.findNavController
 import org.linphone.LinphoneApplication.Companion.coreContext
 import org.linphone.R
 import org.linphone.activities.*
 import org.linphone.activities.main.*
 import org.linphone.activities.main.history.viewmodels.CallLogViewModel
-import org.linphone.activities.main.history.viewmodels.CallLogViewModelFactory
-import org.linphone.activities.main.viewmodels.SharedMainViewModel
 import org.linphone.activities.navigateToContact
 import org.linphone.activities.navigateToContacts
-import org.linphone.activities.navigateToFriend
-import org.linphone.contact.NativeContact
 import org.linphone.core.tools.Log
 import org.linphone.databinding.HistoryDetailFragmentBinding
 import org.linphone.utils.Event
 
 class DetailCallLogFragment : GenericFragment<HistoryDetailFragmentBinding>() {
     private lateinit var viewModel: CallLogViewModel
-    private lateinit var sharedViewModel: SharedMainViewModel
 
     override fun getLayoutId(): Int = R.layout.history_detail_fragment
 
@@ -49,52 +43,42 @@ class DetailCallLogFragment : GenericFragment<HistoryDetailFragmentBinding>() {
 
         binding.lifecycleOwner = viewLifecycleOwner
 
-        sharedViewModel = requireActivity().run {
-            ViewModelProvider(this)[SharedMainViewModel::class.java]
-        }
         binding.sharedMainViewModel = sharedViewModel
 
         val callLogGroup = sharedViewModel.selectedCallLogGroup.value
         if (callLogGroup == null) {
             Log.e("[History] Call log group is null, aborting!")
-            // (activity as MainActivity).showSnackBar(R.string.error)
             findNavController().navigateUp()
             return
         }
 
-        viewModel = ViewModelProvider(
-            this,
-            CallLogViewModelFactory(callLogGroup.lastCallLog)
-        )[CallLogViewModel::class.java]
+        viewModel = callLogGroup.lastCallLogViewModel
         binding.viewModel = viewModel
-
-        useMaterialSharedAxisXForwardAnimation = sharedViewModel.isSlidingPaneSlideable.value == false
-
         viewModel.addRelatedCallLogs(callLogGroup.callLogs)
 
-        binding.setBackClickListener {
-            goBack()
-        }
+        useMaterialSharedAxisXForwardAnimation = sharedViewModel.isSlidingPaneSlideable.value == false
 
         binding.setNewContactClickListener {
             val copy = viewModel.callLog.remoteAddress.clone()
             copy.clean()
-            Log.i("[History] Creating contact with SIP URI: ${copy.asStringUriOnly()}")
+            val address = copy.asStringUriOnly()
+            Log.i("[History] Creating contact with SIP URI: $address")
             sharedViewModel.updateContactsAnimationsBasedOnDestination.value = Event(R.id.masterCallLogsFragment)
-            navigateToContacts(copy.asStringUriOnly())
+            navigateToContacts(address)
         }
 
         binding.setContactClickListener {
             sharedViewModel.updateContactsAnimationsBasedOnDestination.value = Event(R.id.masterCallLogsFragment)
-            val contact = viewModel.contact.value as? NativeContact
-            if (contact != null) {
-                Log.i("[History] Displaying contact $contact")
-                navigateToContact(contact)
+            val contactId = viewModel.contact.value?.refKey
+            if (contactId != null) {
+                Log.i("[History] Displaying contact $contactId")
+                navigateToContact(contactId)
             } else {
                 val copy = viewModel.callLog.remoteAddress.clone()
                 copy.clean()
-                Log.i("[History] Displaying friend with address ${copy.asStringUriOnly()}")
-                navigateToFriend(copy)
+                val address = copy.asStringUriOnly()
+                Log.i("[History] Displaying friend with address $address")
+                navigateToContact(address)
             }
         }
 
@@ -102,7 +86,10 @@ class DetailCallLogFragment : GenericFragment<HistoryDetailFragmentBinding>() {
             viewLifecycleOwner
         ) {
             it.consume { callLog ->
-                val address = callLog.remoteAddress
+                // To remove the GRUU if any
+                val address = callLog.remoteAddress.clone()
+                address.clean()
+
                 if (coreContext.core.callsNb > 0) {
                     Log.i("[History] Starting dialer with pre-filled URI ${address.asStringUriOnly()}, is transfer? ${sharedViewModel.pendingCallTransfer}")
                     sharedViewModel.updateDialerAnimationsBasedOnDestination.value =
@@ -118,6 +105,7 @@ class DetailCallLogFragment : GenericFragment<HistoryDetailFragmentBinding>() {
                     navigateToDialer(args)
                 } else {
                     val localAddress = callLog.localAddress
+                    Log.i("[History] Starting call to ${address.asStringUriOnly()} with local address ${localAddress.asStringUriOnly()}")
                     coreContext.startCall(address, localAddress = localAddress)
                 }
             }
@@ -134,7 +122,7 @@ class DetailCallLogFragment : GenericFragment<HistoryDetailFragmentBinding>() {
             }
         }
 
-        viewModel.onErrorEvent.observe(
+        viewModel.onMessageToNotifyEvent.observe(
             viewLifecycleOwner
         ) {
             it.consume { messageResourceId ->
@@ -143,11 +131,13 @@ class DetailCallLogFragment : GenericFragment<HistoryDetailFragmentBinding>() {
         }
     }
 
-    override fun goBack() {
-        if (sharedViewModel.isSlidingPaneSlideable.value == true) {
-            sharedViewModel.closeSlidingPaneEvent.value = Event(true)
-        } else {
-            navigateToEmptyCallHistory()
-        }
+    override fun onResume() {
+        super.onResume()
+        viewModel.enableListener(true)
+    }
+
+    override fun onPause() {
+        viewModel.enableListener(false)
+        super.onPause()
     }
 }

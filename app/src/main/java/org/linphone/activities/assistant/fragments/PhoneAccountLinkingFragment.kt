@@ -22,7 +22,7 @@ package org.linphone.activities.assistant.fragments
 import android.os.Bundle
 import android.view.View
 import androidx.lifecycle.ViewModelProvider
-import org.linphone.LinphoneApplication
+import org.linphone.LinphoneApplication.Companion.coreContext
 import org.linphone.R
 import org.linphone.activities.SnackBarActivity
 import org.linphone.activities.assistant.viewmodels.*
@@ -30,10 +30,9 @@ import org.linphone.activities.navigateToEchoCancellerCalibration
 import org.linphone.activities.navigateToPhoneAccountValidation
 import org.linphone.core.tools.Log
 import org.linphone.databinding.AssistantPhoneAccountLinkingFragmentBinding
-import org.linphone.mediastream.Version
 
 class PhoneAccountLinkingFragment : AbstractPhoneFragment<AssistantPhoneAccountLinkingFragmentBinding>() {
-    private lateinit var sharedViewModel: SharedAssistantViewModel
+    private lateinit var sharedAssistantViewModel: SharedAssistantViewModel
     override lateinit var viewModel: PhoneAccountLinkingViewModel
 
     override fun getLayoutId(): Int = R.layout.assistant_phone_account_linking_fragment
@@ -43,11 +42,11 @@ class PhoneAccountLinkingFragment : AbstractPhoneFragment<AssistantPhoneAccountL
 
         binding.lifecycleOwner = viewLifecycleOwner
 
-        sharedViewModel = requireActivity().run {
+        sharedAssistantViewModel = requireActivity().run {
             ViewModelProvider(this)[SharedAssistantViewModel::class.java]
         }
 
-        val accountCreator = sharedViewModel.getAccountCreator()
+        val accountCreator = sharedAssistantViewModel.getAccountCreator()
         viewModel = ViewModelProvider(this, PhoneAccountLinkingViewModelFactory(accountCreator))[PhoneAccountLinkingViewModel::class.java]
         binding.viewModel = viewModel
 
@@ -69,7 +68,9 @@ class PhoneAccountLinkingFragment : AbstractPhoneFragment<AssistantPhoneAccountL
         }
 
         binding.setSelectCountryClickListener {
-            CountryPickerFragment(viewModel).show(childFragmentManager, "CountryPicker")
+            val countryPickerFragment = CountryPickerFragment()
+            countryPickerFragment.listener = viewModel
+            countryPickerFragment.show(childFragmentManager, "CountryPicker")
         }
 
         viewModel.goToSmsValidationEvent.observe(
@@ -87,7 +88,7 @@ class PhoneAccountLinkingFragment : AbstractPhoneFragment<AssistantPhoneAccountL
             viewLifecycleOwner
         ) {
             it.consume {
-                if (LinphoneApplication.coreContext.core.isEchoCancellerCalibrationRequired) {
+                if (coreContext.core.isEchoCancellerCalibrationRequired) {
                     navigateToEchoCancellerCalibration()
                 } else {
                     requireActivity().finish()
@@ -103,8 +104,6 @@ class PhoneAccountLinkingFragment : AbstractPhoneFragment<AssistantPhoneAccountL
             }
         }
 
-        if (Version.sdkAboveOrEqual(Version.API23_MARSHMALLOW_60)) {
-            checkPermissions()
-        }
+        checkPermissions()
     }
 }

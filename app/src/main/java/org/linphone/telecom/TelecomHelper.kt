@@ -25,16 +25,14 @@ import android.content.ComponentName
 import android.content.Context
 import android.graphics.drawable.Icon
 import android.net.Uri
-import android.os.Build
 import android.os.Bundle
 import android.telecom.PhoneAccount
 import android.telecom.PhoneAccountHandle
 import android.telecom.TelecomManager
 import android.telecom.TelecomManager.*
-import java.lang.Exception
+import kotlin.Exception
 import org.linphone.LinphoneApplication.Companion.coreContext
 import org.linphone.R
-import org.linphone.contact.Contact
 import org.linphone.core.Call
 import org.linphone.core.Core
 import org.linphone.core.CoreListenerStub
@@ -43,7 +41,7 @@ import org.linphone.utils.LinphoneUtils
 import org.linphone.utils.PermissionHelper
 import org.linphone.utils.SingletonHolder
 
-@TargetApi(26)
+@TargetApi(29)
 class TelecomHelper private constructor(context: Context) {
     companion object : SingletonHolder<TelecomHelper, Context>(::TelecomHelper)
 
@@ -85,8 +83,6 @@ class TelecomHelper private constructor(context: Context) {
     }
 
     fun isIncomingCallPermitted(): Boolean {
-        if (Build.MODEL.contains("Myco"))
-            return true
         val incomingCallPermitted = telecomManager.isIncomingCallPermitted(account.accountHandle)
         Log.i("[Telecom Helper] Is incoming call permitted? $incomingCallPermitted")
         return incomingCallPermitted
@@ -109,22 +105,27 @@ class TelecomHelper private constructor(context: Context) {
     @SuppressLint("MissingPermission")
     fun findExistingAccount(context: Context): PhoneAccount? {
         if (PermissionHelper.required(context).hasReadPhoneStateOrPhoneNumbersPermission()) {
-            var account: PhoneAccount? = null
-            val phoneAccountHandleList: List<PhoneAccountHandle> =
-                telecomManager.selfManagedPhoneAccounts
-            val connectionService = ComponentName(context, TelecomConnectionService::class.java)
-            for (phoneAccountHandle in phoneAccountHandleList) {
-                val phoneAccount: PhoneAccount = telecomManager.getPhoneAccount(phoneAccountHandle)
-                if (phoneAccountHandle.componentName == connectionService) {
-                    Log.i("[Telecom Helper] Found existing phone account: $phoneAccount")
-                    account = phoneAccount
-                    break
+            try {
+                var account: PhoneAccount? = null
+                val phoneAccountHandleList: List<PhoneAccountHandle> =
+                    telecomManager.selfManagedPhoneAccounts
+                val connectionService = ComponentName(context, TelecomConnectionService::class.java)
+                for (phoneAccountHandle in phoneAccountHandleList) {
+                    val phoneAccount: PhoneAccount =
+                        telecomManager.getPhoneAccount(phoneAccountHandle)
+                    if (phoneAccountHandle.componentName == connectionService) {
+                        Log.i("[Telecom Helper] Found existing phone account: $phoneAccount")
+                        account = phoneAccount
+                        break
+                    }
                 }
+                if (account == null) {
+                    Log.w("[Telecom Helper] Existing phone account not found")
+                }
+                return account
+            } catch (se: SecurityException) {
+                Log.w("[Telecom Helper] Can't check phone accounts: $se")
             }
-            if (account == null) {
-                Log.w("[Telecom Helper] Existing phone account not found")
-            }
-            return account
         } else {
             Log.e("[Telecom Helper] Can't search for existing phone account, missing permission(s)")
         }
@@ -183,13 +184,20 @@ class TelecomHelper private constructor(context: Context) {
             .setShortDescription(context.getString(R.string.app_description))
             .setSupportedUriSchemes(listOf(PhoneAccount.SCHEME_SIP))
             .build()
-        telecomManager.registerPhoneAccount(account)
-        Log.i("[Telecom Helper] Phone account created: $account")
+
+        try {
+            telecomManager.registerPhoneAccount(account)
+            Log.i("[Telecom Helper] Phone account created: $account")
+        } catch (uoe: UnsupportedOperationException) {
+            Log.e("[Telecom Helper] Unsupported Operation Exception: $uoe")
+        } catch (e: Exception) {
+            Log.e("[Telecom Helper] Exception: $e")
+        }
         return account
     }
 
     private fun onIncomingCall(call: Call) {
-        Log.i("[Telecom Helper] Incoming call received from ${call.remoteAddress.asStringUriOnly()}")
+        Log.i("[Telecom Helper] Incoming call received from ${call.remoteAddress.asStringUriOnly()}, using account handle ${account.accountHandle}")
 
         val extras = prepareBundle(call)
         telecomManager.addNewIncomingCall(
@@ -203,7 +211,7 @@ class TelecomHelper private constructor(context: Context) {
 
     @SuppressLint("MissingPermission")
     private fun onOutgoingCall(call: Call) {
-        Log.i("[Telecom Helper] Outgoing call started to ${call.remoteAddress.asStringUriOnly()}")
+        Log.i("[Telecom Helper] Outgoing call started to ${call.remoteAddress.asStringUriOnly()}, using account handle ${account.accountHandle}")
 
         val extras = prepareBundle(call)
         telecomManager.placeCall(
@@ -230,8 +238,8 @@ class TelecomHelper private constructor(context: Context) {
 
         extras.putString("Call-ID", call.callLog.callId)
 
-        val contact: Contact? = coreContext.contactsManager.findContactByAddress(call.remoteAddress)
-        val displayName = contact?.fullName ?: LinphoneUtils.getDisplayName(call.remoteAddress)
+        val contact = coreContext.contactsManager.findContactByAddress(call.remoteAddress)
+        val displayName = contact?.name ?: LinphoneUtils.getDisplayName(call.remoteAddress)
         extras.putString("DisplayName", displayName)
 
         return extras

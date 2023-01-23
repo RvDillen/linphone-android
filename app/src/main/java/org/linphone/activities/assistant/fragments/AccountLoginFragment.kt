@@ -35,12 +35,11 @@ import org.linphone.activities.main.viewmodels.DialogViewModel
 import org.linphone.activities.navigateToEchoCancellerCalibration
 import org.linphone.activities.navigateToPhoneAccountValidation
 import org.linphone.databinding.AssistantAccountLoginFragmentBinding
-import org.linphone.mediastream.Version
 import org.linphone.utils.DialogUtils
 
 class AccountLoginFragment : AbstractPhoneFragment<AssistantAccountLoginFragmentBinding>() {
     override lateinit var viewModel: AccountLoginViewModel
-    private lateinit var sharedViewModel: SharedAssistantViewModel
+    private lateinit var sharedAssistantViewModel: SharedAssistantViewModel
 
     override fun getLayoutId(): Int = R.layout.assistant_account_login_fragment
 
@@ -49,13 +48,13 @@ class AccountLoginFragment : AbstractPhoneFragment<AssistantAccountLoginFragment
 
         binding.lifecycleOwner = viewLifecycleOwner
 
-        sharedViewModel = requireActivity().run {
+        sharedAssistantViewModel = requireActivity().run {
             ViewModelProvider(this)[SharedAssistantViewModel::class.java]
         }
 
         viewModel = ViewModelProvider(
             this,
-            AccountLoginViewModelFactory(sharedViewModel.getAccountCreator())
+            AccountLoginViewModelFactory(sharedAssistantViewModel.getAccountCreator())
         )[AccountLoginViewModel::class.java]
         binding.viewModel = viewModel
 
@@ -68,7 +67,9 @@ class AccountLoginFragment : AbstractPhoneFragment<AssistantAccountLoginFragment
         }
 
         binding.setSelectCountryClickListener {
-            CountryPickerFragment(viewModel).show(childFragmentManager, "CountryPicker")
+            val countryPickerFragment = CountryPickerFragment()
+            countryPickerFragment.listener = viewModel
+            countryPickerFragment.show(childFragmentManager, "CountryPicker")
         }
 
         binding.setForgotPasswordClickListener {
@@ -93,7 +94,7 @@ class AccountLoginFragment : AbstractPhoneFragment<AssistantAccountLoginFragment
             viewLifecycleOwner
         ) {
             it.consume {
-                coreContext.contactsManager.updateLocalContacts()
+                coreContext.newAccountConfigured(true)
 
                 if (coreContext.core.isEchoCancellerCalibrationRequired) {
                     navigateToEchoCancellerCalibration()
@@ -136,8 +137,6 @@ class AccountLoginFragment : AbstractPhoneFragment<AssistantAccountLoginFragment
             }
         }
 
-        if (Version.sdkAboveOrEqual(Version.API23_MARSHMALLOW_60)) {
-            checkPermissions()
-        }
+        checkPermissions()
     }
 }

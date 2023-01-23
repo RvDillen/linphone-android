@@ -6,9 +6,6 @@
         <import type="android.view.View"/>
         <import type="android.text.InputType"/>
         <variable
-            name="backClickListener"
-            type="android.view.View.OnClickListener"/>
-        <variable
             name="viewModel"
             type="org.linphone.activities.main.settings.viewmodels.ChatSettingsViewModel"/>
         <variable
@@ -30,7 +27,6 @@
 
             <ImageView
                 android:id="@+id/back"
-                android:onClick="@{backClickListener}"
                 android:visibility="@{sharedMainViewModel.isSlidingPaneSlideable ? View.VISIBLE : View.GONE}"
                 android:contentDescription="@string/content_description_go_back"
                 android:layout_width="0dp"
@@ -102,7 +98,7 @@
                 <include
                     layout="@layout/settings_widget_switch"
                     linphone:title="@{@string/chat_settings_downloaded_media_public_title}"
-                    linphone:enabled="@{!viewModel.vfs &amp;&amp; viewModel.autoDownloadIndex != 1}"
+                    linphone:enabled="@{!viewModel.vfs}"
                     linphone:subtitle="@{@string/chat_settings_downloaded_media_public_summary}"
                     linphone:listener="@{viewModel.downloadedMediaPublicListener}"
                     linphone:checked="@={viewModel.downloadedMediaPublic}"/>

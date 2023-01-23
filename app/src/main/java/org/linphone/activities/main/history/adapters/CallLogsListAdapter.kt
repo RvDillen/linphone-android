@@ -65,7 +65,7 @@ class CallLogsListAdapter(
     ) : RecyclerView.ViewHolder(binding.root) {
         fun bind(callLogGroup: GroupedCallLogData) {
             with(binding) {
-                val callLogViewModel = callLogGroup.lastCallLogData
+                val callLogViewModel = callLogGroup.lastCallLogViewModel
                 viewModel = callLogViewModel
 
                 lifecycleOwner = viewLifecycleOwner
@@ -152,6 +152,6 @@ private class CallLogDiffCallback : DiffUtil.ItemCallback<GroupedCallLogData>() 
         oldItem: GroupedCallLogData,
         newItem: GroupedCallLogData
     ): Boolean {
-        return false // For headers
+        return oldItem.callLogs.size == newItem.callLogs.size
     }
 }

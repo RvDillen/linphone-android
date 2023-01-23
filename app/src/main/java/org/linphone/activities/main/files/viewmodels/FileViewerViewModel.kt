@@ -19,6 +19,7 @@
  */
 package org.linphone.activities.main.files.viewmodels
 
+import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import org.linphone.core.Content
 import org.linphone.core.tools.Log
@@ -28,10 +29,12 @@ open class FileViewerViewModel(val content: Content) : ViewModel() {
     val filePath: String
     private val deleteAfterUse: Boolean = content.isFileEncrypted
 
+    val fullScreenMode = MutableLiveData<Boolean>()
+
     init {
         filePath = if (deleteAfterUse) {
             Log.i("[File Viewer] Content is encrypted, requesting plain file path")
-            content.plainFilePath
+            content.exportPlainFile()
         } else {
             content.filePath.orEmpty()
         }
@@ -44,5 +47,9 @@ open class FileViewerViewModel(val content: Content) : ViewModel() {
         }
 
         super.onCleared()
+    }
+
+    fun toggleFullScreen() {
+        fullScreenMode.value = fullScreenMode.value != true
     }
 }

@@ -7,9 +7,6 @@
         <import type="android.view.View"/>
         <import type="android.text.InputType"/>
         <variable
-            name="backClickListener"
-            type="android.view.View.OnClickListener"/>
-        <variable
             name="viewModel"
             type="org.linphone.activities.main.settings.viewmodels.AccountSettingsViewModel"/>
         <variable
@@ -31,7 +28,6 @@
 
             <ImageView
                 android:id="@+id/back"
-                android:onClick="@{backClickListener}"
                 android:visibility="@{sharedMainViewModel.isSlidingPaneSlideable ? View.VISIBLE : View.GONE}"
                 android:contentDescription="@string/content_description_go_back"
                 android:layout_width="0dp"
@@ -134,7 +130,8 @@
                 <include
                     layout="@layout/settings_widget_basic"
                     linphone:title="@{@string/account_settings_link_phone_number_title}"
-                    linphone:listener="@{viewModel.linkPhoneNumberListener}"/>
+                    linphone:listener="@{viewModel.linkPhoneNumberListener}"
+                    android:visibility="@{viewModel.hideLinkPhoneNumber ? View.GONE : View.VISIBLE}"/>
 
                 <include
                     layout="@layout/settings_widget_basic"
@@ -229,14 +226,37 @@
                     linphone:title="@{@string/account_settings_apply_prefix_for_calls_title}"
                     linphone:subtitle="@{@string/account_settings_apply_prefix_for_calls_summary}"
                     linphone:listener="@{viewModel.dialPrefixListener}"
-                    linphone:checked="@={viewModel.dialPrefix}"
-                    android:visibility="gone"/>
+                    linphone:checked="@={viewModel.dialPrefix}"/>
 
                 <include
                     layout="@layout/settings_widget_switch"
                     linphone:title="@{@string/account_settings_escape_plus_title}"
                     linphone:listener="@{viewModel.escapePlusListener}"
                     linphone:checked="@={viewModel.escapePlus}"/>
+
+                <include
+                    layout="@layout/settings_widget_text"
+                    linphone:title="@{@string/account_setting_conference_factory_address}"
+                    linphone:listener="@{viewModel.conferenceFactoryUriListener}"
+                    linphone:defaultValue="@{viewModel.conferenceFactoryUri}"
+                    android:visibility="gone"
+                    linphone:inputType="@{InputType.TYPE_CLASS_TEXT}"/>
+
+                <include
+                    layout="@layout/settings_widget_text"
+                    linphone:title="@{@string/account_setting_audio_video_conference_factory_address}"
+                    linphone:listener="@{viewModel.audioVideoConferenceFactoryUriListener}"
+                    linphone:defaultValue="@{viewModel.audioVideoConferenceFactoryUri}"
+                    android:visibility="gone"
+                    linphone:inputType="@{InputType.TYPE_CLASS_TEXT}"/>
+
+                <include
+                    layout="@layout/settings_widget_text"
+                    linphone:title="@{@string/account_setting_end_to_end_encryption_keys_server_url}"
+                    linphone:listener="@{viewModel.limeServerUrlListener}"
+                    linphone:defaultValue="@{viewModel.limeServerUrl}"
+                    android:visibility="gone"
+                    linphone:inputType="@{InputType.TYPE_CLASS_TEXT}"/>
 
             </LinearLayout>
 

@@ -19,6 +19,7 @@
  */
 package org.linphone.notifications
 
+import android.annotation.SuppressLint
 import android.app.Notification
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -36,25 +37,18 @@ import androidx.core.content.ContextCompat
 import androidx.core.content.LocusIdCompat
 import androidx.core.graphics.drawable.IconCompat
 import androidx.navigation.NavDeepLinkBuilder
-import kotlin.collections.ArrayList
-import kotlin.collections.HashMap
 import org.linphone.LinphoneApplication.Companion.coreContext
 import org.linphone.LinphoneApplication.Companion.corePreferences
 import org.linphone.R
-import org.linphone.activities.call.CallActivity
-import org.linphone.activities.call.IncomingCallActivity
-import org.linphone.activities.call.OutgoingCallActivity
 import org.linphone.activities.chat_bubble.ChatBubbleActivity
 import org.linphone.activities.main.MainActivity
-import org.linphone.clb.CallStateCLB
+import org.linphone.activities.voip.CallActivity
 import org.linphone.compatibility.Compatibility
-import org.linphone.contact.Contact
+import org.linphone.contact.getPerson
+import org.linphone.contact.getThumbnailUri
 import org.linphone.core.*
 import org.linphone.core.tools.Log
-import org.linphone.utils.AppUtils
-import org.linphone.utils.FileUtils
-import org.linphone.utils.ImageUtils
-import org.linphone.utils.LinphoneUtils
+import org.linphone.utils.*
 
 class Notifiable(val notificationId: Int) {
     val messages: ArrayList<NotifiableMessage> = arrayListOf()
@@ -68,7 +62,7 @@ class Notifiable(val notificationId: Int) {
 
 class NotifiableMessage(
     var message: String,
-    val contact: Contact?,
+    val friend: Friend?,
     val sender: String,
     val time: Long,
     val senderAvatar: Bitmap? = null,
@@ -107,7 +101,7 @@ class NotificationsManager(private val context: Context) {
     private var currentForegroundServiceNotificationId: Int = 0
     private var serviceNotification: Notification? = null
 
-    var service: CoreService? = null
+    private var service: CoreService? = null
 
     var currentlyDisplayedChatRoomAddress: String? = null
 
@@ -121,29 +115,39 @@ class NotificationsManager(private val context: Context) {
             Log.i("[Notifications Manager] Call state changed [$state]")
 
             if (corePreferences.preventInterfaceFromShowingUp) {
-                Log.w("[Context] We were asked to not show the call notifications")
+                Log.w("[Notifications Manager] We were asked to not show the call notifications")
                 return
             }
 
             when (call.state) {
-                Call.State.IncomingEarlyMedia, Call.State.IncomingReceived -> displayIncomingCallNotification(call)
+                Call.State.IncomingEarlyMedia, Call.State.IncomingReceived -> {
+                    if (service != null) {
+                        Log.i("[Notifications Manager] Service isn't null, show incoming call notification")
+                        displayIncomingCallNotification(call, false)
+                    } else {
+                        Log.w("[Notifications Manager] No service found, waiting for it to start")
+                    }
+                }
                 Call.State.End, Call.State.Error -> dismissCallNotification(call)
                 Call.State.Released -> {
                     if (LinphoneUtils.isCallLogMissed(call.callLog)) {
-                        /* CLB exclusive!: Do NOT show 'missed call notification' and icon!! =>
                         displayMissedCallNotification(call.remoteAddress)
-                        */
                     }
                 }
-                else -> displayCallNotification(call, true)
+                else -> displayCallNotification(call)
             }
         }
 
-        override fun onMessageReceived(core: Core, room: ChatRoom, message: ChatMessage) {
-            if (message.isOutgoing || corePreferences.disableChat) return
+        override fun onMessagesReceived(
+            core: Core,
+            room: ChatRoom,
+            messages: Array<out ChatMessage>
+        ) {
+            Log.i("[Notifications Manager] Received ${messages.size} aggregated messages")
+            if (corePreferences.disableChat) return
 
             if (corePreferences.preventInterfaceFromShowingUp) {
-                Log.w("[Context] We were asked to not show the chat notifications")
+                Log.w("[Notifications Manager] We were asked to not show the chat notifications")
                 return
             }
 
@@ -153,24 +157,28 @@ class NotificationsManager(private val context: Context) {
                 return
             }
 
-            if (message.errorInfo.reason == Reason.UnsupportedContent) {
-                Log.w("[Notifications Manager] Received message with unsupported content, do not notify")
-                return
-            }
-
-            if (message.contents.find { content ->
-                content.isFile or content.isFileTransfer or content.isText
-            } == null
-            ) {
-                Log.w("[Notifications Manager] Received message with neither text or attachment, do not notify")
+            val id = LinphoneUtils.getChatRoomId(room.localAddress, room.peerAddress)
+            val mute = corePreferences.chatRoomMuted(id)
+            if (mute) {
+                Log.i("[Notifications Manager] Chat room $id has been muted")
                 return
             }
 
             if (corePreferences.chatRoomShortcuts) {
-                Log.i("[Notifications Manager] Ensure chat room shortcut exists for bubble notification")
-                Compatibility.createShortcutsToChatRooms(context)
+                if (ShortcutsHelper.isShortcutToChatRoomAlreadyCreated(context, room)) {
+                    Log.i("[Notifications Manager] Chat room shortcut already exists")
+                } else {
+                    Log.i("[Notifications Manager] Ensure chat room shortcut exists for bubble notification")
+                    ShortcutsHelper.createShortcutsToChatRooms(context)
+                }
             }
-            displayIncomingChatNotification(room, message)
+
+            val notifiable = createChatNotifiable(room, messages)
+            if (notifiable.messages.isNotEmpty()) {
+                displayChatNotifiable(room, notifiable)
+            } else {
+                Log.w("[Notifications Manager] No message to display in received aggregated messages")
+            }
         }
 
         override fun onChatRoomRead(core: Core, chatRoom: ChatRoom) {
@@ -192,6 +200,11 @@ class NotificationsManager(private val context: Context) {
                     dismissChatNotification(chatRoom)
                 }
             }
+        }
+
+        override fun onLastCallEnded(core: Core) {
+            Log.i("[Notifications Manager] Last call ended, make sure foreground service is stopped and notification removed")
+            stopCallForeground()
         }
     }
 
@@ -266,7 +279,13 @@ class NotificationsManager(private val context: Context) {
         coreContext.core.removeListener(listener)
     }
 
+    @SuppressLint("MissingPermission")
     private fun notify(id: Int, notification: Notification, tag: String? = null) {
+        if (!PermissionHelper.get().hasPostNotificationsPermission()) {
+            Log.w("[Notifications Manager] Can't notify [$id] with tag [$tag], POST_NOTIFICATIONS permission isn't granted!")
+            return
+        }
+
         Log.i("[Notifications Manager] Notifying [$id] with tag [$tag]")
         notificationManager.notify(tag, id, notification)
     }
@@ -322,7 +341,8 @@ class NotificationsManager(private val context: Context) {
                 val call = coreContext.core.currentCall ?: coreContext.core.calls[0]
                 when (call.state) {
                     Call.State.IncomingReceived, Call.State.IncomingEarlyMedia -> {
-                        Log.i("[Notifications Manager] Waiting for call to be in state Connected before creating service notification")
+                        Log.i("[Notifications Manager] Creating incoming call notification to be used as foreground service")
+                        displayIncomingCallNotification(call, true)
                     }
                     else -> {
                         Log.i("[Notifications Manager] Creating call notification to be used as foreground service")
@@ -334,6 +354,8 @@ class NotificationsManager(private val context: Context) {
     }
 
     fun startForeground(coreService: CoreService, useAutoStartDescription: Boolean = true) {
+        service = coreService
+
         if (serviceNotification == null) {
             createServiceNotification(useAutoStartDescription)
             if (serviceNotification == null) {
@@ -341,31 +363,45 @@ class NotificationsManager(private val context: Context) {
                 return
             }
         }
+
         currentForegroundServiceNotificationId = SERVICE_NOTIF_ID
         Log.i("[Notifications Manager] Starting service as foreground [$currentForegroundServiceNotificationId]")
         Compatibility.startForegroundService(coreService, currentForegroundServiceNotificationId, serviceNotification)
-        service = coreService
-
-        // CLB Forcing init of Callstate
-        // (coreContext.core)
-        var instance = CallStateCLB.instance()
-
-        instance.Restart()
     }
 
     private fun startForeground(notificationId: Int, callNotification: Notification) {
         if (currentForegroundServiceNotificationId == 0 && service != null) {
             Log.i("[Notifications Manager] Starting service as foreground using call notification [$notificationId]")
-            currentForegroundServiceNotificationId = notificationId
-            service?.startForeground(currentForegroundServiceNotificationId, callNotification)
+            try {
+                currentForegroundServiceNotificationId = notificationId
+
+                val coreService = service
+                if (coreService != null) {
+                    Compatibility.startForegroundService(
+                        coreService,
+                        currentForegroundServiceNotificationId,
+                        callNotification
+                    )
+                } else {
+                    Log.w("[Notifications Manager] No Service found, can't start it as foreground")
+                    currentForegroundServiceNotificationId = 0
+                }
+            } catch (e: Exception) {
+                Log.e("[Notifications Manager] Foreground service wasn't allowed! $e")
+                currentForegroundServiceNotificationId = 0
+            }
+        } else {
+            Log.w("[Notifications Manager] Can't start foreground service using notification id [$notificationId] (current foreground service notification id is [$currentForegroundServiceNotificationId]) and service [$service]")
         }
     }
 
     fun stopForegroundNotification() {
         if (service != null) {
-            Log.i("[Notifications Manager] Stopping service as foreground [$currentForegroundServiceNotificationId]")
+            if (currentForegroundServiceNotificationId != 0) {
+                Log.i("[Notifications Manager] Stopping service as foreground [$currentForegroundServiceNotificationId]")
+                currentForegroundServiceNotificationId = 0
+            }
             service?.stopForeground(true)
-            currentForegroundServiceNotificationId = 0
         }
     }
 
@@ -377,10 +413,21 @@ class NotificationsManager(private val context: Context) {
     }
 
     fun stopCallForeground() {
-        if (service != null && currentForegroundServiceNotificationId != SERVICE_NOTIF_ID && !corePreferences.keepServiceAlive) {
+        if (service != null && currentForegroundServiceNotificationId != SERVICE_NOTIF_ID) {
             Log.i("[Notifications Manager] Stopping call notification [$currentForegroundServiceNotificationId] used as foreground service")
             stopForegroundNotification()
         }
+    }
+
+    fun serviceCreated(createdService: CoreService) {
+        Log.i("[Notifications Manager] Service has been created, keeping it around")
+        service = createdService
+    }
+
+    fun serviceDestroyed() {
+        Log.i("[Notifications Manager] Service has been destroyed")
+        stopForegroundNotification()
+        service = null
     }
 
     private fun createServiceNotification(useAutoStartDescription: Boolean = false) {
@@ -432,62 +479,46 @@ class NotificationsManager(private val context: Context) {
         return notifiable
     }
 
-    fun getPerson(contact: Contact?, displayName: String, picture: Bitmap?): Person {
-        return if (contact != null) {
-            contact.getPerson()
-        } else {
-            val builder = Person.Builder().setName(displayName)
-            val userIcon =
-                if (picture != null) {
-                    IconCompat.createWithBitmap(picture)
-                } else {
-                    IconCompat.createWithResource(context, R.drawable.avatar)
-                }
-            if (userIcon != null) builder.setIcon(userIcon)
-            builder.build()
-        }
+    fun getPerson(friend: Friend?, displayName: String, picture: Bitmap?): Person {
+        return friend?.getPerson()
+            ?: Person.Builder()
+                .setName(displayName)
+                .setIcon(
+                    if (picture != null) {
+                        IconCompat.createWithAdaptiveBitmap(picture)
+                    } else {
+                        coreContext.contactsManager.contactAvatar
+                    }
+                )
+                .setKey(displayName)
+                .build()
     }
 
-    fun displayIncomingCallNotification(
-        call: Call,
-        useAsForeground: Boolean = false,
-        skipDeclineCheck: Boolean = false
-    ) {
-        if (!skipDeclineCheck && coreContext.declineCallDueToGsmActiveCall()) {
+    fun displayIncomingCallNotification(call: Call, useAsForeground: Boolean) {
+        if (coreContext.declineCallDueToGsmActiveCall()) {
             Log.w("[Notifications Manager] Call will be declined, do not show incoming call notification")
             return
-        }
-        try {
-            val showLockScreenNotification = android.provider.Settings.Secure.getInt(
-                context.contentResolver,
-                "lock_screen_show_notifications",
-                0
-            )
-            Log.i("[Notifications Manager] Are notifications allowed on lock screen? ${showLockScreenNotification != 0} ($showLockScreenNotification)")
-        } catch (e: Exception) {
-            Log.e("[Notifications Manager] Failed to get android.provider.Settings.Secure.getInt(lock_screen_show_notifications): $e")
-        }
-
-        try {
-            val showLockScreenNotification = android.provider.Settings.Secure.getInt(
-                context.contentResolver,
-                "lock_screen_show_notifications",
-                0
-            )
-            Log.i("[Notifications Manager] Are notifications allowed on lock screen? ${showLockScreenNotification != 0} ($showLockScreenNotification)")
-        } catch (e: Exception) {
-            Log.e("[Notifications Manager] Failed to get android.provider.Settings.Secure.getInt(lock_screen_show_notifications): $e")
         }
 
         val notifiable = getNotifiableForCall(call)
         if (notifiable.notificationId == currentForegroundServiceNotificationId) {
-            Log.e("[Notifications Manager] There is already a Service foreground notification for an incoming call, cancelling it")
-            cancel(notifiable.notificationId)
-            currentForegroundServiceNotificationId = 0
+            Log.i("[Notifications Manager] There is already a Service foreground notification for this incoming call, skipping")
+            return
         }
 
-        val incomingCallNotificationIntent = Intent(context, IncomingCallActivity::class.java)
-        incomingCallNotificationIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_USER_ACTION)
+        try {
+            val showLockScreenNotification = android.provider.Settings.Secure.getInt(
+                context.contentResolver,
+                "lock_screen_show_notifications",
+                0
+            )
+            Log.i("[Notifications Manager] Are notifications allowed on lock screen? ${showLockScreenNotification != 0} ($showLockScreenNotification)")
+        } catch (e: Exception) {
+            Log.e("[Notifications Manager] Failed to get android.provider.Settings.Secure.getInt(lock_screen_show_notifications): $e")
+        }
+
+        val incomingCallNotificationIntent = Intent(context, CallActivity::class.java)
+        incomingCallNotificationIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_USER_ACTION or Intent.FLAG_FROM_BACKGROUND)
         val pendingIntent = PendingIntent.getActivity(
             context,
             0,
@@ -513,9 +544,9 @@ class NotificationsManager(private val context: Context) {
                 .format(missedCallCount)
             Log.i("[Notifications Manager] Updating missed calls notification count to $missedCallCount")
         } else {
-            val contact: Contact? = coreContext.contactsManager.findContactByAddress(remoteAddress)
+            val friend: Friend? = coreContext.contactsManager.findContactByAddress(remoteAddress)
             body = context.getString(R.string.missed_call_notification_body)
-                .format(contact?.fullName ?: LinphoneUtils.getDisplayName(remoteAddress))
+                .format(friend?.name ?: LinphoneUtils.getDisplayName(remoteAddress))
             Log.i("[Notifications Manager] Creating missed call notification")
         }
 
@@ -554,18 +585,6 @@ class NotificationsManager(private val context: Context) {
     fun displayCallNotification(call: Call, useAsForeground: Boolean = false) {
         val notifiable = getNotifiableForCall(call)
 
-        val callActivity: Class<*> = when (call.state) {
-            Call.State.Paused, Call.State.Pausing, Call.State.PausedByRemote -> {
-                CallActivity::class.java
-            }
-            Call.State.OutgoingRinging, Call.State.OutgoingProgress, Call.State.OutgoingInit, Call.State.OutgoingEarlyMedia -> {
-                OutgoingCallActivity::class.java
-            }
-            else -> {
-                CallActivity::class.java
-            }
-        }
-
         val serviceChannel = context.getString(R.string.notification_channel_service_id)
         val channelToUse = when (val serviceChannelImportance = Compatibility.getChannelImportance(notificationManager, serviceChannel)) {
             NotificationManagerCompat.IMPORTANCE_NONE -> {
@@ -583,7 +602,7 @@ class NotificationsManager(private val context: Context) {
             }
         }
 
-        val callNotificationIntent = Intent(context, callActivity)
+        val callNotificationIntent = Intent(context, CallActivity::class.java)
         callNotificationIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         val pendingIntent = PendingIntent.getActivity(
             context,
@@ -645,22 +664,19 @@ class NotificationsManager(private val context: Context) {
         )
 
         val id = LinphoneUtils.getChatRoomId(room.localAddress, room.peerAddress)
-        val notification = createMessageNotification(notifiable, pendingIntent, bubbleIntent, id)
+        val me = coreContext.contactsManager.getMePerson(room.localAddress)
+        val notification = createMessageNotification(notifiable, pendingIntent, bubbleIntent, id, me)
         notify(notifiable.notificationId, notification, CHAT_TAG)
     }
 
-    private fun displayIncomingChatNotification(room: ChatRoom, message: ChatMessage) {
-        val contact: Contact? = coreContext.contactsManager.findContactByAddress(message.fromAddress)
-
+    private fun createChatNotifiable(room: ChatRoom, messages: Array<out ChatMessage>): Notifiable {
         val notifiable = getNotifiableForRoom(room)
-        if (notifiable.messages.isNotEmpty() || room.unreadMessagesCount == 1) {
-            val notifiableMessage = getNotifiableMessage(message, contact)
+
+        for (message in messages) {
+            if (message.isRead || message.isOutgoing) continue
+            val friend = coreContext.contactsManager.findContactByAddress(message.fromAddress)
+            val notifiableMessage = getNotifiableMessage(message, friend, notifiable)
             notifiable.messages.add(notifiableMessage)
-        } else {
-            for (chatMessage in room.unreadHistory) {
-                val notifiableMessage = getNotifiableMessage(chatMessage, contact)
-                notifiable.messages.add(notifiableMessage)
-            }
         }
 
         if (room.hasCapability(ChatRoomCapabilities.OneToOne.toInt())) {
@@ -670,7 +686,7 @@ class NotificationsManager(private val context: Context) {
             notifiable.groupTitle = room.subject
         }
 
-        displayChatNotifiable(room, notifiable)
+        return notifiable
     }
 
     private fun getNotifiableForRoom(room: ChatRoom): Notifiable {
@@ -687,23 +703,32 @@ class NotificationsManager(private val context: Context) {
         return notifiable
     }
 
-    private fun getNotifiableMessage(message: ChatMessage, contact: Contact?): NotifiableMessage {
-        val pictureUri = contact?.getContactThumbnailPictureUri()
-        val roundPicture = ImageUtils.getRoundBitmapFromUri(context, pictureUri)
-        val displayName = contact?.fullName ?: LinphoneUtils.getDisplayName(message.fromAddress)
+    private fun getNotifiableMessage(message: ChatMessage, friend: Friend?, notifiable: Notifiable): NotifiableMessage {
+        val roundPicture = ImageUtils.getRoundBitmapFromUri(context, friend?.getThumbnailUri())
+        val displayName = friend?.name ?: LinphoneUtils.getDisplayName(message.fromAddress)
+        var text = ""
 
-        var text: String = message.contents.find { content -> content.isText }?.utf8Text ?: ""
+        val isConferenceInvite = message.contents.firstOrNull()?.isIcalendar ?: false
+        text = if (isConferenceInvite) {
+            AppUtils.getString(R.string.conference_invitation_received_notification)
+        } else {
+            message.contents.find { content -> content.isText }?.utf8Text ?: ""
+        }
+
         if (text.isEmpty()) {
             for (content in message.contents) {
+                if (text.isNotEmpty()) {
+                    text += ", "
+                }
                 text += content.name
             }
         }
 
         val notifiableMessage = NotifiableMessage(
             text,
-            contact,
+            friend,
             displayName,
-            message.time,
+            message.time * 1000, /* Linphone timestamps are in seconds */
             senderAvatar = roundPicture,
             isOutgoing = message.isOutgoing
         )
@@ -735,10 +760,11 @@ class NotificationsManager(private val context: Context) {
         Log.i("[Notifications Manager] Updating message notification with reply for notification ${notifiable.notificationId}")
 
         val text = message.contents.find { content -> content.isText }?.utf8Text ?: ""
+        val senderAddress = message.fromAddress
         val reply = NotifiableMessage(
             text,
             null,
-            notifiable.myself ?: LinphoneUtils.getDisplayName(message.fromAddress),
+            notifiable.myself ?: LinphoneUtils.getDisplayName(senderAddress),
             System.currentTimeMillis(),
             isOutgoing = true
         )
@@ -787,49 +813,56 @@ class NotificationsManager(private val context: Context) {
         notifiable: Notifiable,
         pendingIntent: PendingIntent,
         bubbleIntent: PendingIntent,
-        id: String
+        id: String,
+        me: Person
     ): Notification {
-        val me = Person.Builder().setName(notifiable.myself).build()
         val style = NotificationCompat.MessagingStyle(me)
-        val largeIcon: Bitmap? = notifiable.messages.lastOrNull()?.senderAvatar
+        val allPersons = arrayListOf<Person>()
 
+        var lastPersonAvatar: Bitmap? = null
         var lastPerson: Person? = null
         for (message in notifiable.messages) {
-            val contact = message.contact
-            val person = getPerson(contact, message.sender, message.senderAvatar)
+            val friend = message.friend
+            val person = if (message.isOutgoing)
+                me
+            else
+                getPerson(friend, message.sender, message.senderAvatar)
 
-            // We don't want to see our own avatar
             if (!message.isOutgoing) {
+                // We don't want to see our own avatar
                 lastPerson = person
+                lastPersonAvatar = message.senderAvatar
+
+                if (allPersons.find { it.key == person.key } == null) {
+                    allPersons.add(person)
+                }
             }
 
-            val msg = if (!corePreferences.hideChatMessageContentInNotification) {
-                NotificationCompat.MessagingStyle.Message(message.message, message.time, person)
-            } else {
+            val msg = if (corePreferences.hideChatMessageContentInNotification) {
                 NotificationCompat.MessagingStyle.Message(AppUtils.getString(R.string.chat_message_notification_hidden_content), message.time, person)
-            }
-
-            if (message.filePath != null && !corePreferences.hideChatMessageContentInNotification) {
-                msg.setData(message.fileMime, message.filePath)
+            } else {
+                val tmp = NotificationCompat.MessagingStyle.Message(message.message, message.time, person)
+                if (message.filePath != null) tmp.setData(message.fileMime, message.filePath)
+                tmp
             }
 
             style.addMessage(msg)
         }
 
-        if (notifiable.isGroup) {
-            style.conversationTitle = notifiable.groupTitle
-        }
+        style.conversationTitle = if (notifiable.isGroup) notifiable.groupTitle else lastPerson?.name
         style.isGroupConversation = notifiable.isGroup
 
-        val icon = lastPerson?.icon ?: IconCompat.createWithResource(context, R.drawable.avatar)
+        val icon = lastPerson?.icon ?: coreContext.contactsManager.contactAvatar
         val bubble = NotificationCompat.BubbleMetadata.Builder(bubbleIntent, icon)
             .setDesiredHeightResId(R.dimen.chat_message_bubble_desired_height)
             .build()
 
+        val largeIcon = if (notifiable.isGroup) coreContext.contactsManager.groupBitmap else lastPersonAvatar
         val notificationBuilder = NotificationCompat.Builder(context, context.getString(R.string.notification_channel_chat_id))
             .setSmallIcon(R.drawable.topbar_chat_notification)
             .setAutoCancel(true)
             .setLargeIcon(largeIcon)
+            .setColor(ContextCompat.getColor(context, R.color.primary_color))
             .setCategory(NotificationCompat.CATEGORY_MESSAGE)
             .setGroup(CHAT_NOTIFICATIONS_GROUP)
             .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
@@ -837,11 +870,14 @@ class NotificationsManager(private val context: Context) {
             .setWhen(System.currentTimeMillis())
             .setShowWhen(true)
             .setStyle(style)
-            .setColor(ContextCompat.getColor(context, R.color.primary_color))
             .addAction(getReplyMessageAction(notifiable))
             .addAction(getMarkMessageAsReadAction(notifiable))
             .setShortcutId(id)
             .setLocusId(LocusIdCompat(id))
+
+        for (person in allPersons) {
+            notificationBuilder.addPerson(person)
+        }
 
         if (!corePreferences.preventInterfaceFromShowingUp) {
             notificationBuilder.setContentIntent(pendingIntent)
@@ -904,7 +940,9 @@ class NotificationsManager(private val context: Context) {
             R.drawable.call_hangup,
             context.getString(R.string.incoming_call_notification_hangup_action_label),
             getCallDeclinePendingIntent(notifiable)
-        ).build()
+        )
+            .setShowsUserInterface(false)
+            .build()
     }
 
     private fun getReplyMessageAction(notifiable: Notifiable): NotificationCompat.Action {
@@ -933,6 +971,7 @@ class NotificationsManager(private val context: Context) {
         )
             .addRemoteInput(remoteInput)
             .setAllowGeneratedReplies(true)
+            .setShowsUserInterface(false)
             .setSemanticAction(NotificationCompat.Action.SEMANTIC_ACTION_REPLY)
             .build()
     }
@@ -959,6 +998,7 @@ class NotificationsManager(private val context: Context) {
             context.getString(R.string.received_chat_notification_mark_as_read_label),
             markAsReadPendingIntent
         )
+            .setShowsUserInterface(false)
             .setSemanticAction(NotificationCompat.Action.SEMANTIC_ACTION_MARK_AS_READ)
             .build()
     }

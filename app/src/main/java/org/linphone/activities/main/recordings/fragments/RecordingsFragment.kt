@@ -19,6 +19,8 @@
  */
 package org.linphone.activities.main.recordings.fragments
 
+import android.content.ActivityNotFoundException
+import android.content.Intent
 import android.os.Bundle
 import android.view.MotionEvent
 import android.view.View
@@ -32,6 +34,7 @@ import org.linphone.activities.main.recordings.viewmodels.RecordingsViewModel
 import org.linphone.core.tools.Log
 import org.linphone.databinding.RecordingsFragmentBinding
 import org.linphone.utils.AppUtils
+import org.linphone.utils.FileUtils
 import org.linphone.utils.RecyclerViewHeaderDecoration
 
 class RecordingsFragment : MasterFragment<RecordingsFragmentBinding, RecordingsListAdapter>() {
@@ -59,7 +62,7 @@ class RecordingsFragment : MasterFragment<RecordingsFragmentBinding, RecordingsL
         binding.recordingsList.setHasFixedSize(true)
         binding.recordingsList.adapter = adapter
 
-        val layoutManager = LinearLayoutManager(activity)
+        val layoutManager = LinearLayoutManager(requireContext())
         binding.recordingsList.layoutManager = layoutManager
 
         // Divider between items
@@ -75,7 +78,24 @@ class RecordingsFragment : MasterFragment<RecordingsFragmentBinding, RecordingsL
             adapter.submitList(recordings)
         }
 
-        binding.setBackClickListener { goBack() }
+        viewModel.exportRecordingEvent.observe(
+            viewLifecycleOwner
+        ) {
+            it.consume { path ->
+                val publicFilePath = FileUtils.getPublicFilePath(requireContext(), "file://$path")
+                Log.i("[Recordings] Exporting file [$path] with public URI [$publicFilePath]")
+                val intent = Intent(Intent.ACTION_SEND)
+                intent.type = " video/x-matroska"
+                intent.putExtra(Intent.EXTRA_STREAM, publicFilePath)
+                intent.putExtra(Intent.EXTRA_TEXT, getString(R.string.recordings_export))
+
+                try {
+                    requireActivity().startActivity(Intent.createChooser(intent, getString(R.string.recordings_export)))
+                } catch (anfe: ActivityNotFoundException) {
+                    Log.e(anfe)
+                }
+            }
+        }
 
         binding.setEditClickListener { listSelectionViewModel.isEditionEnabled.value = true }
 
@@ -114,7 +134,7 @@ class RecordingsFragment : MasterFragment<RecordingsFragmentBinding, RecordingsL
 
     override fun onResume() {
         if (this::viewModel.isInitialized) {
-            viewModel.udpdateRecordingsList()
+            viewModel.updateRecordingsList()
         } else {
             Log.e("[Recordings] Fragment resuming but viewModel lateinit property isn't initialized!")
         }

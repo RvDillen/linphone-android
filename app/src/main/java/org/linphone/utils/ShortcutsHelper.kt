@@ -23,21 +23,21 @@ import android.annotation.TargetApi
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ShortcutInfo
-import android.content.pm.ShortcutManager
 import android.os.Bundle
 import androidx.collection.ArraySet
 import androidx.core.app.Person
 import androidx.core.content.LocusIdCompat
 import androidx.core.content.pm.ShortcutInfoCompat
+import androidx.core.content.pm.ShortcutManagerCompat
 import androidx.core.graphics.drawable.IconCompat
+import kotlin.math.min
 import org.linphone.LinphoneApplication.Companion.coreContext
-import org.linphone.R
 import org.linphone.activities.main.MainActivity
-import org.linphone.contact.Contact
-import org.linphone.contact.NativeContact
+import org.linphone.contact.getPerson
 import org.linphone.core.Address
 import org.linphone.core.ChatRoom
 import org.linphone.core.ChatRoomCapabilities
+import org.linphone.core.Friend
 import org.linphone.core.tools.Log
 import org.linphone.mediastream.Version
 
@@ -45,14 +45,13 @@ import org.linphone.mediastream.Version
 class ShortcutsHelper(val context: Context) {
     companion object {
         fun createShortcutsToContacts(context: Context) {
-            val shortcuts = ArrayList<ShortcutInfo>()
-            val shortcutManager = context.getSystemService(ShortcutManager::class.java)
-            if (shortcutManager.isRateLimitingActive) {
+            val shortcuts = ArrayList<ShortcutInfoCompat>()
+            if (ShortcutManagerCompat.isRateLimitingActive(context)) {
                 Log.e("[Shortcut Helper] Rate limiting is active, aborting")
                 return
             }
 
-            val maxShortcuts = shortcutManager.maxShortcutCountPerActivity
+            val maxShortcuts = min(ShortcutManagerCompat.getMaxShortcutCountPerActivity(context), 5)
             var count = 0
             val processedAddresses = arrayListOf<String>()
             for (room in coreContext.core.chatRooms) {
@@ -78,11 +77,11 @@ class ShortcutsHelper(val context: Context) {
                     val stringAddress = address.asStringUriOnly()
                     if (!processedAddresses.contains(stringAddress)) {
                         processedAddresses.add(stringAddress)
-                        val contact: Contact? =
+                        val contact: Friend? =
                             coreContext.contactsManager.findContactByAddress(address)
 
-                        if (contact != null && contact is NativeContact) {
-                            val shortcut: ShortcutInfo? = createContactShortcut(context, contact)
+                        if (contact != null && contact.refKey != null) {
+                            val shortcut: ShortcutInfoCompat? = createContactShortcut(context, contact)
                             if (shortcut != null) {
                                 Log.i("[Shortcut Helper] Creating launcher shortcut for ${shortcut.shortLabel}")
                                 shortcuts.add(shortcut)
@@ -94,44 +93,44 @@ class ShortcutsHelper(val context: Context) {
                     }
                 }
             }
-            shortcutManager.dynamicShortcuts = shortcuts
+            ShortcutManagerCompat.setDynamicShortcuts(context, shortcuts)
         }
 
-        private fun createContactShortcut(context: Context, contact: NativeContact): ShortcutInfo? {
+        private fun createContactShortcut(context: Context, contact: Friend): ShortcutInfoCompat? {
             try {
                 val categories: ArraySet<String> = ArraySet()
                 categories.add(ShortcutInfo.SHORTCUT_CATEGORY_CONVERSATION)
 
                 val person = contact.getPerson()
                 val icon = person.icon
+                val id = contact.refKey ?: return null
 
                 val intent = Intent(Intent.ACTION_MAIN)
                 intent.setClass(context, MainActivity::class.java)
-                intent.putExtra("ContactId", contact.nativeId)
+                intent.putExtra("ContactId", id)
 
-                return ShortcutInfoCompat.Builder(context, contact.nativeId)
-                    .setShortLabel(contact.fullName ?: "${contact.firstName} ${contact.lastName}")
+                return ShortcutInfoCompat.Builder(context, id)
+                    .setShortLabel(contact.name ?: "")
                     .setIcon(icon)
                     .setPerson(person)
                     .setCategories(categories)
                     .setIntent(intent)
-                    .build().toShortcutInfo()
+                    .build()
             } catch (e: Exception) {
-                Log.e("[Shortcuts Helper] createContactShortcut for contact [${contact.fullName}] exception: $e")
+                Log.e("[Shortcuts Helper] createContactShortcut for contact [${contact.name}] exception: $e")
             }
 
             return null
         }
 
         fun createShortcutsToChatRooms(context: Context) {
-            val shortcuts = ArrayList<ShortcutInfo>()
-            val shortcutManager = context.getSystemService(ShortcutManager::class.java)
-            if (shortcutManager.isRateLimitingActive) {
+            val shortcuts = ArrayList<ShortcutInfoCompat>()
+            if (ShortcutManagerCompat.isRateLimitingActive(context)) {
                 Log.e("[Shortcut Helper] Rate limiting is active, aborting")
                 return
             }
-
-            val maxShortcuts = shortcutManager.maxShortcutCountPerActivity
+            Log.i("[Shortcut Helper] Creating launcher shortcuts for chat rooms")
+            val maxShortcuts = min(ShortcutManagerCompat.getMaxShortcutCountPerActivity(context), 5)
             var count = 0
             for (room in coreContext.core.chatRooms) {
                 // Android can usually only have around 4-5 shortcuts at a time
@@ -140,17 +139,18 @@ class ShortcutsHelper(val context: Context) {
                     break
                 }
 
-                val shortcut: ShortcutInfo? = createChatRoomShortcut(context, room)
+                val shortcut: ShortcutInfoCompat? = createChatRoomShortcut(context, room)
                 if (shortcut != null) {
-                    Log.i("[Shortcut Helper] Creating launcher shortcut for ${shortcut.shortLabel}")
+                    Log.i("[Shortcut Helper] Created launcher shortcut for ${shortcut.shortLabel}")
                     shortcuts.add(shortcut)
                     count += 1
                 }
             }
-            shortcutManager.dynamicShortcuts = shortcuts
+            ShortcutManagerCompat.setDynamicShortcuts(context, shortcuts)
+            Log.i("[Shortcut Helper] Created $count launcher shortcuts")
         }
 
-        private fun createChatRoomShortcut(context: Context, chatRoom: ChatRoom): ShortcutInfo? {
+        private fun createChatRoomShortcut(context: Context, chatRoom: ChatRoom): ShortcutInfoCompat? {
             val localAddress = chatRoom.localAddress.asStringUriOnly()
             val peerAddress = chatRoom.peerAddress.asStringUriOnly()
             val id = LinphoneUtils.getChatRoomId(chatRoom.localAddress, chatRoom.peerAddress)
@@ -165,20 +165,24 @@ class ShortcutsHelper(val context: Context) {
                 if (chatRoom.hasCapability(ChatRoomCapabilities.Basic.toInt())) {
                     val contact =
                         coreContext.contactsManager.findContactByAddress(chatRoom.peerAddress)
-                    if (contact != null) {
-                        personsList.add(contact.getPerson())
+                    val person = contact?.getPerson()
+                    if (person != null) {
+                        personsList.add(person)
                     }
-                    subject = contact?.fullName ?: LinphoneUtils.getDisplayName(chatRoom.peerAddress)
-                    icon = contact?.getPerson()?.icon ?: IconCompat.createWithResource(context, R.drawable.avatar)
+
+                    icon = person?.icon ?: coreContext.contactsManager.contactAvatar
+                    subject = contact?.name ?: LinphoneUtils.getDisplayName(chatRoom.peerAddress)
                 } else if (chatRoom.hasCapability(ChatRoomCapabilities.OneToOne.toInt()) && chatRoom.participants.isNotEmpty()) {
                     val address = chatRoom.participants.first().address
                     val contact =
                         coreContext.contactsManager.findContactByAddress(address)
-                    if (contact != null) {
-                        personsList.add(contact.getPerson())
+                    val person = contact?.getPerson()
+                    if (person != null) {
+                        personsList.add(person)
                     }
-                    subject = contact?.fullName ?: LinphoneUtils.getDisplayName(address)
-                    icon = contact?.getPerson()?.icon ?: IconCompat.createWithResource(context, R.drawable.avatar)
+
+                    subject = contact?.name ?: LinphoneUtils.getDisplayName(address)
+                    icon = person?.icon ?: coreContext.contactsManager.contactAvatar
                 } else {
                     for (participant in chatRoom.participants) {
                         val contact =
@@ -188,7 +192,7 @@ class ShortcutsHelper(val context: Context) {
                         }
                     }
                     subject = chatRoom.subject.orEmpty()
-                    icon = IconCompat.createWithResource(context, R.drawable.chat_group_avatar)
+                    icon = coreContext.contactsManager.groupAvatar
                 }
 
                 val persons = arrayOfNulls<Person>(personsList.size)
@@ -212,7 +216,7 @@ class ShortcutsHelper(val context: Context) {
                     .setIntent(intent)
                     .setLongLived(Version.sdkAboveOrEqual(Version.API30_ANDROID_11))
                     .setLocusId(LocusIdCompat(id))
-                    .build().toShortcutInfo()
+                    .build()
             } catch (e: Exception) {
                 Log.e("[Shortcuts Helper] createChatRoomShortcut for id [$id] exception: $e")
             }
@@ -222,8 +226,15 @@ class ShortcutsHelper(val context: Context) {
 
         fun removeShortcuts(context: Context) {
             Log.w("[Shortcut Helper] Removing all contacts shortcuts")
-            val shortcutManager = context.getSystemService(ShortcutManager::class.java)
-            shortcutManager.removeAllDynamicShortcuts()
+            ShortcutManagerCompat.removeAllDynamicShortcuts(context)
+        }
+
+        fun isShortcutToChatRoomAlreadyCreated(context: Context, chatRoom: ChatRoom): Boolean {
+            val id = LinphoneUtils.getChatRoomId(chatRoom.localAddress, chatRoom.peerAddress)
+            val found = ShortcutManagerCompat.getDynamicShortcuts(context).find {
+                it.id == id
+            }
+            return found != null
         }
     }
 }

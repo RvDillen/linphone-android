@@ -10,6 +10,192 @@ Group changes to describe their impact on the project, as follows:
     Fixed for any bug fixes.
     Security to invite users to upgrade in case of vulnerabilities.
 
+## [5.0.3] - 2023-01-13
+
+### Added
+- Voice message recording/playback will use bluetooth/headset/headphones/hearing aid device if available
+- Chat message notifications are now compatible with Android Auto
+
+### Changed
+- In video conference, when in active speaker layout, currently speaking participant miniature will be hidden
+- Attach file, voice recording and send message icons are now a bit bigger
+- Updated Firebase BoM, gradle & some dependencies
+
+### Fixed
+- ANR happening sometimes during voice message playback
+
+## [5.0.2] - 2023-01-05
+
+### Changed
+- Export files to native gallery is now available even if automatically download files setting is enabled
+
+### Fixed
+- Makes sure sip.linphone.org accounts have a LIME X3DH server URL for E2E chat messages encryption
+- Files not being exported to native gallery sometimes
+- Crashes reported by Google Play Store & Crashlytics
+
+## [5.0.1] - 2022-12-16
+
+### Changed
+- File transfer progress indication & error status improvements
+
+### Fixed
+- Wrong LIME status for participant that has multiple devices
+- No longer sends video when switching from audio only to another conference layout
+- SIP URI regex pattern to prevent HTTP URLs containing '@' to be handled as SIP URI
+
+## [5.0.0] - 2022-12-06
+
+### Added
+- Post Quantum encryption when using ZRTP
+- Conference creation with scheduling, video, different layouts, showing who is speaking and who is muted, etc...
+- Group calls directly from group chat rooms
+- Chat rooms can be individually muted (no notification when receiving a chat message)
+- When a message is received wait a short amount of time to check if more are to be received to notify them all at once
+- Outgoing call video in early-media if requested by callee
+- Image & Video in-app viewers allow for full-screen display
+- Display name can be set during assistant when creating / logging in a sip.linphone.org account
+- Android 13 support, using new post notifications & media permissions
+- Call recordings can be exported
+- Setting to prevent international prefix from account to be applied to call & chat
+- Themed app icon is now supported for Android 13+
+
+### Changed
+- In-call views have been re-designed
+- "Media Encryption Mandatory" setting now allows for any media encryption (instead of only the one selected in the above setting previously)
+- Improved how call logs are handled to improve performances
+- Improved how contact avatars are generated
+- 3-dots menu even for basic chat rooms with more options
+- Phone numbers & email addresses are now clickable links in chat messages
+- Go to call activity when you click on launcher icon if there is at least one active call
+
+### Fixed
+- Multiple file download attempt from the same chat bubble at the same time needed app restart to properly download each file
+- Call stopped when removing app from recent tasks
+- Generated avatars in dark mode
+- Call state in self-managed TelecomManager service if it takes longer to be created than the call to be answered
+- Show service notification sooner to prevent crash if Core creation takes too long
+- Incoming call screen not being showed up to user (& screen staying off) when using app in Samsung secure folder
+- One to one chat room creation process waiting indefinitely if chat room already exists
+- Contact edition (SIP addresses & phone numbers) not working due to original value being lost in Friend parsing
+- Automatically start call recording
+- "Blinking" in some views when presence is being received
+- Trying to keep the preferred driver (OpenSLES / AAudio) when switching device
+- Issues when storing presence in native contacts + potentially duplicated SIP addresses in contact details
+- Chat room scroll position lost when going into sub-view
+- Trim user input to remove any space at end of string due to keyboard auto completion
+- No longer makes requests to our LIME server (end-to-end encryption keys server) for non sip.linphone.org accounts
+- Fixed incoming call/notification not ringing if Do not Disturb mode is enabled except for favorite contacts
+
+## [4.6.14] - 2022-09-19
+
+### Fixed
+- ANR that happens sometimes when playing voice recording
+
+### Changed
+- Improved contact loader by querying only relevant fields
+
+## [4.6.13] - 2022-08-25
+
+### Fixed
+- Disable Telecom Manager feature on Android < 10 to prevent crash due to Android 9 OS bug
+- Fixed crash due to AAudio's waitForStateChange (SDK fix)
+
+## [4.6.12] - 2022-07-29
+
+### Fixed
+- Call notification not being removed if service channel is disabled & background mode is enabled
+- Wrong display name in chat notification sometimes
+- Removed secure chat button if no LIME server configured or no conference factory URI set
+- Disable TelecomManager feature when the device doesn't support it
+
+### Changed
+- ContactsLoader have been updated, shouldn't crash anymore
+
+## [4.6.11] - 2022-06-27
+
+### Fixed
+- Various crashes due to unhandled exceptions
+- Echo canceller calibration not using speaker (SDK fix)
+
+## [4.6.10] - 2022-06-07
+
+### Fixed
+- Fixed contact address used instead of identity address when creating a basic chat room from history or contact details
+- Fixed call notification still visible after call ended on some devices
+- Fixed incoming call activity not displayed on some devices
+- Fixed Malaysian dial plan (SDK fix)
+- Fixed incoming call ringing even if Do not disturb mode is enabled (SDK fix)
+
+## [4.6.9] - 2022-05-30
+
+### Fixed
+- ANR when screen turns OFF/ON while app is in foreground
+- Crash due to missing CoreContext instance in TelecomManager service
+- One-to-One encrypted chat room creation if it already exists
+- Crash if ConnectionService feature isn't supported by the device
+
+### Changed
+- Updated translations from Weblate
+- Improved audio devices logs
+
+## [4.6.8] - 2022-05-23
+
+### Fixed
+- Crash due to missing CoreContext in CoreService
+- Crash in BootReceiver if auto start is disabled
+- Other crashes
+
+## [4.6.7] - 2022-05-04
+
+### Changed
+- Do not start Core in Application, prevents service notification from appearing by itself
+- When switching from bluetooth or headset device to earpiece/speaker, also change microphone
+- Prevent empty chat bubble by sending only space character(s)
+
+### Fixed
+- Phone numbers with non-ASCII labels missing from address book
+- Wrong audio device displayed in call statistics
+- Various issues from Crashlytics
+
+## [4.6.6] - 2022-04-26
+
+### Changed
+- Prevent requests to LIME X3DH & long term presence servers when not using a sip.linphone.org account
+- Updated DE & RU translations
+- Improved UI on landscape tablets
+
+### Fixed
+- Catching exceptions in new ContactsLoader reported on PlayStore
+- Missing phone numbers in contacts when label contains a space character (5.1.24 SDK fix)
+- Prevent app from starting by itself due to DummySyncService
+- Hide chat rooms settings not working properly
+
+## [4.6.5] - 2022-04-11
+
+### Changed
+- Only display phone number if it matches SIP address username
+- Using new MagicSearch API to improve contacts list performances
+
+### Fixed
+- Prevent concurrent exception while loading native address book contacts
+
+## [4.6.4] - 2022-04-06
+
+### Added
+- Set video information in CallStyle incoming call notification
+
+### Changed
+- Massive rework of how native contacts from address book are handled to improve performances
+- Only display phone number from LDAP search result if it matches SIP address' username
+
+### Fixed
+- Do not use CallStyle notification on Samsung devices, they are currently displayed badly
+- Fixed microphone muted when starting a new call if microphone was muted at the end of the previous one
+- Added LDAP contact display name to SIP address
+- Prevent read-only 1-1 chat room
+- Fixed chat room last updated time not updated sometimes
+
 ## [4.6.3] - 2022-03-08
 
 ### Added

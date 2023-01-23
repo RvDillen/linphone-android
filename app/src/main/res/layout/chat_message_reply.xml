@@ -19,7 +19,8 @@
         android:background="@{data.chatMessage.isOutgoing ? @color/chat_bubble_outgoing_color : @color/chat_bubble_incoming_color, default=@color/chat_bubble_incoming_color}"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:visibility="@{inflatedVisibility}">
+        android:visibility="@{inflatedVisibility}"
+        inflatedLifecycleOwner="@{true}">
 
         <LinearLayout
             android:id="@+id/reply_layout"
@@ -35,7 +36,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 style="@style/chat_message_reply_sender_font"
-                android:text="@{data.contact.fullName ?? data.displayName, default=Tintin}"/>
+                android:text="@{data.contact.name ?? data.displayName, default=Tintin}"/>
 
             <HorizontalScrollView
                 android:visibility="@{data.contents.size() == 0 ? View.GONE : View.VISIBLE}"
@@ -58,6 +59,8 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="5dp"
+                android:maxLines="5"
+                android:ellipsize="end"
                 style="@style/chat_message_reply_font"
                 android:text="@{data.text, default=`Lorem Ipsum`}"/>
 

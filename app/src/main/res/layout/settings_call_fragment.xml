@@ -6,9 +6,6 @@
         <import type="android.view.View"/>
         <import type="android.text.InputType"/>
         <variable
-            name="backClickListener"
-            type="android.view.View.OnClickListener"/>
-        <variable
             name="viewModel"
             type="org.linphone.activities.main.settings.viewmodels.CallSettingsViewModel"/>
         <variable
@@ -30,7 +27,6 @@
 
             <ImageView
                 android:id="@+id/back"
-                android:onClick="@{backClickListener}"
                 android:visibility="@{sharedMainViewModel.isSlidingPaneSlideable ? View.VISIBLE : View.GONE}"
                 android:contentDescription="@string/content_description_go_back"
                 android:layout_width="0dp"
@@ -107,16 +103,9 @@
                     layout="@layout/settings_widget_switch"
                     linphone:title="@{@string/call_settings_use_telecom_manager_title}"
                     linphone:subtitle="@{@string/call_settings_use_telecom_manager_summary}"
-                    android:visibility="@{viewModel.api26OrHigher ? View.VISIBLE : View.GONE}"
+                    android:visibility="@{viewModel.api29OrHigher ? View.VISIBLE : View.GONE}"
                     linphone:listener="@{viewModel.useTelecomManagerListener}"
                     linphone:checked="@={viewModel.useTelecomManager}"/>
-
-                <include
-                    layout="@layout/settings_widget_switch"
-                    linphone:title="@{@string/call_settings_full_screen_title}"
-                    linphone:subtitle="@{@string/call_settings_full_screen_summary}"
-                    linphone:listener="@{viewModel.fullScreenListener}"
-                    linphone:checked="@={viewModel.fullScreen}"/>
 
                 <include
                     layout="@layout/settings_widget_switch"
@@ -149,6 +138,13 @@
                     linphone:title="@{@string/call_settings_auto_start_recording_title}"
                     linphone:listener="@{viewModel.autoStartCallRecordingListener}"
                     linphone:checked="@={viewModel.autoStartCallRecording}"/>
+
+                <include
+                    layout="@layout/settings_widget_switch"
+                    linphone:title="@{@string/call_settings_remote_recording_title}"
+                    linphone:listener="@{viewModel.remoteCallRecordingListener}"
+                    linphone:checked="@={viewModel.remoteCallRecording}"
+                    android:visibility="gone"/>
 
                 <include
                     layout="@layout/settings_widget_switch"

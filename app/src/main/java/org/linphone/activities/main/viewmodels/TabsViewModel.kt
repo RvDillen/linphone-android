@@ -70,7 +70,11 @@ class TabsViewModel : ViewModel() {
             updateUnreadChatCount()
         }
 
-        override fun onMessageReceived(core: Core, chatRoom: ChatRoom, message: ChatMessage) {
+        override fun onMessagesReceived(
+            core: Core,
+            chatRoom: ChatRoom,
+            messages: Array<out ChatMessage>
+        ) {
             updateUnreadChatCount()
         }
 
@@ -101,7 +105,6 @@ class TabsViewModel : ViewModel() {
     }
 
     override fun onCleared() {
-        if (corePreferences.enableAnimations) bounceAnimator.end()
         coreContext.core.removeListener(listener)
         super.onCleared()
     }

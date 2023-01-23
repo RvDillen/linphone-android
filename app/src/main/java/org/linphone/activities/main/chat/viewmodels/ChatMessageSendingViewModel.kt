@@ -41,10 +41,8 @@ import org.linphone.activities.main.chat.data.ChatMessageData
 import org.linphone.compatibility.Compatibility
 import org.linphone.core.*
 import org.linphone.core.tools.Log
-import org.linphone.utils.AppUtils
+import org.linphone.utils.*
 import org.linphone.utils.Event
-import org.linphone.utils.FileUtils
-import org.linphone.utils.PermissionHelper
 
 class ChatMessageSendingViewModelFactory(private val chatRoom: ChatRoom) :
     ViewModelProvider.NewInstanceFactory() {
@@ -101,7 +99,7 @@ class ChatMessageSendingViewModel(private val chatRoom: ChatRoom) : ViewModel() 
         EditorInfo.IME_FLAG_NO_EXTRACT_UI
     }
 
-    private val recorder: Recorder
+    private lateinit var recorder: Recorder
 
     private var voiceRecordAudioFocusRequest: AudioFocusRequestCompat? = null
 
@@ -113,9 +111,15 @@ class ChatMessageSendingViewModel(private val chatRoom: ChatRoom) : ViewModel() 
 
     private val chatRoomListener: ChatRoomListenerStub = object : ChatRoomListenerStub() {
         override fun onStateChanged(chatRoom: ChatRoom, state: ChatRoom.State) {
-            if (state == ChatRoom.State.Created || state == ChatRoom.State.Terminated) {
-                isReadOnly.value = chatRoom.isReadOnly()
-            }
+            updateChatRoomReadOnlyState()
+        }
+
+        override fun onConferenceJoined(chatRoom: ChatRoom, eventLog: EventLog) {
+            updateChatRoomReadOnlyState()
+        }
+
+        override fun onConferenceLeft(chatRoom: ChatRoom, eventLog: EventLog) {
+            updateChatRoomReadOnlyState()
         }
     }
 
@@ -128,23 +132,16 @@ class ChatMessageSendingViewModel(private val chatRoom: ChatRoom) : ViewModel() 
 
         attachFileEnabled.value = true
         sendMessageEnabled.value = false
-        isReadOnly.value = chatRoom.isReadOnly()
-
-        val recorderParams = coreContext.core.createRecorderParams()
-        if (corePreferences.voiceMessagesFormatMkv) {
-            recorderParams.fileFormat = RecorderFileFormat.Mkv
-        } else {
-            recorderParams.fileFormat = RecorderFileFormat.Wav
-        }
-        recorder = coreContext.core.createRecorder(recorderParams)
+        updateChatRoomReadOnlyState()
     }
 
     override fun onCleared() {
-        attachments.value.orEmpty().forEach(ChatMessageAttachmentData::destroy)
         pendingChatMessageToReplyTo.value?.destroy()
 
-        if (recorder.state != RecorderState.Closed) {
-            recorder.close()
+        if (this::recorder.isInitialized) {
+            if (recorder.state != RecorderState.Closed) {
+                recorder.close()
+            }
         }
 
         if (this::voiceRecordingPlayer.isInitialized) {
@@ -158,7 +155,7 @@ class ChatMessageSendingViewModel(private val chatRoom: ChatRoom) : ViewModel() 
     }
 
     fun onTextToSendChanged(value: String) {
-        sendMessageEnabled.value = value.isNotEmpty() || attachments.value?.isNotEmpty() == true || isPendingVoiceRecord.value == true
+        sendMessageEnabled.value = value.trim().isNotEmpty() || attachments.value?.isNotEmpty() == true || isPendingVoiceRecord.value == true
         if (value.isNotEmpty()) {
             if (attachFileEnabled.value == true && !corePreferences.allowMultipleFilesAndTextInSameMessage) {
                 attachFileEnabled.value = false
@@ -181,7 +178,7 @@ class ChatMessageSendingViewModel(private val chatRoom: ChatRoom) : ViewModel() 
         )
         attachments.value = list
 
-        sendMessageEnabled.value = textToSend.value.orEmpty().isNotEmpty() || list.isNotEmpty() || isPendingVoiceRecord.value == true
+        sendMessageEnabled.value = textToSend.value.orEmpty().trim().isNotEmpty() || list.isNotEmpty() || isPendingVoiceRecord.value == true
         if (!corePreferences.allowMultipleFilesAndTextInSameMessage) {
             attachFileEnabled.value = false
         }
@@ -191,10 +188,9 @@ class ChatMessageSendingViewModel(private val chatRoom: ChatRoom) : ViewModel() 
         val list = arrayListOf<ChatMessageAttachmentData>()
         list.addAll(attachments.value.orEmpty())
         list.remove(attachment)
-        attachment.destroy()
         attachments.value = list
 
-        sendMessageEnabled.value = textToSend.value.orEmpty().isNotEmpty() || list.isNotEmpty() || isPendingVoiceRecord.value == true
+        sendMessageEnabled.value = textToSend.value.orEmpty().trim().isNotEmpty() || list.isNotEmpty() || isPendingVoiceRecord.value == true
         if (!corePreferences.allowMultipleFilesAndTextInSameMessage) {
             attachFileEnabled.value = list.isEmpty()
         }
@@ -227,13 +223,13 @@ class ChatMessageSendingViewModel(private val chatRoom: ChatRoom) : ViewModel() 
             isVoiceRecording.value = false
         }
 
-        val toSend = textToSend.value
-        if (toSend != null && toSend.isNotEmpty()) {
+        val toSend = textToSend.value.orEmpty().trim()
+        if (toSend.isNotEmpty()) {
             if (voiceRecord && isBasicChatRoom) {
-                val textMessage: ChatMessage = chatRoom.createMessageFromUtf8(toSend.trim())
+                val textMessage: ChatMessage = chatRoom.createMessageFromUtf8(toSend)
                 textMessage.send()
             } else {
-                message.addUtf8TextContent(toSend.trim())
+                message.addUtf8TextContent(toSend)
             }
         }
 
@@ -266,7 +262,6 @@ class ChatMessageSendingViewModel(private val chatRoom: ChatRoom) : ViewModel() 
         }
 
         cancelReply()
-        attachments.value.orEmpty().forEach(ChatMessageAttachmentData::destroy)
         attachments.value = arrayListOf()
         textToSend.value = ""
 
@@ -284,14 +279,14 @@ class ChatMessageSendingViewModel(private val chatRoom: ChatRoom) : ViewModel() 
     }
 
     private fun tickerFlowRecording() = flow {
-        while (recorder.state == RecorderState.Running) {
+        while (isVoiceRecording.value == true) {
             emit(Unit)
             delay(100)
         }
     }
 
     private fun tickerFlowPlaying() = flow {
-        while (voiceRecordingPlayer.state == Player.State.Playing) {
+        while (isPlayingVoiceRecording.value == true) {
             emit(Unit)
             delay(100)
         }
@@ -301,6 +296,10 @@ class ChatMessageSendingViewModel(private val chatRoom: ChatRoom) : ViewModel() 
         if (corePreferences.holdToRecordVoiceMessage) {
             // Disables click listener just in case, touch listener will be used instead
             return
+        }
+
+        if (!this::recorder.isInitialized) {
+            initVoiceMessageRecorder()
         }
 
         if (isVoiceRecording.value == true) {
@@ -350,14 +349,15 @@ class ChatMessageSendingViewModel(private val chatRoom: ChatRoom) : ViewModel() 
         isVoiceRecording.value = true
         sendMessageEnabled.value = true
 
+        val maxVoiceRecordDuration = corePreferences.voiceRecordingMaxDuration
         tickerFlowRecording().onEach {
-            val duration = recorder.duration
-            voiceRecordingDuration.postValue(recorder.duration % voiceRecordingProgressBarMax)
-            formattedDuration.postValue(SimpleDateFormat("mm:ss", Locale.getDefault()).format(duration)) // duration is in ms
+            withContext(Dispatchers.Main) {
+                val duration = recorder.duration
+                voiceRecordingDuration.value = recorder.duration % voiceRecordingProgressBarMax
+                formattedDuration.value = SimpleDateFormat("mm:ss", Locale.getDefault()).format(duration) // duration is in ms
 
-            if (duration >= corePreferences.voiceRecordingMaxDuration) {
-                withContext(Dispatchers.Main) {
-                    Log.w("[Chat Message Sending] Max duration for voice recording exceeded (${corePreferences.voiceRecordingMaxDuration}ms), stopping.")
+                if (duration >= maxVoiceRecordDuration) {
+                    Log.w("[Chat Message Sending] Max duration for voice recording exceeded (${maxVoiceRecordDuration}ms), stopping.")
                     stopVoiceRecording()
                 }
             }
@@ -384,7 +384,7 @@ class ChatMessageSendingViewModel(private val chatRoom: ChatRoom) : ViewModel() 
 
         isPendingVoiceRecord.value = false
         isVoiceRecording.value = false
-        sendMessageEnabled.value = textToSend.value?.isNotEmpty() == true || attachments.value?.isNotEmpty() == true
+        sendMessageEnabled.value = textToSend.value.orEmpty().trim().isNotEmpty() == true || attachments.value?.isNotEmpty() == true
 
         if (!isPlayerClosed()) {
             stopVoiceRecordPlayer()
@@ -432,7 +432,9 @@ class ChatMessageSendingViewModel(private val chatRoom: ChatRoom) : ViewModel() 
         isPlayingVoiceRecording.value = true
 
         tickerFlowPlaying().onEach {
-            voiceRecordPlayingPosition.postValue(voiceRecordingPlayer.currentPosition)
+            withContext(Dispatchers.Main) {
+                voiceRecordPlayingPosition.value = voiceRecordingPlayer.currentPosition
+            }
         }.launchIn(scope)
     }
 
@@ -451,27 +453,29 @@ class ChatMessageSendingViewModel(private val chatRoom: ChatRoom) : ViewModel() 
         isPlayingVoiceRecording.value = false
     }
 
+    private fun initVoiceMessageRecorder() {
+        Log.i("[Chat Message Sending] Creating recorder for voice message")
+        val recorderParams = coreContext.core.createRecorderParams()
+        if (corePreferences.voiceMessagesFormatMkv) {
+            recorderParams.fileFormat = RecorderFileFormat.Mkv
+        } else {
+            recorderParams.fileFormat = RecorderFileFormat.Wav
+        }
+
+        val recordingAudioDevice = AudioRouteUtils.getAudioRecordingDeviceForVoiceMessage()
+        recorderParams.audioDevice = recordingAudioDevice
+        Log.i("[Chat Message Sending] Using device ${recorderParams.audioDevice?.id} to make the voice message recording")
+
+        recorder = coreContext.core.createRecorder(recorderParams)
+    }
+
     private fun initVoiceRecordPlayer() {
         Log.i("[Chat Message Sending] Creating player for voice record")
-        // In case no headphones/headset is connected, use speaker sound card to play recordings, otherwise use earpiece
-        // If none are available, default one will be used
-        var headphonesCard: String? = null
-        var speakerCard: String? = null
-        var earpieceCard: String? = null
-        for (device in coreContext.core.audioDevices) {
-            if (device.hasCapability(AudioDevice.Capabilities.CapabilityPlay)) {
-                if (device.type == AudioDevice.Type.Speaker) {
-                    speakerCard = device.id
-                } else if (device.type == AudioDevice.Type.Earpiece) {
-                    earpieceCard = device.id
-                } else if (device.type == AudioDevice.Type.Headphones || device.type == AudioDevice.Type.Headset) {
-                    headphonesCard = device.id
-                }
-            }
-        }
-        Log.i("[Chat Message Sending] Found headset/headphones sound card [$headphonesCard], speaker sound card [$speakerCard] and earpiece sound card [$earpieceCard]")
 
-        val localPlayer = coreContext.core.createLocalPlayer(headphonesCard ?: speakerCard ?: earpieceCard, null, null)
+        val playbackSoundCard = AudioRouteUtils.getAudioPlaybackDeviceIdForCallRecordingOrVoiceMessage()
+        Log.i("[Chat Message Sending] Using device $playbackSoundCard to make the voice message playback")
+
+        val localPlayer = coreContext.core.createLocalPlayer(playbackSoundCard, null, null)
         if (localPlayer != null) {
             voiceRecordingPlayer = localPlayer
         } else {
@@ -508,5 +512,9 @@ class ChatMessageSendingViewModel(private val chatRoom: ChatRoom) : ViewModel() 
 
     private fun isPlayerClosed(): Boolean {
         return !this::voiceRecordingPlayer.isInitialized || voiceRecordingPlayer.state == Player.State.Closed
+    }
+
+    private fun updateChatRoomReadOnlyState() {
+        isReadOnly.value = chatRoom.isReadOnly || (chatRoom.hasCapability(ChatRoomCapabilities.Conference.toInt()) && chatRoom.participants.isEmpty())
     }
 }

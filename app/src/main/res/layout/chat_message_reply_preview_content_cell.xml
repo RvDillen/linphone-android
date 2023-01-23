@@ -19,8 +19,8 @@
             android:layout_width="@dimen/chat_message_small_bubble_file_size"
             android:layout_height="@dimen/chat_message_small_bubble_file_size"
             android:layout_margin="5dp"
-            app:glidePath="@{data.filePath}"
-            android:visibility="@{data.image ? View.VISIBLE : View.GONE}"
+            coil="@{data.filePath}"
+            android:visibility="@{data.image ? View.VISIBLE : View.GONE, default=gone}"
             android:scaleType="@{ScaleType.CENTER_CROP}"
             android:adjustViewBounds="true" />
 
@@ -29,13 +29,13 @@
             android:layout_width="@dimen/chat_message_small_bubble_file_size"
             android:layout_height="@dimen/chat_message_small_bubble_file_size"
             android:layout_margin="5dp"
-            android:src="@{data.videoPreview}"
-            android:visibility="@{data.video ? View.VISIBLE : View.GONE}"
+            coilVideoPreview="@{data.filePath}"
+            android:visibility="@{data.video ? View.VISIBLE : View.GONE, default=gone}"
             android:scaleType="@{ScaleType.CENTER_CROP}"
             android:adjustViewBounds="true" />
 
         <ImageView
-            android:visibility="@{data.video ? View.VISIBLE : View.GONE}"
+            android:visibility="@{data.video ? View.VISIBLE : View.GONE, default=gone}"
             android:layout_width="@dimen/play_pause_button_size"
             android:layout_height="@dimen/play_pause_button_size"
             android:layout_margin="5dp"
@@ -46,14 +46,29 @@
             android:layout_centerInParent="true"/>
 
         <TextView
-            android:visibility="@{data.isVoiceRecording ? View.VISIBLE : View.GONE}"
+            android:visibility="@{data.isVoiceRecording ? View.VISIBLE : View.GONE, default=gone}"
             android:layout_width="wrap_content"
             android:layout_height="@dimen/progress_bar_height"
             android:drawablePadding="5dp"
             android:gravity="center"
             android:text="@{data.formattedDuration, default=`00:00`}"
             android:textColor="@color/light_primary_text_color"
-            android:drawableLeft="@drawable/audio_recording_reply_preview_default"/>
+            app:drawableLeftCompat="@drawable/audio_recording_reply_preview_default" />
+
+        <TextView
+            android:visibility="@{data.isConferenceSchedule ? View.VISIBLE : View.GONE, default=gone}"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:maxWidth="@dimen/chat_message_content_preview_max_width"
+            android:maxLines="3"
+            android:ellipsize="end"
+            android:text="@{data.conferenceSubject, default=`Lorem Ipsum`}"
+            android:textColor="@color/light_primary_text_color"
+            android:drawablePadding="5dp"
+            android:padding="5dp"
+            android:drawableTop="@drawable/icon_meeting_schedule"
+            android:layout_centerVertical="true"/>
 
         <ImageView
             android:layout_width="@dimen/chat_message_small_bubble_file_size"

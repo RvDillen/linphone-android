@@ -19,17 +19,20 @@
  */
 package org.linphone.telecom
 
+import android.annotation.TargetApi
 import android.content.ComponentName
 import android.content.Intent
 import android.net.Uri
-import android.os.Handler
 import android.telecom.*
+import org.linphone.LinphoneApplication
 import org.linphone.LinphoneApplication.Companion.coreContext
+import org.linphone.LinphoneApplication.Companion.ensureCoreExists
 import org.linphone.core.Call
 import org.linphone.core.Core
 import org.linphone.core.CoreListenerStub
 import org.linphone.core.tools.Log
 
+@TargetApi(29)
 class TelecomConnectionService : ConnectionService() {
     private val listener: CoreListenerStub = object : CoreListenerStub() {
         override fun onCallStateChanged(
@@ -38,8 +41,22 @@ class TelecomConnectionService : ConnectionService() {
             state: Call.State?,
             message: String
         ) {
-            Log.i("[Telecom Connection Service] onCallStateChanged from listener")
-            onCallStateChanged(call, state, core)
+            Log.i("[Telecom Connection Service] call [${call.callLog.callId}] state changed: $state")
+            when (call.state) {
+                Call.State.OutgoingProgress -> {
+                    for (connection in TelecomHelper.get().connections) {
+                        if (connection.callId.isEmpty()) {
+                            Log.i("[Telecom Connection Service] Updating connection with call ID: ${call.callLog.callId}")
+                            connection.callId = core.currentCall?.callLog?.callId ?: ""
+                        }
+                    }
+                }
+                Call.State.Error -> onCallError(call)
+                Call.State.End, Call.State.Released -> onCallEnded(call)
+                Call.State.Paused, Call.State.Pausing, Call.State.PausedByRemote -> onCallPaused(call)
+                Call.State.Connected, Call.State.StreamsRunning -> onCallConnected(call)
+                else -> {}
+            }
         }
 
         override fun onLastCallEnded(core: Core) {
@@ -55,42 +72,25 @@ class TelecomConnectionService : ConnectionService() {
         }
     }
 
-    private fun onCallStateChanged(
-        call: Call?,
-        state: Call.State?,
-        core: Core
-    ) {
-        Log.i("[Telecom Connection Service] call [${call?.callLog?.callId}] state changed: $state")
-        when (call?.state) {
-            Call.State.OutgoingProgress -> {
-                for (connection in TelecomHelper.get().connections) {
-                    if (connection.callId.isEmpty()) {
-                        Log.i("[Telecom Connection Service] Updating connection with call ID: ${call.callLog.callId}")
-                        connection.callId = core.currentCall?.callLog?.callId ?: ""
-                    }
-                }
-            }
-            Call.State.Error -> onCallError(call)
-            Call.State.End, Call.State.Released -> onCallEnded(call)
-            Call.State.StreamsRunning -> onCallConnected(call)
-        }
-    }
-
     override fun onCreate() {
-        coreContext.core.addListener(listener)
         super.onCreate()
+
         Log.i("[Telecom Connection Service] onCreate()")
+        ensureCoreExists(applicationContext)
+        coreContext.core.addListener(listener)
     }
 
     override fun onUnbind(intent: Intent?): Boolean {
-        Log.i("[Telecom Connection Service] onUnbind()")
-        coreContext.core.removeListener(listener)
+        if (LinphoneApplication.contextExists()) {
+            Log.i("[Telecom Connection Service] onUnbind()")
+            coreContext.core.removeListener(listener)
+        }
 
         return super.onUnbind(intent)
     }
 
     override fun onCreateOutgoingConnection(
-        connectionManagerPhoneAccount: PhoneAccountHandle,
+        connectionManagerPhoneAccount: PhoneAccountHandle?,
         request: ConnectionRequest
     ): Connection {
         if (coreContext.core.callsNb == 0) {
@@ -152,7 +152,7 @@ class TelecomConnectionService : ConnectionService() {
     }
 
     override fun onCreateIncomingConnection(
-        connectionManagerPhoneAccount: PhoneAccountHandle,
+        connectionManagerPhoneAccount: PhoneAccountHandle?,
         request: ConnectionRequest
     ): Connection {
         if (coreContext.core.callsNb == 0) {
@@ -218,6 +218,7 @@ class TelecomConnectionService : ConnectionService() {
         }
 
         TelecomHelper.get().connections.remove(connection)
+        Log.i("[Telecom Connection Service] Call [$callId] is in error, destroying connection currently in ${connection.stateAsString()}")
         connection.setDisconnected(DisconnectCause(DisconnectCause.ERROR))
         connection.destroy()
     }
@@ -232,38 +233,31 @@ class TelecomConnectionService : ConnectionService() {
 
         TelecomHelper.get().connections.remove(connection)
         val reason = call.reason
-        Log.i("[Telecom Connection Service] Call [$callId] ended with reason: $reason, destroying connection")
+        Log.i("[Telecom Connection Service] Call [$callId] ended with reason: $reason, destroying connection currently in ${connection.stateAsString()}")
         connection.setDisconnected(DisconnectCause(DisconnectCause.LOCAL))
         connection.destroy()
+    }
+
+    private fun onCallPaused(call: Call) {
+        val callId = call.callLog.callId
+        val connection = TelecomHelper.get().findConnectionForCallId(callId.orEmpty())
+        if (connection == null) {
+            Log.e("[Telecom Connection Service] Failed to find connection for call id: $callId")
+            return
+        }
+        Log.i("[Telecom Connection Service] Setting connection as on hold, currently in ${connection.stateAsString()}")
+        connection.setOnHold()
     }
 
     private fun onCallConnected(call: Call) {
         val callId = call.callLog.callId
         val connection = TelecomHelper.get().findConnectionForCallId(callId.orEmpty())
         if (connection == null) {
-            Log.e("[Telecom Connection Service] Retrying failed to find connection for call id: $callId")
-            // CLB: Added post delayed to try again if at first the connection wasn't found.
-            Handler().postDelayed(
-                {
-                    val connection = TelecomHelper.get().findConnectionForCallId(callId.orEmpty())
-                    if (connection == null) {
-                        Log.e("[Telecom Connection Service] Failed to find connection for call id: $callId")
-                        return@postDelayed
-                    }
-                    Log.i("[Telecom Connection Service] found connection for call id delayed: $callId")
-
-                    if (connection.state != Connection.STATE_HOLDING) {
-                        connection.setActive()
-                    }
-                },
-                500
-            )
+            Log.e("[Telecom Connection Service] Failed to find connection for call id: $callId")
             return
         }
-        Log.i("[Telecom Connection Service] found connection for call id: $callId")
 
-        if (connection.state != Connection.STATE_HOLDING) {
-            connection.setActive()
-        }
+        Log.i("[Telecom Connection Service] Setting connection as active, currently in ${connection.stateAsString()}")
+        connection.setActive()
     }
 }

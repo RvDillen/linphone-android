@@ -34,6 +34,7 @@ import android.telecom.TelecomManager
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
+import androidx.annotation.StringRes
 import android.view.inputmethod.InputMethodManager
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
@@ -48,6 +49,7 @@ import androidx.navigation.NavController
 import androidx.navigation.NavDestination
 import androidx.navigation.findNavController
 import androidx.window.layout.FoldingFeature
+import coil.imageLoader
 import com.google.android.material.snackbar.Snackbar
 import java.io.UnsupportedEncodingException
 import java.net.URLDecoder
@@ -66,10 +68,7 @@ import org.linphone.contact.ContactsUpdatedListenerStub
 import org.linphone.core.CorePreferences
 import org.linphone.core.tools.Log
 import org.linphone.databinding.MainActivityBinding
-import org.linphone.utils.AppUtils
-import org.linphone.utils.Event
-import org.linphone.utils.FileUtils
-import org.linphone.utils.GlideApp
+import org.linphone.utils.*
 
 class MainActivity : GenericActivity(), SnackBarActivity, NavController.OnDestinationChangedListener {
     private lateinit var binding: MainActivityBinding
@@ -80,9 +79,9 @@ class MainActivity : GenericActivity(), SnackBarActivity, NavController.OnDestin
         override fun onContactsUpdated() {
             Log.i("[Main Activity] Contact(s) updated, update shortcuts")
             if (corePreferences.contactsShortcuts) {
-                Compatibility.createShortcutsToContacts(this@MainActivity)
+                ShortcutsHelper.createShortcutsToContacts(this@MainActivity)
             } else if (corePreferences.chatRoomShortcuts) {
-                Compatibility.createShortcutsToChatRooms(this@MainActivity)
+                ShortcutsHelper.createShortcutsToChatRooms(this@MainActivity)
             }
         }
     }
@@ -106,7 +105,7 @@ class MainActivity : GenericActivity(), SnackBarActivity, NavController.OnDestin
 
         override fun onTrimMemory(level: Int) {
             Log.w("[Main Activity] onTrimMemory called with level $level !")
-            GlideApp.get(this@MainActivity).clearMemory()
+            applicationContext.imageLoader.memoryCache?.clear()
         }
     }
 
@@ -114,13 +113,14 @@ class MainActivity : GenericActivity(), SnackBarActivity, NavController.OnDestin
         sharedViewModel.layoutChangedEvent.value = Event(true)
     }
 
-    private var tabsFragmentVisible1 = true
-    private var tabsFragmentVisible2 = true
+    private var shouldTabsBeVisibleDependingOnDestination = true
+    private var shouldTabsBeVisibleDueToOrientationAndKeyboard = true
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        val splashScreen = installSplashScreen()
+        // Must be done before the setContentView
+        installSplashScreen()
 
         binding = DataBindingUtil.setContentView(this, R.layout.main_activity)
         binding.lifecycleOwner = this
@@ -189,7 +189,10 @@ class MainActivity : GenericActivity(), SnackBarActivity, NavController.OnDestin
     override fun onNewIntent(intent: Intent?) {
         super.onNewIntent(intent)
 
-        if (intent != null) handleIntentParams(intent)
+        if (intent != null) {
+            Log.d("[Main Activity] Found new intent")
+            handleIntentParams(intent)
+        }
     }
 
     override fun onResume() {
@@ -202,11 +205,11 @@ class MainActivity : GenericActivity(), SnackBarActivity, NavController.OnDestin
         super.onPause()
     }
 
-    override fun showSnackBar(resourceId: Int) {
+    override fun showSnackBar(@StringRes resourceId: Int) {
         Snackbar.make(findViewById(R.id.coordinator), resourceId, Snackbar.LENGTH_LONG).show()
     }
 
-    override fun showSnackBar(resourceId: Int, action: Int, listener: () -> Unit) {
+    override fun showSnackBar(@StringRes resourceId: Int, action: Int, listener: () -> Unit) {
         Snackbar
             .make(findViewById(R.id.coordinator), resourceId, Snackbar.LENGTH_LONG)
             .setAction(action) {
@@ -264,15 +267,16 @@ class MainActivity : GenericActivity(), SnackBarActivity, NavController.OnDestin
             val keyboardVisible = ViewCompat.getRootWindowInsets(binding.rootCoordinatorLayout)
                 ?.isVisible(WindowInsetsCompat.Type.ime()) == true
             Log.d("[Tabs Fragment] Keyboard is ${if (keyboardVisible) "visible" else "invisible"}")
-            tabsFragmentVisible2 = !portraitOrientation || !keyboardVisible
+            shouldTabsBeVisibleDueToOrientationAndKeyboard = !portraitOrientation || !keyboardVisible
             updateTabsFragmentVisibility()
         }
 
         initOverlay()
 
-        if (intent != null) handleIntentParams(intent)
-
-        // launchSetDefaultDialerIntent(this)
+        if (intent != null) {
+            Log.d("[Main Activity] Found post create intent")
+            handleIntentParams(intent)
+        }
     }
 
     override fun onDestroy() {
@@ -291,7 +295,7 @@ class MainActivity : GenericActivity(), SnackBarActivity, NavController.OnDestin
             statusFragment.visibility = View.VISIBLE
         }
 
-        tabsFragmentVisible1 = when (destination.id) {
+        shouldTabsBeVisibleDependingOnDestination = when (destination.id) {
             R.id.masterCallLogsFragment, R.id.masterContactsFragment, R.id.dialerFragment, R.id.masterChatRoomsFragment ->
                 true
             else -> false
@@ -303,17 +307,19 @@ class MainActivity : GenericActivity(), SnackBarActivity, NavController.OnDestin
         currentFocus?.hideKeyboard()
     }
 
-    private fun updateTabsFragmentVisibility() {
-        tabsFragment.visibility = if (tabsFragmentVisible1 && tabsFragmentVisible2) View.VISIBLE else View.GONE
+    fun hideStatusFragment(hide: Boolean) {
+        statusFragment.visibility = if (hide) View.GONE else View.VISIBLE
     }
 
-    private fun View.hideKeyboard() {
-        val imm = context.getSystemService(Activity.INPUT_METHOD_SERVICE) as InputMethodManager
-        imm.hideSoftInputFromWindow(windowToken, 0)
+    private fun updateTabsFragmentVisibility() {
+        tabsFragment.visibility = if (shouldTabsBeVisibleDependingOnDestination && shouldTabsBeVisibleDueToOrientationAndKeyboard) View.VISIBLE else View.GONE
     }
 
     private fun handleIntentParams(intent: Intent) {
+        Log.i("[Main Activity] Handling intent with action [${intent.action}], type [${intent.type}] and data [${intent.data}]")
+
         when (intent.action) {
+            Intent.ACTION_MAIN -> handleMainIntent(intent)
             Intent.ACTION_SEND, Intent.ACTION_SENDTO -> {
                 if (intent.type == "text/plain") {
                     handleSendText(intent)
@@ -330,16 +336,18 @@ class MainActivity : GenericActivity(), SnackBarActivity, NavController.OnDestin
             }
             Intent.ACTION_VIEW -> {
                 val uri = intent.data
-                if (intent.type == AppUtils.getString(R.string.linphone_address_mime_type)) {
-                    if (uri != null) {
-                        val contactId = coreContext.contactsManager.getAndroidContactIdFromUri(uri)
+                if (uri != null) {
+                    if (
+                        intent.type == AppUtils.getString(R.string.linphone_address_mime_type) &&
+                        PermissionHelper.get().hasReadContactsPermission()
+                    ) {
+                        val contactId =
+                            coreContext.contactsManager.getAndroidContactIdFromUri(uri)
                         if (contactId != null) {
                             Log.i("[Main Activity] Found contact URI parameter in intent: $uri")
                             navigateToContact(contactId)
                         }
-                    }
-                } else {
-                    if (uri != null) {
+                    } else {
                         handleTelOrSipUri(uri)
                     }
                 }
@@ -358,32 +366,49 @@ class MainActivity : GenericActivity(), SnackBarActivity, NavController.OnDestin
                     handleLocusOrShortcut(locus)
                 }
             }
-            else -> {
-                when {
-                    intent.hasExtra("ContactId") -> {
-                        val id = intent.getStringExtra("ContactId")
-                        Log.i("[Main Activity] Found contact ID in extras: $id")
-                        navigateToContact(id)
-                    }
-                    intent.hasExtra("Chat") -> {
-                        if (corePreferences.disableChat) return
+            else -> handleMainIntent(intent)
+        }
 
-                        if (intent.hasExtra("RemoteSipUri") && intent.hasExtra("LocalSipUri")) {
-                            val peerAddress = intent.getStringExtra("RemoteSipUri")
-                            val localAddress = intent.getStringExtra("LocalSipUri")
-                            Log.i("[Main Activity] Found chat room intent extra: local SIP URI=[$localAddress], peer SIP URI=[$peerAddress]")
-                            navigateToChatRoom(localAddress, peerAddress)
-                        } else {
-                            Log.i("[Main Activity] Found chat intent extra, go to chat rooms list")
-                            navigateToChatRooms()
-                        }
-                    }
-                    intent.hasExtra("Dialer") -> {
-                        Log.i("[Main Activity] Found dialer intent extra, go to dialer")
-                        val args = Bundle()
-                        args.putBoolean("Transfer", intent.getBooleanExtra("Transfer", false))
-                        navigateToDialer(args)
-                    }
+        // Prevent this intent to be processed again
+        intent.action = null
+        intent.data = null
+        intent.extras?.clear()
+    }
+
+    private fun handleMainIntent(intent: Intent) {
+        when {
+            intent.hasExtra("ContactId") -> {
+                val id = intent.getStringExtra("ContactId")
+                Log.i("[Main Activity] Found contact ID in extras: $id")
+                navigateToContact(id)
+            }
+            intent.hasExtra("Chat") -> {
+                if (corePreferences.disableChat) return
+
+                if (intent.hasExtra("RemoteSipUri") && intent.hasExtra("LocalSipUri")) {
+                    val peerAddress = intent.getStringExtra("RemoteSipUri")
+                    val localAddress = intent.getStringExtra("LocalSipUri")
+                    Log.i("[Main Activity] Found chat room intent extra: local SIP URI=[$localAddress], peer SIP URI=[$peerAddress]")
+                    navigateToChatRoom(localAddress, peerAddress)
+                } else {
+                    Log.i("[Main Activity] Found chat intent extra, go to chat rooms list")
+                    navigateToChatRooms()
+                }
+            }
+            intent.hasExtra("Dialer") -> {
+                Log.i("[Main Activity] Found dialer intent extra, go to dialer")
+                val args = Bundle()
+                args.putBoolean("Transfer", intent.getBooleanExtra("Transfer", false))
+                navigateToDialer(args)
+            }
+            else -> {
+                val core = coreContext.core
+                val call = core.currentCall ?: core.calls.firstOrNull()
+                if (call != null) {
+                    Log.i("[Main Activity] Launcher clicked while there is at least one active call, go to CallActivity")
+                    val callIntent = Intent(this, org.linphone.activities.voip.CallActivity::class.java)
+                    callIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
+                    startActivity(callIntent)
                 }
             }
         }
@@ -414,7 +439,7 @@ class MainActivity : GenericActivity(), SnackBarActivity, NavController.OnDestin
             }
         }
 
-        val address = coreContext.core.interpretUrl(addressToCall)
+        val address = coreContext.core.interpretUrl(addressToCall, LinphoneUtils.applyInternationalPrefix())
         if (address != null) {
             addressToCall = address.asStringUriOnly()
         }
@@ -513,7 +538,7 @@ class MainActivity : GenericActivity(), SnackBarActivity, NavController.OnDestin
 
             val localAddress =
                 coreContext.core.defaultAccount?.params?.identityAddress?.asStringUriOnly()
-            val peerAddress = coreContext.core.interpretUrl(addressToIM)?.asStringUriOnly()
+            val peerAddress = coreContext.core.interpretUrl(addressToIM, LinphoneUtils.applyInternationalPrefix())?.asStringUriOnly()
             Log.i("[Main Activity] Navigating to chat room with local [$localAddress] and peer [$peerAddress] addresses")
             navigateToChatRoom(localAddress, peerAddress)
         } else {

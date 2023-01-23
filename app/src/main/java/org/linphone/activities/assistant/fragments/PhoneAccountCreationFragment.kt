@@ -29,11 +29,10 @@ import org.linphone.activities.assistant.viewmodels.PhoneAccountCreationViewMode
 import org.linphone.activities.assistant.viewmodels.SharedAssistantViewModel
 import org.linphone.activities.navigateToPhoneAccountValidation
 import org.linphone.databinding.AssistantPhoneAccountCreationFragmentBinding
-import org.linphone.mediastream.Version
 
 class PhoneAccountCreationFragment :
     AbstractPhoneFragment<AssistantPhoneAccountCreationFragmentBinding>() {
-    private lateinit var sharedViewModel: SharedAssistantViewModel
+    private lateinit var sharedAssistantViewModel: SharedAssistantViewModel
     override lateinit var viewModel: PhoneAccountCreationViewModel
 
     override fun getLayoutId(): Int = R.layout.assistant_phone_account_creation_fragment
@@ -43,13 +42,13 @@ class PhoneAccountCreationFragment :
 
         binding.lifecycleOwner = viewLifecycleOwner
 
-        sharedViewModel = requireActivity().run {
+        sharedAssistantViewModel = requireActivity().run {
             ViewModelProvider(this)[SharedAssistantViewModel::class.java]
         }
 
         viewModel = ViewModelProvider(
             this,
-            PhoneAccountCreationViewModelFactory(sharedViewModel.getAccountCreator())
+            PhoneAccountCreationViewModelFactory(sharedAssistantViewModel.getAccountCreator())
         )[PhoneAccountCreationViewModel::class.java]
         binding.viewModel = viewModel
 
@@ -58,7 +57,9 @@ class PhoneAccountCreationFragment :
         }
 
         binding.setSelectCountryClickListener {
-            CountryPickerFragment(viewModel).show(childFragmentManager, "CountryPicker")
+            val countryPickerFragment = CountryPickerFragment()
+            countryPickerFragment.listener = viewModel
+            countryPickerFragment.show(childFragmentManager, "CountryPicker")
         }
 
         viewModel.goToSmsValidationEvent.observe(
@@ -80,8 +81,6 @@ class PhoneAccountCreationFragment :
             }
         }
 
-        if (Version.sdkAboveOrEqual(Version.API23_MARSHMALLOW_60)) {
-            checkPermissions()
-        }
+        checkPermissions()
     }
 }

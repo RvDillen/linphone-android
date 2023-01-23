@@ -50,11 +50,6 @@ class ChatSettingsViewModel : GenericSettingsViewModel() {
             core.maxSizeForAutoDownloadIncomingFiles = maxSize
             autoDownloadMaxSize.value = maxSize
             updateAutoDownloadIndexFromMaxSize(maxSize)
-
-            // Auto download isn't compatible with making downloaded images public
-            if (position > 0 && downloadedMediaPublic.value == true) {
-                downloadedMediaPublic.value = false
-            }
         }
     }
     val autoDownloadIndex = MutableLiveData<Int>()
@@ -116,6 +111,7 @@ class ChatSettingsViewModel : GenericSettingsViewModel() {
     val hideEmptyRoomsListener = object : SettingListenerStub() {
         override fun onBoolValueChanged(newValue: Boolean) {
             prefs.hideEmptyRooms = newValue
+            reloadChatRoomsEvent.value = Event(true)
         }
     }
     val hideEmptyRooms = MutableLiveData<Boolean>()
@@ -123,6 +119,7 @@ class ChatSettingsViewModel : GenericSettingsViewModel() {
     val hideRoomsRemovedProxiesListener = object : SettingListenerStub() {
         override fun onBoolValueChanged(newValue: Boolean) {
             prefs.hideRoomsFromRemovedProxies = newValue
+            reloadChatRoomsEvent.value = Event(true)
         }
     }
     val hideRoomsRemovedProxies = MutableLiveData<Boolean>()
@@ -135,6 +132,10 @@ class ChatSettingsViewModel : GenericSettingsViewModel() {
     val goToAndroidNotificationSettingsEvent = MutableLiveData<Event<Boolean>>()
 
     val vfs = MutableLiveData<Boolean>()
+
+    val reloadChatRoomsEvent: MutableLiveData<Event<Boolean>> by lazy {
+        MutableLiveData<Event<Boolean>>()
+    }
 
     init {
         markAsReadNotifDismissal.value = prefs.markAsReadUponChatMessageNotificationDismissal

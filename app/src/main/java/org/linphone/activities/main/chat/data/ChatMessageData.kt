@@ -21,8 +21,7 @@ package org.linphone.activities.main.chat.data
 
 import android.os.CountDownTimer
 import android.text.Spannable
-import android.text.util.Linkify
-import androidx.core.text.util.LinkifyCompat
+import android.util.Patterns
 import androidx.lifecycle.MutableLiveData
 import java.util.regex.Pattern
 import org.linphone.R
@@ -38,8 +37,6 @@ class ChatMessageData(val chatMessage: ChatMessage) : GenericContactData(chatMes
     private var contentListener: OnContentClickedListener? = null
 
     val sendInProgress = MutableLiveData<Boolean>()
-
-    val transferInProgress = MutableLiveData<Boolean>()
 
     val showImdn = MutableLiveData<Boolean>()
 
@@ -60,6 +57,10 @@ class ChatMessageData(val chatMessage: ChatMessage) : GenericContactData(chatMes
     val text = MutableLiveData<Spannable>()
 
     val replyData = MutableLiveData<ChatMessageData>()
+
+    val isDisplayed = MutableLiveData<Boolean>()
+
+    val isOutgoing = chatMessage.isOutgoing
 
     var hasPreviousMessage = false
     var hasNextMessage = false
@@ -154,20 +155,25 @@ class ChatMessageData(val chatMessage: ChatMessage) : GenericContactData(chatMes
     }
 
     private fun updateChatMessageState(state: ChatMessage.State) {
-        transferInProgress.value = state == ChatMessage.State.FileTransferInProgress
-
-        sendInProgress.value = state == ChatMessage.State.InProgress || state == ChatMessage.State.FileTransferInProgress
+        sendInProgress.value = when (state) {
+            ChatMessage.State.InProgress, ChatMessage.State.FileTransferInProgress, ChatMessage.State.FileTransferDone -> true
+            else -> false
+        }
 
         showImdn.value = when (state) {
-            ChatMessage.State.DeliveredToUser, ChatMessage.State.Displayed, ChatMessage.State.NotDelivered -> true
+            ChatMessage.State.DeliveredToUser, ChatMessage.State.Displayed,
+            ChatMessage.State.NotDelivered, ChatMessage.State.FileTransferError -> true
             else -> false
         }
 
         imdnIcon.value = when (state) {
             ChatMessage.State.DeliveredToUser -> R.drawable.chat_delivered
             ChatMessage.State.Displayed -> R.drawable.chat_read
+            ChatMessage.State.FileTransferError, ChatMessage.State.NotDelivered -> R.drawable.chat_error
             else -> R.drawable.chat_error
         }
+
+        isDisplayed.value = state == ChatMessage.State.Displayed
     }
 
     private fun updateContentsList() {
@@ -177,23 +183,42 @@ class ChatMessageData(val chatMessage: ChatMessage) : GenericContactData(chatMes
         val contentsList = chatMessage.contents
         for (index in contentsList.indices) {
             val content = contentsList[index]
-            if (content.isFileTransfer || content.isFile) {
+            if (content.isFileTransfer || content.isFile || content.isIcalendar) {
                 val data = ChatMessageContentData(chatMessage, index)
                 data.listener = contentListener
                 list.add(data)
             } else if (content.isText) {
                 val spannable = Spannable.Factory.getInstance().newSpannable(content.utf8Text?.trim())
-                LinkifyCompat.addLinks(spannable, Linkify.WEB_URLS)
                 text.value = PatternClickableSpan()
                     .add(
-                        Pattern.compile("(sips?):([^@]+)(?:@([^ ]+))?"),
+                        Pattern.compile("(?:<?sips?:)?[a-zA-Z0-9+_.\\-]+(?:@([a-zA-Z0-9+_.\\-;=]+))+(>)?"),
                         object : PatternClickableSpan.SpannableClickedListener {
                             override fun onSpanClicked(text: String) {
                                 Log.i("[Chat Message Data] Clicked on SIP URI: $text")
                                 contentListener?.onSipAddressClicked(text)
                             }
                         }
+                    )
+                    .add(
+                        Patterns.WEB_URL,
+                        object : PatternClickableSpan.SpannableClickedListener {
+                            override fun onSpanClicked(text: String) {
+                                Log.i("[Chat Message Data] Clicked on web URL: $text")
+                                contentListener?.onWebUrlClicked(text)
+                            }
+                        }
+                    )
+                    .add(
+                        Patterns.PHONE,
+                        object : PatternClickableSpan.SpannableClickedListener {
+                            override fun onSpanClicked(text: String) {
+                                Log.i("[Chat Message Data] Clicked on phone number: $text")
+                                contentListener?.onSipAddressClicked(text)
+                            }
+                        }
                     ).build(spannable)
+            } else {
+                Log.e("[Chat Message Data] Unexpected content with type: ${content.type}/${content.subtype}")
             }
         }
 

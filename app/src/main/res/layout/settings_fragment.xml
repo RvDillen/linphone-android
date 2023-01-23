@@ -7,9 +7,6 @@
         <import type="android.view.View"/>
         <import type="android.text.InputType"/>
         <variable
-            name="backClickListener"
-            type="android.view.View.OnClickListener"/>
-        <variable
             name="viewModel"
             type="org.linphone.activities.main.settings.viewmodels.SettingsViewModel" />
     </data>
@@ -21,7 +18,7 @@
         tools:context=".MainActivity">
 
         <RelativeLayout
-            android:layout_width="280dp"
+            android:layout_width="@dimen/master_fragment_width"
             android:layout_height="match_parent"
             android:layout_gravity="start">
 
@@ -35,7 +32,6 @@
 
                 <ImageView
                     android:id="@+id/back"
-                    android:onClick="@{backClickListener}"
                     android:contentDescription="@string/content_description_go_back"
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
@@ -152,6 +148,13 @@
                         linphone:listener="@{viewModel.callSettingsListener}"
                         linphone:title="@{@string/settings_call_title}"
                         linphone:icon="@{@drawable/settings_call}" />
+
+                    <include
+                        layout="@layout/settings_widget_basic"
+                        android:visibility="@{viewModel.showConferencesSettings ? View.VISIBLE : View.GONE}"
+                        linphone:listener="@{viewModel.conferencesSettingsListener}"
+                        linphone:title="@{@string/settings_conferences_title}"
+                        linphone:icon="@{@drawable/settings_conferences}" />
 
                     <include
                         layout="@layout/settings_widget_basic"

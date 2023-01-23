@@ -20,6 +20,9 @@
             name="aboutClickListener"
             type="android.view.View.OnClickListener"/>
         <variable
+            name="conferencesClickListener"
+            type="android.view.View.OnClickListener"/>
+        <variable
             name="quitClickListener"
             type="android.view.View.OnClickListener"/>
         <variable
@@ -43,30 +46,32 @@
             android:background="?attr/lightToolbarBackgroundColor">
 
             <ImageView
-                android:visibility="@{viewModel.defaultAccountFound ? View.VISIBLE : View.GONE}"
-                android:onClick="@{selfPictureClickListener}"
                 android:id="@+id/avatar"
+                coilRounded="@{viewModel.defaultAccountAvatar}"
                 android:layout_width="wrap_content"
                 android:layout_height="match_parent"
+                android:layout_margin="10dp"
                 android:adjustViewBounds="true"
-                android:padding="10dp"
-                android:src="@drawable/avatar"
+                android:background="@drawable/generated_avatar_bg"
                 android:contentDescription="@string/content_description_change_own_picture"
-                glideAvatarFallback="@{viewModel.defaultAccountAvatar}" />
+                android:onClick="@{selfPictureClickListener}"
+                android:src="@drawable/icon_single_contact_avatar"
+                android:visibility="@{viewModel.defaultAccountFound ? View.VISIBLE : View.GONE}" />
 
             <ImageView
-                android:visibility="@{viewModel.defaultAccountFound ? View.VISIBLE : View.GONE}"
+                android:id="@+id/avatar_border"
                 android:layout_width="wrap_content"
                 android:layout_height="match_parent"
+                android:layout_margin="10dp"
                 android:adjustViewBounds="true"
-                android:padding="10dp"
                 android:contentDescription="@null"
-                android:src="@drawable/avatar_border" />
+                android:src="@drawable/avatar_border"
+                android:visibility="@{viewModel.defaultAccountFound ? View.VISIBLE : View.GONE}" />
 
             <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="match_parent"
-                android:layout_toRightOf="@id/avatar"
+                android:layout_toRightOf="@id/avatar_border"
                 android:gravity="center_vertical"
                 android:orientation="vertical">
 
@@ -162,6 +167,7 @@
                 </LinearLayout>
 
                 <View
+                    android:visibility="@{viewModel.showAssistant ? View.VISIBLE : View.GONE}"
                     android:layout_width="match_parent"
                     android:layout_height="1dp"
                     android:background="?dividerColor" />
@@ -191,6 +197,7 @@
                 </LinearLayout>
 
                 <View
+                    android:visibility="@{viewModel.showSettings ? View.VISIBLE : View.GONE}"
                     android:layout_width="match_parent"
                     android:layout_height="1dp"
                     android:background="?dividerColor" />
@@ -220,6 +227,37 @@
                 </LinearLayout>
 
                 <View
+                    android:visibility="@{viewModel.showRecordings ? View.VISIBLE : View.GONE}"
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="?dividerColor" />
+
+                <LinearLayout
+                    android:onClick="@{conferencesClickListener}"
+                    android:visibility="@{viewModel.showScheduledConferences ? View.VISIBLE : View.GONE}"
+                    android:layout_width="match_parent"
+                    android:layout_height="45dp">
+
+                    <ImageView
+                        android:layout_width="45dp"
+                        android:layout_height="45dp"
+                        android:padding="7dp"
+                        android:contentDescription="@string/conference_scheduled"
+                        android:src="@drawable/icon_meeting_schedule" />
+
+                    <TextView
+                        android:text="@string/conference_scheduled"
+                        style="@style/standard_text_font"
+                        android:layout_width="match_parent"
+                        android:layout_height="45dp"
+                        android:gravity="center_vertical"
+                        android:paddingLeft="5dp"
+                        android:paddingRight="16dp" />
+
+                </LinearLayout>
+
+                <View
+                    android:visibility="@{viewModel.showScheduledConferences ? View.VISIBLE : View.GONE}"
                     android:layout_width="match_parent"
                     android:layout_height="1dp"
                     android:background="?dividerColor" />
@@ -249,6 +287,7 @@
                 </LinearLayout>
 
                 <View
+                    android:visibility="@{viewModel.showAbout ? View.VISIBLE : View.GONE}"
                     android:layout_width="match_parent"
                     android:layout_height="1dp"
                     android:background="?dividerColor" />

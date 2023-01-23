@@ -27,7 +27,6 @@ import kotlin.math.max
 import org.linphone.activities.main.chat.data.EventLogData
 import org.linphone.core.*
 import org.linphone.core.tools.Log
-import org.linphone.mediastream.Version
 import org.linphone.utils.Event
 import org.linphone.utils.LinphoneUtils
 import org.linphone.utils.PermissionHelper
@@ -57,31 +56,10 @@ class ChatMessagesListViewModel(private val chatRoom: ChatRoom) : ViewModel() {
     }
 
     private val chatRoomListener: ChatRoomListenerStub = object : ChatRoomListenerStub() {
-        override fun onChatMessageReceived(chatRoom: ChatRoom, eventLog: EventLog) {
-            if (eventLog.type == EventLog.Type.ConferenceChatMessage) {
-                val chatMessage = eventLog.chatMessage
-                chatMessage ?: return
-                chatMessage.userData = events.value.orEmpty().size
-
-                val existingEvent = events.value.orEmpty().find { data ->
-                    data.eventLog == eventLog
-                }
-                if (existingEvent != null) {
-                    Log.w("[Chat Messages] Found already present chat message, don't add it it's probably the result of an auto download")
-                    return
-                }
-
-                if (Version.sdkStrictlyBelow(Version.API29_ANDROID_10) && !PermissionHelper.get().hasWriteExternalStoragePermission()) {
-                    for (content in chatMessage.contents) {
-                        if (content.isFileTransfer) {
-                            Log.i("[Chat Messages] Android < 10 detected and WRITE_EXTERNAL_STORAGE permission isn't granted yet")
-                            requestWriteExternalStoragePermissionEvent.value = Event(true)
-                        }
-                    }
-                }
+        override fun onChatMessagesReceived(chatRoom: ChatRoom, eventLogs: Array<out EventLog>) {
+            for (eventLog in eventLogs) {
+                addChatMessageEventLog(eventLog)
             }
-
-            addEvent(eventLog)
         }
 
         override fun onChatMessageSending(chatRoom: ChatRoom, eventLog: EventLog) {
@@ -245,5 +223,32 @@ class ChatMessagesListViewModel(private val chatRoom: ChatRoom) : ViewModel() {
 
         events.value.orEmpty().forEach(EventLogData::destroy)
         events.value = getEvents()
+    }
+
+    private fun addChatMessageEventLog(eventLog: EventLog) {
+        if (eventLog.type == EventLog.Type.ConferenceChatMessage) {
+            val chatMessage = eventLog.chatMessage
+            chatMessage ?: return
+            chatMessage.userData = events.value.orEmpty().size
+
+            val existingEvent = events.value.orEmpty().find { data ->
+                data.eventLog.type == EventLog.Type.ConferenceChatMessage && data.eventLog.chatMessage?.messageId == chatMessage.messageId
+            }
+            if (existingEvent != null) {
+                Log.w("[Chat Messages] Found already present chat message, don't add it it's probably the result of an auto download or an aggregated message received before but notified after the conversation was displayed")
+                return
+            }
+
+            if (!PermissionHelper.get().hasWriteExternalStoragePermission()) {
+                for (content in chatMessage.contents) {
+                    if (content.isFileTransfer) {
+                        Log.i("[Chat Messages] Android < 10 detected and WRITE_EXTERNAL_STORAGE permission isn't granted yet")
+                        requestWriteExternalStoragePermissionEvent.value = Event(true)
+                    }
+                }
+            }
+        }
+
+        addEvent(eventLog)
     }
 }

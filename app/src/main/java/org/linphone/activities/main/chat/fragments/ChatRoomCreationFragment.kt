@@ -23,28 +23,25 @@ import android.content.pm.PackageManager
 import android.os.Bundle
 import android.view.View
 import androidx.lifecycle.ViewModelProvider
-import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
-import org.linphone.LinphoneApplication
+import org.linphone.LinphoneApplication.Companion.coreContext
+import org.linphone.LinphoneApplication.Companion.corePreferences
 import org.linphone.R
 import org.linphone.activities.main.MainActivity
-import org.linphone.activities.main.chat.adapters.ChatRoomCreationContactsAdapter
 import org.linphone.activities.main.chat.viewmodels.ChatRoomCreationViewModel
 import org.linphone.activities.main.fragments.SecureFragment
-import org.linphone.activities.main.viewmodels.SharedMainViewModel
 import org.linphone.activities.navigateToChatRoom
-import org.linphone.activities.navigateToEmptyChatRoom
 import org.linphone.activities.navigateToGroupInfo
+import org.linphone.contact.ContactsSelectionAdapter
 import org.linphone.core.tools.Log
 import org.linphone.databinding.ChatRoomCreationFragmentBinding
 import org.linphone.utils.AppUtils
-import org.linphone.utils.Event
+import org.linphone.utils.LinphoneUtils
 import org.linphone.utils.PermissionHelper
 
 class ChatRoomCreationFragment : SecureFragment<ChatRoomCreationFragmentBinding>() {
     private lateinit var viewModel: ChatRoomCreationViewModel
-    private lateinit var sharedViewModel: SharedMainViewModel
-    private lateinit var adapter: ChatRoomCreationContactsAdapter
+    private lateinit var adapter: ContactsSelectionAdapter
 
     override fun getLayoutId(): Int = R.layout.chat_room_creation_fragment
 
@@ -52,10 +49,6 @@ class ChatRoomCreationFragment : SecureFragment<ChatRoomCreationFragmentBinding>
         super.onViewCreated(view, savedInstanceState)
 
         binding.lifecycleOwner = viewLifecycleOwner
-
-        sharedViewModel = requireActivity().run {
-            ViewModelProvider(this)[SharedMainViewModel::class.java]
-        }
 
         useMaterialSharedAxisXForwardAnimation = sharedViewModel.isSlidingPaneSlideable.value == false
 
@@ -68,20 +61,17 @@ class ChatRoomCreationFragment : SecureFragment<ChatRoomCreationFragmentBinding>
 
         binding.viewModel = viewModel
 
-        adapter = ChatRoomCreationContactsAdapter(viewLifecycleOwner)
-        adapter.groupChatEnabled = viewModel.createGroupChat.value == true
-        adapter.updateSecurity(viewModel.isEncrypted.value == true)
+        adapter = ContactsSelectionAdapter(viewLifecycleOwner)
+        adapter.setGroupChatCapabilityRequired(viewModel.createGroupChat.value == true)
+        adapter.setLimeCapabilityRequired(viewModel.isEncrypted.value == true)
         binding.contactsList.adapter = adapter
 
-        val layoutManager = LinearLayoutManager(activity)
+        val layoutManager = LinearLayoutManager(requireContext())
         binding.contactsList.layoutManager = layoutManager
 
         // Divider between items
         binding.contactsList.addItemDecoration(AppUtils.getDividerDecoration(requireContext(), layoutManager))
 
-        binding.setBackClickListener {
-            goBack()
-        }
         binding.back.visibility = if (resources.getBoolean(R.bool.isTablet)) View.INVISIBLE else View.VISIBLE
 
         binding.setAllContactsToggleClickListener {
@@ -101,13 +91,13 @@ class ChatRoomCreationFragment : SecureFragment<ChatRoomCreationFragmentBinding>
         viewModel.isEncrypted.observe(
             viewLifecycleOwner
         ) {
-            adapter.updateSecurity(it)
+            adapter.setLimeCapabilityRequired(it)
         }
 
         viewModel.sipContactsSelected.observe(
             viewLifecycleOwner
         ) {
-            viewModel.updateContactsList()
+            viewModel.applyFilter()
         }
 
         viewModel.selectedAddresses.observe(
@@ -152,7 +142,7 @@ class ChatRoomCreationFragment : SecureFragment<ChatRoomCreationFragmentBinding>
             navigateToGroupInfo()
         }
 
-        viewModel.onErrorEvent.observe(
+        viewModel.onMessageToNotifyEvent.observe(
             viewLifecycleOwner
         ) {
             it.consume { messageResourceId ->
@@ -160,22 +150,15 @@ class ChatRoomCreationFragment : SecureFragment<ChatRoomCreationFragmentBinding>
             }
         }
 
-        if (!PermissionHelper.get().hasReadContactsPermission()) {
-            Log.i("[Chat Room Creation] Asking for READ_CONTACTS permission")
-            requestPermissions(arrayOf(android.Manifest.permission.READ_CONTACTS), 0)
-        }
-    }
-
-    override fun goBack() {
-        if (!findNavController().popBackStack()) {
-            if (sharedViewModel.isSlidingPaneSlideable.value == true) {
-                sharedViewModel.closeSlidingPaneEvent.value = Event(true)
-            } else {
-                navigateToEmptyChatRoom()
+        if (corePreferences.enableNativeAddressBookIntegration) {
+            if (!PermissionHelper.get().hasReadContactsPermission()) {
+                Log.i("[Chat Room Creation] Asking for READ_CONTACTS permission")
+                requestPermissions(arrayOf(android.Manifest.permission.READ_CONTACTS), 0)
             }
         }
     }
 
+    @Deprecated("Deprecated in Java")
     override fun onRequestPermissionsResult(
         requestCode: Int,
         permissions: Array<out String>,
@@ -185,12 +168,17 @@ class ChatRoomCreationFragment : SecureFragment<ChatRoomCreationFragmentBinding>
             val granted = grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED
             if (granted) {
                 Log.i("[Chat Room Creation] READ_CONTACTS permission granted")
-                LinphoneApplication.coreContext.contactsManager.onReadContactsPermissionGranted()
-                LinphoneApplication.coreContext.contactsManager.fetchContactsAsync()
+                coreContext.fetchContacts()
             } else {
                 Log.w("[Chat Room Creation] READ_CONTACTS permission denied")
             }
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+
+        viewModel.secureChatAvailable.value = LinphoneUtils.isEndToEndEncryptedChatAvailable()
     }
 
     private fun addParticipantsFromSharedViewModel() {

@@ -26,6 +26,7 @@ size=vga
 [app]
 tunnel=disabled
 auto_start=1
+record_aware=1
 
 [tunnel]
 host=
@@ -38,6 +39,7 @@ file_transfer_server_url=https://www.linphone.org:444/lft.php
 version_check_url_root=
 max_calls=10
 history_max_size=100
+conference_layout=1
 
 [in-app-purchase]
 server_url=https://subscribe.linphone.org:444/inapp.php

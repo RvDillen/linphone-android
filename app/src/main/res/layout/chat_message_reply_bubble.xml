@@ -39,7 +39,7 @@
                 android:layout_height="wrap_content"
                 app:layout_constraintTop_toTopOf="parent"
                 app:layout_constraintLeft_toLeftOf="parent"
-                app:layout_constraintWidth_max="120dp"
+                app:layout_constraintWidth_max="@dimen/chat_message_content_preview_max_width"
                 app:entries="@{data.contents}"
                 app:layout="@{@layout/chat_message_reply_content_cell}"
                 app:flexWrap="wrap"
@@ -61,7 +61,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 style="@style/chat_message_reply_sender_font"
-                android:text="@{data.contact.fullName ?? data.displayName, default=Tintin}"/>
+                android:text="@{data.contact.name ?? data.displayName, default=Tintin}"/>
 
             <TextView
                 android:visibility="@{data.text.length() == 0 ? View.GONE : View.VISIBLE}"
@@ -69,6 +69,8 @@
                 android:layout_height="wrap_content"
                 android:singleLine="false"
                 android:layout_marginTop="5dp"
+                android:maxLines="5"
+                android:ellipsize="end"
                 style="@style/chat_message_reply_font"
                 android:text="@{data.text, default=`Lorem ipsum`}"/>
 

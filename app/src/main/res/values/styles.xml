@@ -7,22 +7,22 @@
     </style>
 
     <!-- Base application theme. -->
-
-    <style name="AppTheme" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+    <style name="BaseAppTheme" parent="Theme.MaterialComponents.DayNight.NoActionBar">
         <!-- Disable animations between activities -->
         <item name="android:windowAnimationStyle">@null</item>
         <item name="android:windowBackground">@color/transparent_color</item>
 
         <!-- Android theme override -->
+        <item name="android:scrollbarThumbVertical">@color/light_grey_color</item>
         <item name="colorAccent">@color/primary_color</item>
         <item name="colorPrimary">@color/primary_color</item>
         <item name="android:colorPrimary">@color/primary_color</item>
         <!-- Comment out the following line to disable system's status bar coloring -->
         <item name="android:colorPrimaryDark">@color/primary_dark_color</item>
+
         <item name="android:textColorPrimary">@color/light_primary_text_color</item>
         <item name="android:textColorSecondary">@color/grey_color</item>
         <item name="android:textColorHint">@color/light_grey_color</item>
-        <item name="android:colorBackground">@color/white_color</item>
         <item name="android:textColorPrimaryInverse">@color/white_color</item>
 
         <item name="accentColor">@color/primary_color</item>
@@ -35,6 +35,8 @@
 
         <item name="backgroundColor">@color/white_color</item>
         <item name="backgroundColor2">@color/header_background_color</item>
+        <item name="backgroundColor3">@color/voip_light_gray</item>
+        <item name="backgroundColor4">@color/header_background_color</item>
         <item name="backgroundContrastColor">@color/dark_grey_color</item>
         <item name="dividerColor">@color/light_grey_color</item>
 
@@ -45,18 +47,31 @@
         <item name="drawableTintColor3">@color/light_grey_color</item>
 
         <item name="lightToolbarBackgroundColor">@color/toolbar_color</item>
-        <item name="lightToolbarBackgroundDisabledColor">@color/light_grey_color</item>
         <item name="lightToolbarTextColor">@color/dark_grey_color</item>
         <item name="darkToolbarBackgroundColor">@color/dark_grey_color</item>
         <item name="darkToolbarTextColor">@color/white_color</item>
 
         <item name="button_background_drawable">@drawable/button_background_light</item>
+
+        <item name="voipBackgroundColor">@color/voip_gray_blue_color</item>
+        <item name="voipBackgroundBWColor">@color/white_color</item>
+        <item name="voipParticipantBackgroundColor">@color/voip_gray_background</item>
+        <item name="voipMeParticipantBackgroundColor">@color/voip_dark_color3</item>
+        <item name="voipExtraButtonsBackgroundColor">@color/voip_gray</item>
+        <item name="voipToolbarBackgroundColor">@color/toolbar_color</item>
+        <item name="voipDrawableColor">@color/voip_dark_gray</item>
+        <item name="voipDrawableColor2">@color/white_color</item>
+        <item name="voipDrawablePressedColor">@color/voip_dark_gray</item>
+        <item name="voipDrawableDisabledColor">@color/light_grey_color</item>
+        <item name="voipTextColor">@color/voip_dark_gray</item>
+        <item name="voipTextColor2">@color/voip_dark_gray</item>
+        <item name="voipFormBackgroundColor">@color/form_field_gray_background</item>
+        <item name="voipFormFieldBackgroundColor">@color/light_grey_color</item>
+        <item name="voipFormDisabledFieldBackgroundColor">@color/header_background_color</item>
+        <item name="voipCancelledMeetingBackgroundColor">@color/voip_conference_cancelled_bg_color_light</item>
     </style>
 
-    <style name="FullScreenTheme" parent="@style/AppTheme">
-        <item name="android:windowTranslucentStatus">true</item>
-        <item name="android:windowTranslucentNavigation">true</item>
-    </style>
+    <style name="AppTheme" parent="BaseAppTheme" />
 
     <!-- Numpad -->
 
@@ -66,6 +81,15 @@
         <item name="android:layout_height">wrap_content</item>
         <item name="layout_maxWidth">50dp</item>
         <item name="layout_maxHeight">50dp</item>
+    </style>
+
+    <style name="call_numpad_digit" parent="@android:style/TextAppearance.Medium">
+        <item name="android:textColor">@android:color/transparent</item>
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">0dp</item>
+        <item name="android:layout_margin">5dp</item>
+        <item name="android:padding">15dp</item>
+        <item name="android:background">@drawable/button_call_numpad_background</item>
     </style>
 
     <!-- Assistant related -->
@@ -95,6 +119,185 @@
         <item name="android:textSize">16sp</item>
     </style>
 
+    <!-- Conference scheduling related -->
+
+    <style name="conference_scheduling_address_font" parent="@android:style/TextAppearance.Medium">
+        <item name="android:textColor">@color/voip_conf_address_text_color</item>
+        <item name="android:textSize">16sp</item>
+    </style>
+
+    <style name="conference_scheduling_font" parent="@android:style/TextAppearance.Medium">
+        <item name="android:textColor">?attr/voipTextColor</item>
+        <item name="android:textSize">16sp</item>
+    </style>
+
+    <style name="conference_scheduling_font_alt" parent="@android:style/TextAppearance.Medium">
+        <item name="android:textColor">?attr/voipTextColor2</item>
+        <item name="android:textSize">16sp</item>
+    </style>
+
+    <style name="conference_scheduling_participant_sip_uri_font" parent="@android:style/TextAppearance.Medium">
+        <item name="android:textColor">?attr/accentColor</item>
+        <item name="android:textSize">14sp</item>
+    </style>
+
+    <style name="conference_invite_title_font" parent="@android:style/TextAppearance.Medium">
+        <item name="android:textColor">?attr/lightToolbarTextColor</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textSize">16sp</item>
+    </style>
+
+    <style name="conference_update_title_font" parent="@android:style/TextAppearance.Medium">
+        <item name="android:textColor">@color/voip_conference_updated_color</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textSize">16sp</item>
+    </style>
+
+    <style name="conference_cancel_title_font" parent="@android:style/TextAppearance.Medium">
+        <item name="android:textColor">@color/voip_conference_cancelled_title_color</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textSize">16sp</item>
+    </style>
+
+    <style name="conference_invite_subject_font" parent="@android:style/TextAppearance.Medium">
+        <item name="android:textColor">?attr/voipTextColor2</item>
+        <item name="android:textSize">16sp</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+
+    <style name="conference_invite_desc_title_font" parent="@android:style/TextAppearance.Medium">
+        <item name="android:textColor">?attr/lightToolbarTextColor</item>
+        <item name="android:textSize">16sp</item>
+    </style>
+
+    <style name="conference_invite_desc_font" parent="@android:style/TextAppearance.Medium">
+        <item name="android:textColor">?attr/lightToolbarTextColor</item>
+        <item name="android:textSize">14sp</item>
+    </style>
+
+    <style name="conference_invite_dat_time_font" parent="@android:style/TextAppearance.Small">
+        <item name="android:textColor">?attr/lightToolbarTextColor</item>
+        <item name="android:textSize">13sp</item>
+    </style>
+
+    <style name="conference_invite_join_font" parent="@android:style/TextAppearance.Medium">
+        <item name="android:textColor">@color/white_color</item>
+        <item name="android:textAllCaps">true</item>
+        <item name="android:textSize">18sp</item>
+    </style>
+
+    <style name="conference_waiting_room_no_video_font" parent="@android:style/TextAppearance.Medium">
+        <item name="android:textColor">@color/white_color</item>
+        <item name="android:textSize">16sp</item>
+    </style>
+
+    <style name="conference_waiting_room_subject_font" parent="@android:style/TextAppearance.Large">
+        <item name="android:textColor">@color/white_color</item>
+        <item name="android:textSize">20sp</item>
+    </style>
+
+    <!-- Call related -->
+
+    <style name="call_remote_name_font" parent="@android:style/TextAppearance.Medium">
+        <item name="android:textColor">@color/white_color</item>
+        <item name="android:textSize">18sp</item>
+        <item name="android:singleLine">true</item>
+        <item name="android:ellipsize">end</item>
+        <item name="autoSizeTextType">uniform</item>
+        <item name="autoSizeMinTextSize">12sp</item>
+        <item name="autoSizeMaxTextSize">18sp</item>
+        <item name="autoSizeStepGranularity">@dimen/settings_granularity_step</item>
+    </style>
+
+    <style name="call_remote_name_small_font" parent="@android:style/TextAppearance.Medium">
+        <item name="android:textColor">@color/white_color</item>
+        <item name="android:textSize">16sp</item>
+        <item name="autoSizeTextType">uniform</item>
+        <item name="autoSizeMinTextSize">12sp</item>
+        <item name="autoSizeMaxTextSize">16sp</item>
+        <item name="autoSizeStepGranularity">@dimen/settings_granularity_step</item>
+    </style>
+
+    <style name="call_options_font" parent="@android:style/TextAppearance.Medium">
+        <item name="android:textColor">@color/voip_extra_button_text_color</item>
+        <item name="android:textSize">12sp</item>
+    </style>
+
+    <style name="calls_list_header_font" parent="@android:style/TextAppearance.Large">
+        <item name="android:textColor">?attr/voipTextColor</item>
+        <item name="android:textSize">20sp</item>
+    </style>
+
+    <style name="call_list_active_name_font" parent="@android:style/TextAppearance.Medium">
+        <item name="android:textColor">@color/white_color</item>
+        <item name="android:textSize">18sp</item>
+    </style>
+
+    <style name="call_list_name_font" parent="@android:style/TextAppearance.Medium">
+        <item name="android:textColor">?attr/voipTextColor</item>
+        <item name="android:textSize">18sp</item>
+    </style>
+
+    <style name="call_list_active_sip_uri_font" parent="@android:style/TextAppearance.Medium">
+        <item name="android:textColor">@color/white_color</item>
+        <item name="android:textSize">12sp</item>
+    </style>
+
+    <style name="call_list_sip_uri_font" parent="@android:style/TextAppearance.Medium">
+        <item name="android:textColor">?attr/voipTextColor</item>
+        <item name="android:textSize">12sp</item>
+    </style>
+
+    <style name="call_context_menu_item_font" parent="@android:style/TextAppearance.Medium">
+        <item name="android:textColor">@color/white_color</item>
+        <item name="android:textSize">16sp</item>
+        <item name="android:gravity">center_vertical</item>
+        <item name="android:textAllCaps">true</item>
+        <item name="android:paddingLeft">20dp</item>
+        <item name="android:paddingRight">20dp</item>
+    </style>
+
+    <style name="conference_paused_title_font" parent="@android:style/TextAppearance.Medium">
+        <item name="android:textColor">@color/white_color</item>
+        <item name="android:textSize">30sp</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+
+    <style name="conference_paused_subtitle_font" parent="@android:style/TextAppearance.Medium">
+        <item name="android:textColor">@color/white_color</item>
+        <item name="android:textSize">20sp</item>
+    </style>
+
+    <style name="call_header_title" parent="@android:style/TextAppearance.Medium">
+        <item name="android:textColor">@color/white_color</item>
+        <item name="android:textSize">18sp</item>
+    </style>
+
+    <style name="call_header_subtitle" parent="@android:style/TextAppearance.Medium">
+        <item name="android:textColor">@color/white_color</item>
+        <item name="android:textSize">14sp</item>
+    </style>
+
+    <style name="call_remote_recording_font" parent="@android:style/TextAppearance.Medium">
+        <item name="android:textColor">@color/white_color</item>
+        <item name="android:textSize">16sp</item>
+    </style>
+
+    <style name="call_stats_title_font" parent="@android:style/TextAppearance.Medium">
+        <item name="android:textColor">@color/white_color</item>
+        <item name="android:textSize">18sp</item>
+    </style>
+
+    <style name="call_stats_font" parent="@android:style/TextAppearance.Medium">
+        <item name="android:textColor">@color/white_color</item>
+        <item name="android:textSize">12sp</item>
+    </style>
+
+    <style name="call_dtmf_history_font" parent="@android:style/TextAppearance.Medium">
+        <item name="android:textColor">@color/white_color</item>
+        <item name="android:textSize">35sp</item>
+    </style>
+
     <!-- Contact related -->
 
     <style name="contact_organization_font" parent="@android:style/TextAppearance.Small">
@@ -119,6 +322,15 @@
 
     <!-- Chat related -->
 
+    <style name="chat_room_last_updated_time_font" parent="@android:style/TextAppearance.Medium">
+        <item name="android:textColor">@color/primary_color</item>
+        <item name="android:textSize">16sp</item>
+        <item name="autoSizeTextType">uniform</item>
+        <item name="autoSizeMinTextSize">8sp</item>
+        <item name="autoSizeMaxTextSize">16sp</item>
+        <item name="autoSizeStepGranularity">@dimen/settings_granularity_step</item>
+    </style>
+
     <style name="chat_message_reply_sender_font">
         <item name="android:textColor">@color/light_primary_text_color</item>
         <item name="android:textSize">13sp</item>
@@ -131,23 +343,19 @@
         <item name="android:fontFamily">sans-serif</item>
     </style>
 
-    <!-- Call stats -->
-
-    <style name="call_stats_title_font" parent="@android:style/TextAppearance.Medium">
-        <item name="android:textColor">?attr/primaryTextColor</item>
-        <item name="android:textSize">18sp</item>
-    </style>
-
-    <style name="call_stats_font" parent="@android:style/TextAppearance.Medium">
-        <item name="android:textColor">?attr/primaryTextColor</item>
-        <item name="android:textSize">12sp</item>
+    <style name="chat_message_reply_forward_indicator_font">
+        <item name="android:textColor">@color/chat_bubble_text_color</item>
+        <item name="android:textSize">10sp</item>
+        <item name="android:textStyle">normal</item>
+        <item name="android:lineSpacingExtra">3.3sp</item>
+        <item name="android:fontFamily">sans-serif</item>
     </style>
 
     <!-- Dialog related -->
 
     <style name="dialog_title_font" parent="@android:style/TextAppearance.Medium">
         <item name="android:textColor">@color/white_color</item>
-        <item name="android:textSize">21.7sp</item>
+        <item name="android:textSize">20sp</item>
         <item name="android:textStyle">bold</item>
         <item name="android:fontFamily">sans-serif</item>
         <item name="android:lineSpacingExtra">6.7sp</item>
@@ -155,7 +363,7 @@
 
     <style name="dialog_message_font" parent="@android:style/TextAppearance.Small">
         <item name="android:textColor">@color/white_color</item>
-        <item name="android:textSize">21sp</item>
+        <item name="android:textSize">18sp</item>
     </style>
 
     <style name="dialog_cancel_button_font" parent="@android:style/TextAppearance.Medium">
@@ -180,7 +388,7 @@
 
     <style name="dialog_zrtp_white_font" parent="@android:style/TextAppearance.Medium">
         <item name="android:textColor">@color/white_color</item>
-        <item name="android:textSize">20sp</item>
+        <item name="android:textSize">18sp</item>
         <item name="android:fontFamily">sans-serif</item>
         <item name="android:lineSpacingExtra">8.3sp</item>
     </style>
@@ -214,13 +422,6 @@
 
     <!-- UI various fonts -->
 
-    <style name="toolbar_title_font" parent="@android:style/TextAppearance.Medium">
-        <item name="android:textColor">?attr/accentColor</item>
-        <item name="android:textAllCaps">true</item>
-        <item name="android:textStyle">bold</item>
-        <item name="android:textSize">24sp</item>
-    </style>
-
     <style name="accent_colored_title_font" parent="@android:style/TextAppearance.Medium">
         <item name="android:textColor">?attr/accentColor</item>
         <item name="android:textAllCaps">true</item>
@@ -230,7 +431,7 @@
 
     <style name="sip_uri_font" parent="@android:style/TextAppearance.Medium">
         <item name="android:textColor">?attr/accentColor</item>
-        <item name="android:textSize">16sp</item>
+        <item name="android:textSize">14sp</item>
     </style>
 
     <style name="sip_uri_small_font" parent="@android:style/TextAppearance.Medium">
@@ -265,16 +466,6 @@
         <item name="android:textSize">16sp</item>
     </style>
 
-    <style name="button_small_font" parent="@android:style/TextAppearance.Small">
-        <item name="android:textColor">?attr/primaryTextColor</item>
-        <item name="android:textSize">13sp</item>
-    </style>
-
-    <style name="button_tiny_font" parent="@android:style/TextAppearance.Small">
-        <item name="android:textColor">?attr/primarySubtextDarkColor</item>
-        <item name="android:textSize">10sp</item>
-    </style>
-
     <style name="standard_small_text_font" parent="@android:style/TextAppearance.Medium">
         <item name="android:textColor">?attr/primarySubtextDarkColor</item>
         <item name="android:textSize">15sp</item>
@@ -286,8 +477,21 @@
     </style>
 
     <style name="file_transfer_progress_font" parent="@android:style/TextAppearance.Medium">
-        <item name="android:textColor">?attr/secondaryTextColor</item>
+        <item name="android:textColor">?attr/accentTextColor</item>
         <item name="android:textSize">12sp</item>
     </style>
 
+    <style name="big_orange_button_bold_font" parent="@android:style/TextAppearance.Large">
+        <item name="android:textColor">@color/white_color</item>
+        <item name="android:textAllCaps">true</item>
+        <item name="android:textSize">15sp</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+
+    <style name="big_orange_button_font" parent="@android:style/TextAppearance.Large">
+        <item name="android:textColor">@color/white_color</item>
+        <item name="android:textAllCaps">true</item>
+        <item name="android:textSize">15sp</item>
+        <item name="android:textStyle">bold</item>
+    </style>
 </resources>

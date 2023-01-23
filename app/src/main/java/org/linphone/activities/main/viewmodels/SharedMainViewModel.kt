@@ -22,8 +22,8 @@ package org.linphone.activities.main.viewmodels
 import android.net.Uri
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
+import org.linphone.LinphoneApplication.Companion.corePreferences
 import org.linphone.activities.main.history.data.GroupedCallLogData
-import org.linphone.contact.Contact
 import org.linphone.core.*
 import org.linphone.utils.Event
 
@@ -32,7 +32,6 @@ class SharedMainViewModel : ViewModel() {
 
     val layoutChangedEvent = MutableLiveData<Event<Boolean>>()
     var isSlidingPaneSlideable = MutableLiveData<Boolean>()
-    val closeSlidingPaneEvent = MutableLiveData<Event<Boolean>>()
 
     /* Call history */
 
@@ -61,7 +60,7 @@ class SharedMainViewModel : ViewModel() {
 
     val contentToOpen = MutableLiveData<Content>()
 
-    var createEncryptedChatRoom: Boolean = false
+    var createEncryptedChatRoom: Boolean = corePreferences.forceEndToEndEncryptedChat
 
     val chatRoomParticipants = MutableLiveData<ArrayList<Address>>()
 
@@ -70,13 +69,17 @@ class SharedMainViewModel : ViewModel() {
     // When using keyboard to share gif or other, see RichContentReceiver & RichEditText classes
     val richContentUri = MutableLiveData<Event<Uri>>()
 
+    val refreshChatRoomInListEvent: MutableLiveData<Event<Boolean>> by lazy {
+        MutableLiveData<Event<Boolean>>()
+    }
+
     /* Contacts */
 
     val contactFragmentOpenedEvent: MutableLiveData<Event<Boolean>> by lazy {
         MutableLiveData<Event<Boolean>>()
     }
 
-    val selectedContact = MutableLiveData<Contact>()
+    val selectedContact = MutableLiveData<Friend>()
 
     // For correct animations directions
     val updateContactsAnimationsBasedOnDestination: MutableLiveData<Event<Int>> by lazy {
@@ -84,6 +87,8 @@ class SharedMainViewModel : ViewModel() {
     }
 
     /* Accounts */
+
+    val defaultAccountChanged = MutableLiveData<Boolean>()
 
     val accountRemoved = MutableLiveData<Boolean>()
 
@@ -94,6 +99,16 @@ class SharedMainViewModel : ViewModel() {
     /* Call */
 
     var pendingCallTransfer: Boolean = false
+
+    /* Conference */
+
+    val addressOfConferenceInfoToEdit: MutableLiveData<Event<String>> by lazy {
+        MutableLiveData<Event<String>>()
+    }
+
+    val participantsListForNextScheduledMeeting: MutableLiveData<Event<ArrayList<Address>>> by lazy {
+        MutableLiveData<Event<ArrayList<Address>>>()
+    }
 
     /* Dialer */
 

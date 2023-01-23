@@ -29,10 +29,10 @@ import com.google.android.material.transition.MaterialSharedAxis
 import org.linphone.LinphoneApplication.Companion.corePreferences
 import org.linphone.R
 import org.linphone.activities.*
+import org.linphone.activities.main.fragments.MasterFragment
 import org.linphone.activities.main.fragments.SecureFragment
 import org.linphone.activities.main.settings.SettingListenerStub
 import org.linphone.activities.main.settings.viewmodels.SettingsViewModel
-import org.linphone.activities.main.viewmodels.SharedMainViewModel
 import org.linphone.activities.navigateToAccountSettings
 import org.linphone.activities.navigateToAudioSettings
 import org.linphone.activities.navigateToTunnelSettings
@@ -41,7 +41,6 @@ import org.linphone.core.tools.Log
 import org.linphone.databinding.SettingsFragmentBinding
 
 class SettingsFragment : SecureFragment<SettingsFragmentBinding>() {
-    private lateinit var sharedViewModel: SharedMainViewModel
     private lateinit var viewModel: SettingsViewModel
 
     override fun getLayoutId(): Int = R.layout.settings_fragment
@@ -61,10 +60,6 @@ class SettingsFragment : SecureFragment<SettingsFragmentBinding>() {
 
         /* Shared view model & sliding pane related */
 
-        sharedViewModel = requireActivity().run {
-            ViewModelProvider(this)[SharedMainViewModel::class.java]
-        }
-
         view.doOnPreDraw { sharedViewModel.isSlidingPaneSlideable.value = binding.slidingPane.isSlideable }
 
         // Account settings loading can take some time, so wait until it is ready before opening the pane
@@ -76,15 +71,6 @@ class SettingsFragment : SecureFragment<SettingsFragmentBinding>() {
             }
         }
 
-        sharedViewModel.closeSlidingPaneEvent.observe(
-            viewLifecycleOwner
-        ) {
-            it.consume {
-                if (!binding.slidingPane.closePane()) {
-                    goBack()
-                }
-            }
-        }
         sharedViewModel.layoutChangedEvent.observe(
             viewLifecycleOwner
         ) {
@@ -100,6 +86,12 @@ class SettingsFragment : SecureFragment<SettingsFragmentBinding>() {
                 }
             }
         }
+
+        requireActivity().onBackPressedDispatcher.addCallback(
+            viewLifecycleOwner,
+            MasterFragment.SlidingPaneBackPressedCallback(binding.slidingPane)
+        )
+
         binding.slidingPane.lockMode = SlidingPaneLayout.LOCK_MODE_LOCKED
 
         /* End of shared view model & sliding pane related */
@@ -107,12 +99,17 @@ class SettingsFragment : SecureFragment<SettingsFragmentBinding>() {
         viewModel = ViewModelProvider(this)[SettingsViewModel::class.java]
         binding.viewModel = viewModel
 
-        binding.setBackClickListener { goBack() }
-
         sharedViewModel.accountRemoved.observe(
             viewLifecycleOwner
         ) {
             Log.i("[Settings] Account removed, update accounts list")
+            viewModel.updateAccountsList()
+        }
+
+        sharedViewModel.defaultAccountChanged.observe(
+            viewLifecycleOwner
+        ) {
+            Log.i("[Settings] Default account changed, update accounts list")
             viewModel.updateAccountsList()
         }
 
@@ -175,6 +172,12 @@ class SettingsFragment : SecureFragment<SettingsFragmentBinding>() {
         viewModel.advancedSettingsListener = object : SettingListenerStub() {
             override fun onClicked() {
                 navigateToAdvancedSettings(binding.slidingPane)
+            }
+        }
+
+        viewModel.conferencesSettingsListener = object : SettingListenerStub() {
+            override fun onClicked() {
+                navigateToConferencesSettings(binding.slidingPane)
             }
         }
     }

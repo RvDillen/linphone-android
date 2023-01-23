@@ -66,37 +66,39 @@ class FileUtils {
                 }
             }
 
-            return extension
+            return extension.lowercase(Locale.getDefault())
         }
 
-        fun isPlainTextFile(path: String): Boolean {
-            val extension = getExtensionFromFileName(path).lowercase(Locale.getDefault())
-            val type = MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension)
+        fun isMimePlainText(type: String?): Boolean {
             return type?.startsWith("text/plain") ?: false
         }
 
-        fun isExtensionPdf(path: String): Boolean {
-            val extension = getExtensionFromFileName(path).lowercase(Locale.getDefault())
-            val type = MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension)
+        fun isMimePdf(type: String?): Boolean {
             return type?.startsWith("application/pdf") ?: false
         }
 
-        fun isExtensionImage(path: String): Boolean {
-            val extension = getExtensionFromFileName(path).lowercase(Locale.getDefault())
-            val type = MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension)
+        fun isMimeImage(type: String?): Boolean {
             return type?.startsWith("image/") ?: false
         }
 
-        fun isExtensionVideo(path: String): Boolean {
-            val extension = getExtensionFromFileName(path).lowercase(Locale.getDefault())
-            val type = MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension)
+        fun isMimeVideo(type: String?): Boolean {
             return type?.startsWith("video/") ?: false
         }
 
-        fun isExtensionAudio(path: String): Boolean {
-            val extension = getExtensionFromFileName(path).lowercase(Locale.getDefault())
-            val type = MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension)
+        fun isMimeAudio(type: String?): Boolean {
             return type?.startsWith("audio/") ?: false
+        }
+
+        fun isExtensionImage(path: String): Boolean {
+            val extension = getExtensionFromFileName(path)
+            val type = MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension)
+            return isMimeImage(type)
+        }
+
+        fun isExtensionVideo(path: String): Boolean {
+            val extension = getExtensionFromFileName(path)
+            val type = MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension)
+            return isMimeVideo(type)
         }
 
         fun clearExistingPlainFiles() {
@@ -316,7 +318,12 @@ class FileUtils {
                     val nameIndex = returnCursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
                     if (nameIndex != -1) {
                         try {
-                            name = returnCursor.getString(nameIndex)
+                            val displayName = returnCursor.getString(nameIndex)
+                            if (displayName != null) {
+                                name = displayName
+                            } else {
+                                Log.e("[File Utils] Failed to get the display name for URI $uri, returned value is null")
+                            }
                         } catch (e: CursorIndexOutOfBoundsException) {
                             Log.e("[File Utils] Failed to get the display name for URI $uri, exception is $e")
                         }
@@ -512,6 +519,21 @@ class FileUtils {
                 Log.e("[File Viewer] Can't open media store export in third party app: $anfe")
             }
             return false
+        }
+
+        fun writeIntoFile(bytes: ByteArray, file: File) {
+            val inStream = ByteArrayInputStream(bytes)
+            val outStream = FileOutputStream(file)
+
+            val buffer = ByteArray(1024)
+            var read: Int
+            while (inStream.read(buffer).also { read = it } != -1) {
+                outStream.write(buffer, 0, read)
+            }
+
+            inStream.close()
+            outStream.flush()
+            outStream.close()
         }
     }
 }

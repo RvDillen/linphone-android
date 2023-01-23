@@ -1,13 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <layout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:tools="http://schemas.android.com/tools">
+    xmlns:app="http://schemas.android.com/apk/res-auto">
 
     <data>
         <import type="android.view.View"/>
-        <variable
-            name="backClickListener"
-            type="android.view.View.OnClickListener"/>
         <variable
             name="avatarClickListener"
             type="android.view.View.OnClickListener"/>
@@ -16,7 +12,7 @@
             type="android.view.View.OnClickListener"/>
         <variable
             name="viewModel"
-            type="org.linphone.activities.main.contact.viewmodels.ContactEditorViewModel" />
+            type="org.linphone.activities.main.contact.data.ContactEditorData" />
     </data>
 
     <RelativeLayout
@@ -31,9 +27,8 @@
             android:orientation="horizontal">
 
             <ImageView
-                android:id="@+id/cancel"
+                android:id="@+id/back"
                 android:contentDescription="@string/content_description_discard_changes"
-                android:onClick="@{backClickListener}"
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
                 android:layout_weight="0.2"
@@ -75,25 +70,24 @@
                 android:layout_marginRight="10dp">
 
                 <FrameLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="100dp">
+                    android:layout_width="@dimen/contact_avatar_big_size"
+                    android:layout_height="@dimen/contact_avatar_big_size">
 
-                    <org.linphone.contact.BigContactAvatarView
+                    <ImageView
                         android:id="@+id/avatar"
                         android:onClick="@{avatarClickListener}"
                         android:layout_width="match_parent"
-                        android:layout_height="100dp"
-                        android:gravity="center"
-                        tools:layout="@layout/contact_avatar_big"
-                        app:viewModel="@{viewModel}"/>
+                        android:layout_height="match_parent"
+                        coilContactBig="@{viewModel}"
+                        android:background="@drawable/generated_avatar_bg"
+                        android:src="@drawable/voip_single_contact_avatar"
+                        android:contentDescription="@null" />
 
                     <ImageView
-                        android:layout_width="100dp"
-                        android:layout_height="100dp"
-                        android:layout_gravity="center"
-                        android:gravity="center"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
                         android:contentDescription="@string/content_description_change_contact_picture"
-                        glideAvatar="@{viewModel.tempPicturePath}"/>
+                        coilGoneIfError="@{viewModel.tempPicturePath}"/>
 
                 </FrameLayout>
 

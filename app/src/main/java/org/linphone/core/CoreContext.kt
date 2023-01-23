@@ -32,9 +32,9 @@ import android.telephony.TelephonyManager
 import android.util.Base64
 import android.util.Pair
 import android.view.*
-import androidx.emoji.bundled.BundledEmojiCompatConfig
-import androidx.emoji.text.EmojiCompat
-import androidx.lifecycle.MutableLiveData
+import android.webkit.MimeTypeMap
+import androidx.lifecycle.*
+import androidx.loader.app.LoaderManager
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import java.io.File
 import java.math.BigInteger
@@ -52,14 +52,12 @@ import kotlinx.coroutines.*
 import org.linphone.BuildConfig
 import org.linphone.LinphoneApplication.Companion.corePreferences
 import org.linphone.R
-import org.linphone.activities.call.CallActivity
-import org.linphone.activities.call.IncomingCallActivity
-import org.linphone.activities.call.OutgoingCallActivity
 import org.linphone.clb.CallStateCLB
 import org.linphone.compatibility.Compatibility
 import org.linphone.compatibility.PhoneStateInterface
-import org.linphone.contact.Contact
+import org.linphone.contact.ContactLoader
 import org.linphone.contact.ContactsManager
+import org.linphone.contact.getContactForPhoneNumberOrAddress
 import org.linphone.core.tools.Log
 import org.linphone.mediastream.Version
 import org.linphone.notifications.NotificationsManager
@@ -67,7 +65,27 @@ import org.linphone.telecom.TelecomHelper
 import org.linphone.utils.*
 import org.linphone.utils.Event
 
-class CoreContext(val context: Context, coreConfig: Config) {
+class CoreContext(
+    val context: Context,
+    coreConfig: Config,
+    service: CoreService? = null,
+    useAutoStartDescription: Boolean = false
+) :
+    LifecycleOwner, ViewModelStoreOwner {
+    private val _lifecycleRegistry = LifecycleRegistry(this)
+    override fun getLifecycle(): Lifecycle {
+        return _lifecycleRegistry
+    }
+
+    private val _viewModelStore = ViewModelStore()
+    override fun getViewModelStore(): ViewModelStore {
+        return _viewModelStore
+    }
+
+    private val contactLoader = ContactLoader()
+
+    private val collator: Collator = Collator.getInstance()
+
     var stopped = false
     val core: Core
     val handler: Handler = Handler(Looper.getMainLooper())
@@ -89,10 +107,10 @@ class CoreContext(val context: Context, coreConfig: Config) {
         "$sdkVersion ($sdkBranch, $sdkBuildType)"
     }
 
-    val collator: Collator = Collator.getInstance()
     val contactsManager: ContactsManager by lazy {
         ContactsManager(context)
     }
+
     val notificationsManager: NotificationsManager by lazy {
         NotificationsManager(context)
     }
@@ -101,8 +119,9 @@ class CoreContext(val context: Context, coreConfig: Config) {
         MutableLiveData<Event<String>>()
     }
 
+    val coroutineScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+
     private val loggingService = Factory.instance().loggingService
-    private val coroutineScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
     private var overlayX = 0f
     private var overlayY = 0f
@@ -114,7 +133,7 @@ class CoreContext(val context: Context, coreConfig: Config) {
         override fun onGlobalStateChanged(core: Core, state: GlobalState, message: String) {
             Log.i("[Context] Global state changed [$state]")
             if (state == GlobalState.On) {
-                contactsManager.fetchContactsAsync()
+                fetchContacts()
             }
         }
 
@@ -137,6 +156,10 @@ class CoreContext(val context: Context, coreConfig: Config) {
                 Log.w("[Context] Mic was muted in Core, enabling it back for next call")
                 core.isMicEnabled = true
             }
+        }
+
+        override fun onPushNotificationReceived(core: Core, payload: String?) {
+            Log.i("[Context] Push notification received: $payload")
         }
 
         override fun onCallStateChanged(
@@ -164,8 +187,7 @@ class CoreContext(val context: Context, coreConfig: Config) {
                         answerCall(call)
                     } else {
                         Log.i("[Context] Scheduling auto answering in $autoAnswerDelay milliseconds")
-                        val mainThreadHandler = Handler(Looper.getMainLooper())
-                        mainThreadHandler.postDelayed(
+                        handler.postDelayed(
                             {
                                 Log.w("[Context] Auto answering call")
                                 answerCall(call)
@@ -174,23 +196,23 @@ class CoreContext(val context: Context, coreConfig: Config) {
                         )
                     }
                 }
-            } else if (state == Call.State.OutgoingInit) {
-                onOutgoingStarted()
             } else if (state == Call.State.OutgoingProgress) {
+                val conferenceInfo = core.findConferenceInformationFromUri(call.remoteAddress)
+                // Do not show outgoing call view for conference calls, wait for connected state
+                if (conferenceInfo == null) {
+                    onOutgoingStarted()
+                }
+
                 if (core.callsNb == 1 && corePreferences.routeAudioToBluetoothIfAvailable) {
                     AudioRouteUtils.routeAudioToBluetooth(call)
                 }
             } else if (state == Call.State.Connected) {
-                if (corePreferences.automaticallyStartCallRecording) {
-                    Log.i("[Context] We were asked to start the call recording automatically")
-                    call.startRecording()
-                }
                 onCallStarted()
             } else if (state == Call.State.StreamsRunning) {
-                // Do not automatically route audio to bluetooth after first call
-                if (core.callsNb == 1) {
-                    // Only try to route bluetooth / headphone / headset when the call is in StreamsRunning for the first time
-                    if (previousCallState == Call.State.Connected) {
+                if (previousCallState == Call.State.Connected) {
+                    // Do not automatically route audio to bluetooth after first call
+                    if (core.callsNb == 1) {
+                        // Only try to route bluetooth / headphone / headset when the call is in StreamsRunning for the first time
                         Log.i("[Context] First call going into StreamsRunning state for the first time, trying to route audio to headset or bluetooth if available")
                         if (AudioRouteUtils.isHeadsetAudioRouteAvailable()) {
                             AudioRouteUtils.routeAudioToHeadset(call)
@@ -198,22 +220,19 @@ class CoreContext(val context: Context, coreConfig: Config) {
                             AudioRouteUtils.routeAudioToBluetooth(call)
                         }
                     }
-                }
 
-                if (corePreferences.routeAudioToSpeakerWhenVideoIsEnabled && call.currentParams.isVideoEnabled) {
-                    // Do not turn speaker on when video is enabled if headset or bluetooth is used
-                    if (!AudioRouteUtils.isHeadsetAudioRouteAvailable() && !AudioRouteUtils.isBluetoothAudioRouteCurrentlyUsed(
-                            call
-                        )
-                    ) {
-                        Log.i("[Context] Video enabled and no wired headset not bluetooth in use, routing audio to speaker")
-                        AudioRouteUtils.routeAudioToSpeaker(call)
+                    // Only start call recording when the call is in StreamsRunning for the first time
+                    if (corePreferences.automaticallyStartCallRecording && !call.params.isRecording) {
+                        if (call.conference == null) { // TODO: FIXME: We disabled conference recording for now
+                            Log.i("[Context] We were asked to start the call recording automatically")
+                            call.startRecording()
+                        }
                     }
                 }
             } else if (state == Call.State.End || state == Call.State.Error || state == Call.State.Released) {
                 if (state == Call.State.Error) {
                     Log.w("[Context] Call error reason is ${call.errorInfo.protocolCode} / ${call.errorInfo.reason} / ${call.errorInfo.phrase}")
-                    val message = when (call.errorInfo.reason) {
+                    val toastMessage = when (call.errorInfo.reason) {
                         Reason.Busy -> context.getString(R.string.call_error_user_busy)
                         Reason.IOError -> context.getString(R.string.call_error_io_error)
                         Reason.NotAcceptable -> context.getString(R.string.call_error_incompatible_media_params)
@@ -222,32 +241,37 @@ class CoreContext(val context: Context, coreConfig: Config) {
                         Reason.TemporarilyUnavailable -> context.getString(R.string.call_error_temporarily_unavailable)
                         else -> context.getString(R.string.call_error_generic).format("${call.errorInfo.protocolCode} / ${call.errorInfo.phrase}")
                     }
-                    callErrorMessageResourceId.value = Event(message)
+                    callErrorMessageResourceId.value = Event(toastMessage)
                 } else if (state == Call.State.End &&
                     call.dir == Call.Dir.Outgoing &&
-                    call.errorInfo.reason == Reason.Declined
+                    call.errorInfo.reason == Reason.Declined &&
+                    core.callsNb == 0
                 ) {
                     Log.i("[Context] Call has been declined")
-                    val message = context.getString(R.string.call_error_declined)
-                    callErrorMessageResourceId.value = Event(message)
+                    val toastMessage = context.getString(R.string.call_error_declined)
+                    callErrorMessageResourceId.value = Event(toastMessage)
                 }
             }
 
             previousCallState = state
         }
 
-        override fun onMessageReceived(core: Core, chatRoom: ChatRoom, message: ChatMessage) {
-            if (core.maxSizeForAutoDownloadIncomingFiles != -1) {
-                var hasFile = false
-                for (content in message.contents) {
-                    if (content.isFile) {
-                        hasFile = true
-                        break
-                    }
-                }
-                if (hasFile) {
-                    exportFilesInMessageToMediaStore(message)
-                }
+        override fun onLastCallEnded(core: Core) {
+            Log.i("[Context] Last call has ended")
+            removeCallOverlay()
+            if (!core.isMicEnabled) {
+                Log.w("[Context] Mic was muted in Core, enabling it back for next call")
+                core.isMicEnabled = true
+            }
+        }
+
+        override fun onMessagesReceived(
+            core: Core,
+            chatRoom: ChatRoom,
+            messages: Array<out ChatMessage>
+        ) {
+            for (message in messages) {
+                exportFileInMessage(message)
             }
         }
     }
@@ -278,6 +302,8 @@ class CoreContext(val context: Context, coreConfig: Config) {
             Log.i("[Context] Crashlytics enabled, register logging service listener")
         }
 
+        _lifecycleRegistry.currentState = Lifecycle.State.INITIALIZED
+
         Log.i("=========================================")
         Log.i("==== Linphone-android information dump ====")
         Log.i("VERSION=${BuildConfig.VERSION_NAME} / ${BuildConfig.VERSION_CODE}")
@@ -285,16 +311,22 @@ class CoreContext(val context: Context, coreConfig: Config) {
         Log.i("BUILD TYPE=${BuildConfig.BUILD_TYPE}")
         Log.i("=========================================")
 
-        core = Factory.instance().createCoreWithConfig(coreConfig, context)
-        stopped = false
+        if (service != null) {
+            Log.i("[Context] Starting foreground service")
+            notificationsManager.startForeground(service, useAutoStartDescription)
+        }
 
+        core = Factory.instance().createCoreWithConfig(coreConfig, context)
+
+        stopped = false
+        _lifecycleRegistry.currentState = Lifecycle.State.CREATED
         Log.i("[Context] Ready")
 
         // CLB, do not use Pause SoundFile (BG-4537)
         core.playFile = null
     }
 
-    fun start(isPush: Boolean = false) {
+    fun start() {
         Log.i("[Context] Starting")
 
         core.addListener(listener)
@@ -315,20 +347,15 @@ class CoreContext(val context: Context, coreConfig: Config) {
             core.config.setBool("audio", "android_disable_audio_focus_requests", false)
         }
 
-        if (isPush) {
-            Log.i("[Context] Push received, assume in background")
-            core.enterBackground()
-        }
-
         configureCore()
 
         core.start()
+        _lifecycleRegistry.currentState = Lifecycle.State.STARTED
 
         initPhoneStateListener()
 
         notificationsManager.onCoreReady()
 
-        EmojiCompat.init(BundledEmojiCompatConfig(context))
         collator.strength = Collator.NO_DECOMPOSITION
 
         if (corePreferences.vfsEnabled) {
@@ -340,6 +367,7 @@ class CoreContext(val context: Context, coreConfig: Config) {
             notificationsManager.startForeground()
         }
 
+        _lifecycleRegistry.currentState = Lifecycle.State.RESUMED
         Log.i("[Context] Started")
     }
 
@@ -361,6 +389,7 @@ class CoreContext(val context: Context, coreConfig: Config) {
         core.stop()
         core.removeListener(listener)
         stopped = true
+        _lifecycleRegistry.currentState = Lifecycle.State.DESTROYED
         loggingService.removeListener(loggingServiceListener)
     }
 
@@ -375,36 +404,86 @@ class CoreContext(val context: Context, coreConfig: Config) {
             core.config.setBool("app", "incoming_call_vibration", false)
         }
 
+        if (core.config.getInt("misc", "conference_layout", 1) > 1) {
+            core.config.setInt("misc", "conference_layout", 1)
+        }
+
+        // Now LIME server URL is set on accounts
+        val limeServerUrl = core.limeX3DhServerUrl.orEmpty()
+        if (limeServerUrl.isNotEmpty()) {
+            Log.w("[Context] Removing LIME X3DH server URL from Core config")
+            core.limeX3DhServerUrl = null
+        }
+
+        // Disable Telecom Manager on Android < 10 to prevent crash due to OS bug in Android 9
+        if (Version.sdkStrictlyBelow(Version.API29_ANDROID_10)) {
+            if (corePreferences.useTelecomManager) {
+                Log.w("[Context] Android < 10 detected, disabling telecom manager to prevent crash due to OS bug")
+            }
+            corePreferences.useTelecomManager = false
+            corePreferences.manuallyDisabledTelecomManager = true
+        }
+
         initUserCertificates()
 
         computeUserAgent()
 
         for (account in core.accountList) {
             if (account.params.identityAddress?.domain == corePreferences.defaultDomain) {
-                // Ensure conference URI is set on sip.linphone.org proxy configs
+                var paramsChanged = false
+                val params = account.params.clone()
+
+                // Ensure conference factory URI is set on sip.linphone.org proxy configs
                 if (account.params.conferenceFactoryUri == null) {
-                    val params = account.params.clone()
                     val uri = corePreferences.conferenceServerUri
                     Log.i("[Context] Setting conference factory on proxy config ${params.identityAddress?.asString()} to default value: $uri")
                     params.conferenceFactoryUri = uri
-                    account.params = params
+                    paramsChanged = true
                 }
 
-                // Ensure LIME server URL is set if at least one sip.linphone.org proxy
-                if (core.limeX3DhAvailable()) {
-                    var url: String? = core.limeX3DhServerUrl
-                    if (url == null || url.isEmpty()) {
-                        url = corePreferences.limeX3dhServerUrl
-                        Log.i("[Context] Setting LIME X3Dh server url to default value: $url")
-                        core.limeX3DhServerUrl = url
+                // Ensure audio/video conference factory URI is set on sip.linphone.org proxy configs
+                if (account.params.audioVideoConferenceFactoryAddress == null) {
+                    val uri = corePreferences.audioVideoConferenceServerUri
+                    val address = core.interpretUrl(uri, false)
+                    if (address != null) {
+                        Log.i("[Context] Setting audio/video conference factory on proxy config ${params.identityAddress?.asString()} to default value: $uri")
+                        params.audioVideoConferenceFactoryAddress = address
+                        paramsChanged = true
+                    } else {
+                        Log.e("[Context] Failed to parse audio/video conference factory URI: $uri")
                     }
                 }
 
+                // Enable Bundle mode by default
+                if (!account.params.isRtpBundleEnabled) {
+                    Log.i("[Context] Enabling RTP bundle mode on proxy config ${params.identityAddress?.asString()}")
+                    params.isRtpBundleEnabled = true
+                    paramsChanged = true
+                }
+
                 // Ensure we allow CPIM messages in basic chat rooms
-                val newParams = account.params.clone()
-                newParams.isCpimInBasicChatRoomEnabled = true
-                account.params = newParams
-                Log.i("[Context] CPIM allowed in basic chat rooms for account ${newParams.identityAddress?.asStringUriOnly()}")
+                if (!account.params.isCpimInBasicChatRoomEnabled) {
+                    params.isCpimInBasicChatRoomEnabled = true
+                    paramsChanged = true
+                    Log.i("[Context] CPIM allowed in basic chat rooms for account ${params.identityAddress?.asString()}")
+                }
+
+                if (account.params.limeServerUrl.isNullOrEmpty()) {
+                    if (limeServerUrl.isNotEmpty()) {
+                        params.limeServerUrl = limeServerUrl
+                        paramsChanged = true
+                        Log.i("[Context] Moving Core's LIME X3DH server URL [$limeServerUrl] on account ${params.identityAddress?.asString()}")
+                    } else {
+                        params.limeServerUrl = corePreferences.limeServerUrl
+                        paramsChanged = true
+                        Log.w("[Context] Linphone account [${params.identityAddress?.asString()}] didn't have a LIME X3DH server URL, setting one: ${corePreferences.limeServerUrl}")
+                    }
+                }
+
+                if (paramsChanged) {
+                    Log.i("[Context] Account params have been updated, apply changes")
+                    account.params = params
+                }
             }
         }
 
@@ -431,6 +510,40 @@ class CoreContext(val context: Context, coreConfig: Config) {
             }
         }
         core.userCertificatesPath = userCertsPath
+    }
+
+    fun fetchContacts() {
+        if (corePreferences.enableNativeAddressBookIntegration) {
+            if (PermissionHelper.required(context).hasReadContactsPermission()) {
+                Log.i("[Context] Init contacts loader")
+                val manager = LoaderManager.getInstance(this@CoreContext)
+                manager.restartLoader(0, null, contactLoader)
+            }
+        }
+    }
+
+    fun newAccountConfigured(isLinphoneAccount: Boolean) {
+        Log.i("[Context] A new ${if (isLinphoneAccount) AppUtils.getString(R.string.app_name) else "third-party"} account has been configured")
+
+        if (isLinphoneAccount) {
+            core.config.setString("sip", "rls_uri", corePreferences.defaultRlsUri)
+            val rlsAddress = core.interpretUrl(corePreferences.defaultRlsUri, false)
+            if (rlsAddress != null) {
+                for (friendList in core.friendsLists) {
+                    friendList.rlsAddress = rlsAddress
+                }
+            }
+            if (core.mediaEncryption == MediaEncryption.None) {
+                Log.i("[Context] Enabling SRTP media encryption instead of None")
+                core.mediaEncryption = MediaEncryption.SRTP
+            }
+        } else {
+            Log.i("[Context] Background mode with foreground service automatically enabled")
+            corePreferences.keepServiceAlive = true
+            notificationsManager.startForeground()
+        }
+
+        contactsManager.updateLocalContacts()
     }
 
     /* Call related functions */
@@ -476,6 +589,13 @@ class CoreContext(val context: Context, coreConfig: Config) {
         return false
     }
 
+    fun videoUpdateRequestTimedOut(call: Call) {
+        coroutineScope.launch {
+            Log.w("[Context] 30 seconds have passed, declining video request")
+            answerCallVideoUpdateRequest(call, false)
+        }
+    }
+
     fun answerCallVideoUpdateRequest(call: Call, accept: Boolean) {
         val params = core.createCallParams(call)
 
@@ -494,18 +614,34 @@ class CoreContext(val context: Context, coreConfig: Config) {
         Log.i("[Context] Answering call $call")
         CallStateCLB.instance().EndAnyCLBCall(core)
         val params = core.createCallParams(call)
-        params?.recordFile = LinphoneUtils.getRecordingFilePathForAddress(call.remoteAddress)
+        if (params == null) {
+            Log.w("[Context] Answering call without params!")
+            call.accept()
+            return
+        }
+
+        params.recordFile = LinphoneUtils.getRecordingFilePathForAddress(call.remoteAddress)
+
         if (LinphoneUtils.checkIfNetworkHasLowBandwidth(context)) {
             Log.w("[Context] Enabling low bandwidth mode!")
-            params?.isLowBandwidthEnabled = true
+            params.isLowBandwidthEnabled = true
         }
+
+        if (call.callLog.wasConference()) {
+            // Prevent incoming group call to start in audio only layout
+            // Do the same as the conference waiting room
+            params.isVideoEnabled = true
+            params.videoDirection = if (core.videoActivationPolicy.automaticallyInitiate) MediaDirection.SendRecv else MediaDirection.RecvOnly
+            Log.i("[Context] Enabling video on call params to prevent audio-only layout when answering")
+        }
+
         call.acceptWithParams(params)
     }
 
     fun declineCall(call: Call) {
         val voiceMailUri = corePreferences.voiceMailUri
         if (voiceMailUri != null && corePreferences.redirectDeclinedCallToVoiceMail) {
-            val voiceMailAddress = core.interpretUrl(voiceMailUri)
+            val voiceMailAddress = core.interpretUrl(voiceMailUri, false)
             if (voiceMailAddress != null) {
                 Log.i("[Context] Redirecting call $call to voice mail URI: $voiceMailUri")
                 call.redirectTo(voiceMailAddress)
@@ -521,47 +657,33 @@ class CoreContext(val context: Context, coreConfig: Config) {
         call.terminate()
     }
 
-    fun transferCallTo(addressToCall: String) {
+    fun transferCallTo(addressToCall: String): Boolean {
         val currentCall = core.currentCall ?: core.calls.firstOrNull()
         if (currentCall == null) {
             Log.e("[Context] Couldn't find a call to transfer")
         } else {
-            val address = core.interpretUrl(addressToCall)
+            val address = core.interpretUrl(addressToCall, LinphoneUtils.applyInternationalPrefix())
             if (address != null) {
                 Log.i("[Context] Transferring current call to $addressToCall")
                 currentCall.transferTo(address)
+                return true
             }
         }
+        return false
     }
 
     fun startCall(to: String) {
-        val tos: List<String> = to.split(";")
-        var stringAddress = tos[0]
+        var stringAddress = to.trim()
         if (android.util.Patterns.PHONE.matcher(to).matches()) {
-            val contact: Contact? = contactsManager.findContactByPhoneNumber(stringAddress)
-            val alias = contact?.getContactForPhoneNumberOrAddress(stringAddress)
+            val contact = contactsManager.findContactByPhoneNumber(to)
+            val alias = contact?.getContactForPhoneNumberOrAddress(to)
             if (alias != null) {
                 Log.i("[Context] Found matching alias $alias for phone number $to, using it")
                 stringAddress = alias
             }
         }
 
-        var address: Address? = core.interpretUrl(stringAddress)
-
-        if (address == null) {
-            Log.e("[Context] Failed to parse $stringAddress, abort outgoing call")
-            callErrorMessageResourceId.value = Event(context.getString(R.string.call_error_network_unreachable))
-            return
-        }
-
-        if (tos.size > 1) {
-            stringAddress = address.asString()
-            for (i in 1 until tos.size) {
-                stringAddress = stringAddress + ";" + tos[i]
-            }
-            address = core.interpretUrl(stringAddress)
-        }
-
+        val address: Address? = core.interpretUrl(stringAddress, LinphoneUtils.applyInternationalPrefix())
         if (address == null) {
             Log.e("[Context] Failed to parse $stringAddress, abort outgoing call")
             callErrorMessageResourceId.value = Event(context.getString(R.string.call_error_network_unreachable))
@@ -571,14 +693,19 @@ class CoreContext(val context: Context, coreConfig: Config) {
         startCall(address)
     }
 
-    fun startCall(address: Address, forceZRTP: Boolean = false, localAddress: Address? = null) {
+    fun startCall(
+        address: Address,
+        callParams: CallParams? = null,
+        forceZRTP: Boolean = false,
+        localAddress: Address? = null
+    ) {
         if (!core.isNetworkReachable) {
             Log.e("[Context] Network unreachable, abort outgoing call")
             callErrorMessageResourceId.value = Event(context.getString(R.string.call_error_network_unreachable))
             return
         }
 
-        val params = core.createCallParams(null)
+        val params = callParams ?: core.createCallParams(null)
         if (params == null) {
             val call = core.inviteAddress(address)
             Log.w("[Context] Starting call $call without params")
@@ -602,11 +729,14 @@ class CoreContext(val context: Context, coreConfig: Config) {
         params.recordFile = LinphoneUtils.getRecordingFilePathForAddress(address)
 
         if (localAddress != null) {
-            params.proxyConfig = core.proxyConfigList.find { proxyConfig ->
-                proxyConfig.identityAddress?.weakEqual(localAddress) ?: false
+            val account = core.accountList.find { account ->
+                account.params.identityAddress?.weakEqual(localAddress) ?: false
             }
-            if (params.proxyConfig != null) {
-                Log.i("[Context] Using proxy config matching address ${localAddress.asStringUriOnly()} as From")
+            if (account != null) {
+                params.account = account
+                Log.i("[Context] Using account matching address ${localAddress.asStringUriOnly()} as From")
+            } else {
+                Log.e("[Context] Failed to find account matching address ${localAddress.asStringUriOnly()}")
             }
         }
 
@@ -643,15 +773,6 @@ class CoreContext(val context: Context, coreConfig: Config) {
 
     fun showSwitchCameraButton(): Boolean {
         return core.videoDevicesList.size > 2 // Count StaticImage camera
-    }
-
-    fun isVideoCallOrConferenceActive(): Boolean {
-        val conference = core.conference
-        return if (conference != null && conference.isIn) {
-            conference.currentParams.isVideoEnabled
-        } else {
-            core.currentCall?.currentParams?.isVideoEnabled ?: false
-        }
     }
 
     fun createCallOverlay() {
@@ -707,8 +828,12 @@ class CoreContext(val context: Context, coreConfig: Config) {
             onCallOverlayClick()
         }
 
-        callOverlay = overlay
-        windowManager.addView(overlay, params)
+        try {
+            windowManager.addView(overlay, params)
+            callOverlay = overlay
+        } catch (e: Exception) {
+            Log.e("[Context] Failed to add overlay in windowManager: $e")
+        }
     }
 
     fun onCallOverlayClick() {
@@ -735,7 +860,23 @@ class CoreContext(val context: Context, coreConfig: Config) {
 
     /* Coroutine related */
 
-    fun exportFilesInMessageToMediaStore(message: ChatMessage) {
+    private fun exportFileInMessage(message: ChatMessage) {
+        // Only do it if auto download feature isn't disabled, otherwise it's done in the user-initiated download process
+        if (core.maxSizeForAutoDownloadIncomingFiles != -1) {
+            var hasFile = false
+            for (content in message.contents) {
+                if (content.isFile) {
+                    hasFile = true
+                    break
+                }
+            }
+            if (hasFile) {
+                exportFilesInMessageToMediaStore(message)
+            }
+        }
+    }
+
+    private fun exportFilesInMessageToMediaStore(message: ChatMessage) {
         if (message.isEphemeral) {
             Log.w("[Context] Do not make ephemeral file(s) public")
             return
@@ -749,9 +890,10 @@ class CoreContext(val context: Context, coreConfig: Config) {
             return
         }
 
-        if (Version.sdkAboveOrEqual(Version.API29_ANDROID_10) || PermissionHelper.get().hasWriteExternalStoragePermission()) {
+        if (PermissionHelper.get().hasWriteExternalStoragePermission()) {
             for (content in message.contents) {
                 if (content.isFile && content.filePath != null && content.userData == null) {
+                    Log.i("[Context] Trying to export file [${content.name}] to MediaStore")
                     addContentToMediaStore(content)
                 }
             }
@@ -770,32 +912,37 @@ class CoreContext(val context: Context, coreConfig: Config) {
             return
         }
 
-        if (Version.sdkAboveOrEqual(Version.API29_ANDROID_10) || PermissionHelper.get().hasWriteExternalStoragePermission()) {
+        if (PermissionHelper.get().hasWriteExternalStoragePermission()) {
             coroutineScope.launch {
-                when (content.type) {
-                    "image" -> {
+                val filePath = content.filePath.orEmpty()
+                Log.i("[Context] Trying to export file [$filePath] through Media Store API")
+
+                val extension = FileUtils.getExtensionFromFileName(filePath)
+                val mime = MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension)
+                when {
+                    FileUtils.isMimeImage(mime) -> {
                         if (Compatibility.addImageToMediaStore(context, content)) {
-                            Log.i("[Context] Adding image ${content.name} to Media Store terminated")
+                            Log.i("[Context] Successfully exported image [${content.name}] to Media Store")
                         } else {
                             Log.e("[Context] Something went wrong while copying file to Media Store...")
                         }
                     }
-                    "video" -> {
+                    FileUtils.isMimeVideo(mime) -> {
                         if (Compatibility.addVideoToMediaStore(context, content)) {
-                            Log.i("[Context] Adding video ${content.name} to Media Store terminated")
+                            Log.i("[Context] Successfully exported video [${content.name}] to Media Store")
                         } else {
                             Log.e("[Context] Something went wrong while copying file to Media Store...")
                         }
                     }
-                    "audio" -> {
+                    FileUtils.isMimeAudio(mime) -> {
                         if (Compatibility.addAudioToMediaStore(context, content)) {
-                            Log.i("[Context] Adding audio ${content.name} to Media Store terminated")
+                            Log.i("[Context] Successfully exported audio [${content.name}] to Media Store")
                         } else {
                             Log.e("[Context] Something went wrong while copying file to Media Store...")
                         }
                     }
                     else -> {
-                        Log.w("[Context] File ${content.name} isn't either an image, an audio file or a video, can't add it to the Media Store")
+                        Log.w("[Context] File [$filePath] isn't either an image, an audio file or a video [${content.type}/${content.subtype}], can't add it to the Media Store")
                     }
                 }
             }
@@ -825,9 +972,9 @@ class CoreContext(val context: Context, coreConfig: Config) {
         }
 
         Log.i("[Context] Starting IncomingCallActivity")
-        val intent = Intent(context, IncomingCallActivity::class.java)
+        val intent = Intent(context, org.linphone.activities.voip.CallActivity::class.java)
         // This flag is required to start an Activity from a Service context
-        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
         context.startActivity(intent)
     }
 
@@ -847,9 +994,9 @@ class CoreContext(val context: Context, coreConfig: Config) {
         }
 
         Log.i("[Context] Starting OutgoingCallActivity")
-        val intent = Intent(context, OutgoingCallActivity::class.java)
+        val intent = Intent(context, org.linphone.activities.voip.CallActivity::class.java)
         // This flag is required to start an Activity from a Service context
-        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
         context.startActivity(intent)
     }
 
@@ -866,7 +1013,7 @@ class CoreContext(val context: Context, coreConfig: Config) {
         }
 
         Log.i("[Context] Starting CallActivity")
-        val intent = Intent(context, CallActivity::class.java)
+        val intent = Intent(context, org.linphone.activities.voip.CallActivity::class.java)
         // This flag is required to start an Activity from a Service context
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
         context.startActivity(intent)

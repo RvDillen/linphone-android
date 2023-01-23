@@ -26,8 +26,10 @@ import android.widget.MediaController
 import androidx.lifecycle.ViewModelProvider
 import androidx.navigation.fragment.findNavController
 import org.linphone.R
+import org.linphone.activities.main.MainActivity
 import org.linphone.activities.main.files.viewmodels.VideoFileViewModel
 import org.linphone.activities.main.files.viewmodels.VideoFileViewModelFactory
+import org.linphone.compatibility.Compatibility
 import org.linphone.core.tools.Log
 import org.linphone.databinding.FileVideoViewerFragmentBinding
 
@@ -46,7 +48,6 @@ class VideoViewerFragment : GenericViewerFragment<FileVideoViewerFragmentBinding
         val content = sharedViewModel.contentToOpen.value
         if (content == null) {
             Log.e("[Video Viewer] Content is null, aborting!")
-            // (activity as MainActivity).showSnackBar(R.string.error)
             findNavController().navigateUp()
             return
         }
@@ -68,6 +69,13 @@ class VideoViewerFragment : GenericViewerFragment<FileVideoViewerFragmentBinding
             }
         }
         initMediaController()
+
+        viewModel.fullScreenMode.observe(
+            viewLifecycleOwner
+        ) { hide ->
+            Compatibility.hideAndroidSystemUI(hide, requireActivity().window)
+            (requireActivity() as MainActivity).hideStatusFragment(hide)
+        }
     }
 
     override fun onResume() {
@@ -85,6 +93,7 @@ class VideoViewerFragment : GenericViewerFragment<FileVideoViewerFragmentBinding
             binding.videoView.pause()
         }
 
+        viewModel.fullScreenMode.value = false
         super.onPause()
     }
 

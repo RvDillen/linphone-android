@@ -40,11 +40,12 @@ import org.linphone.activities.main.chat.data.EventData
 import org.linphone.activities.main.chat.data.EventLogData
 import org.linphone.activities.main.chat.data.OnContentClickedListener
 import org.linphone.activities.main.viewmodels.ListTopBarViewModel
-import org.linphone.core.ChatMessage
-import org.linphone.core.ChatRoomCapabilities
-import org.linphone.core.Content
-import org.linphone.core.EventLog
-import org.linphone.databinding.*
+import org.linphone.core.*
+import org.linphone.core.tools.Log
+import org.linphone.databinding.ChatEventListCellBinding
+import org.linphone.databinding.ChatMessageListCellBinding
+import org.linphone.databinding.ChatMessageLongPressMenuBindingImpl
+import org.linphone.databinding.ChatUnreadMessagesListHeaderBinding
 import org.linphone.utils.AppUtils
 import org.linphone.utils.Event
 import org.linphone.utils.HeaderAdapter
@@ -86,12 +87,24 @@ class ChatMessagesListAdapter(
         MutableLiveData<Event<Content>>()
     }
 
+    val urlClickEvent: MutableLiveData<Event<String>> by lazy {
+        MutableLiveData<Event<String>>()
+    }
+
     val sipUriClickedEvent: MutableLiveData<Event<String>> by lazy {
         MutableLiveData<Event<String>>()
     }
 
+    val callConferenceEvent: MutableLiveData<Event<Pair<String, String?>>> by lazy {
+        MutableLiveData<Event<Pair<String, String?>>>()
+    }
+
     val scrollToChatMessageEvent: MutableLiveData<Event<ChatMessage>> by lazy {
         MutableLiveData<Event<ChatMessage>>()
+    }
+
+    val errorEvent: MutableLiveData<Event<Int>> by lazy {
+        MutableLiveData<Event<Int>>()
     }
 
     private val contentClickedListener = object : OnContentClickedListener {
@@ -99,12 +112,33 @@ class ChatMessagesListAdapter(
             openContentEvent.value = Event(content)
         }
 
+        override fun onWebUrlClicked(url: String) {
+            if (popup?.isShowing == true) {
+                Log.w("[Chat Message Data] Long press that displayed context menu detected, aborting click on URL [$url]")
+                return
+            }
+            urlClickEvent.value = Event(url)
+        }
+
         override fun onSipAddressClicked(sipUri: String) {
+            if (popup?.isShowing == true) {
+                Log.w("[Chat Message Data] Long press that displayed context menu detected, aborting click on SIP URI [$sipUri]")
+                return
+            }
             sipUriClickedEvent.value = Event(sipUri)
+        }
+
+        override fun onCallConference(address: String, subject: String?) {
+            callConferenceEvent.value = Event(Pair(address, subject))
+        }
+
+        override fun onError(messageId: Int) {
+            errorEvent.value = Event(messageId)
         }
     }
 
-    private var contextMenuDisabled: Boolean = false
+    private var advancedContextMenuOptionsDisabled: Boolean = false
+    private var popup: PopupWindow? = null
 
     private var unreadMessagesCount: Int = 0
     private var firstUnreadMessagePosition: Int = -1
@@ -170,8 +204,8 @@ class ChatMessagesListAdapter(
         return binding.root
     }
 
-    fun disableContextMenu() {
-        contextMenuDisabled = true
+    fun disableAdvancedContextMenuOptions() {
+        advancedContextMenuOptionsDisabled = true
     }
 
     fun setUnreadMessageCount(count: Int, forceUpdate: Boolean) {
@@ -269,8 +303,6 @@ class ChatMessagesListAdapter(
 
                     executePendingBindings()
 
-                    if (contextMenuDisabled) return
-
                     setContextMenuClickListener {
                         val popupView: ChatMessageLongPressMenuBindingImpl = DataBindingUtil.inflate(
                             LayoutInflater.from(root.context),
@@ -292,12 +324,19 @@ class ChatMessagesListAdapter(
                             popupView.copyTextHidden = true
                             totalSize -= itemSize
                         }
-                        if (chatMessage.isOutgoing || chatMessageViewModel.contact.value != null) {
+                        if (chatMessage.isOutgoing ||
+                            chatMessageViewModel.contact.value != null ||
+                            advancedContextMenuOptionsDisabled
+                        ) {
                             popupView.addToContactsHidden = true
                             totalSize -= itemSize
                         }
-                        if (chatMessage.chatRoom.isReadOnly()) {
+                        if (chatMessage.chatRoom.isReadOnly) {
                             popupView.replyHidden = true
+                            totalSize -= itemSize
+                        }
+                        if (advancedContextMenuOptionsDisabled) {
+                            popupView.forwardHidden = true
                             totalSize -= itemSize
                         }
 
@@ -309,6 +348,8 @@ class ChatMessagesListAdapter(
                             totalSize,
                             true
                         )
+                        popup = popupWindow
+
                         // Elevation is for showing a shadow around the popup
                         popupWindow.elevation = 20f
 
@@ -445,30 +486,34 @@ private class ChatMessageDiffCallback : DiffUtil.ItemCallback<EventLogData>() {
         oldItem: EventLogData,
         newItem: EventLogData
     ): Boolean {
-        return if (oldItem.eventLog.type == EventLog.Type.ConferenceChatMessage &&
-            newItem.eventLog.type == EventLog.Type.ConferenceChatMessage
+        return if (oldItem.type == EventLog.Type.ConferenceChatMessage &&
+            newItem.type == EventLog.Type.ConferenceChatMessage
         ) {
-            oldItem.eventLog.chatMessage?.time == newItem.eventLog.chatMessage?.time &&
-                oldItem.eventLog.chatMessage?.isOutgoing == newItem.eventLog.chatMessage?.isOutgoing
-        } else oldItem.eventLog.notifyId == newItem.eventLog.notifyId
+            val oldData = (oldItem.data as ChatMessageData)
+            val newData = (newItem.data as ChatMessageData)
+
+            oldData.time.value == newData.time.value &&
+                oldData.isOutgoing == newData.isOutgoing
+        } else oldItem.notifyId == newItem.notifyId
     }
 
     override fun areContentsTheSame(
         oldItem: EventLogData,
         newItem: EventLogData
     ): Boolean {
-        return if (oldItem.eventLog.type == EventLog.Type.ConferenceChatMessage &&
-            newItem.eventLog.type == EventLog.Type.ConferenceChatMessage
+        return if (oldItem.type == EventLog.Type.ConferenceChatMessage &&
+            newItem.type == EventLog.Type.ConferenceChatMessage
         ) {
             val oldData = (oldItem.data as ChatMessageData)
             val newData = (newItem.data as ChatMessageData)
 
             val previous = oldData.hasPreviousMessage == newData.hasPreviousMessage
             val next = oldData.hasNextMessage == newData.hasNextMessage
-            newItem.eventLog.chatMessage?.state == ChatMessage.State.Displayed && previous && next
+            val isDisplayed = newData.isDisplayed.value == true
+            isDisplayed && previous && next
         } else {
-            oldItem.eventLog.type != EventLog.Type.ConferenceChatMessage &&
-                newItem.eventLog.type != EventLog.Type.ConferenceChatMessage
+            oldItem.type != EventLog.Type.ConferenceChatMessage &&
+                newItem.type != EventLog.Type.ConferenceChatMessage
         }
     }
 }

@@ -24,6 +24,7 @@ import androidx.lifecycle.ViewModel
 import org.linphone.LinphoneApplication.Companion.coreContext
 import org.linphone.LinphoneApplication.Companion.corePreferences
 import org.linphone.activities.main.settings.SettingListenerStub
+import org.linphone.utils.LinphoneUtils
 
 class SettingsViewModel : ViewModel() {
     private val tunnelAvailable: Boolean = coreContext.core.tunnelAvailable()
@@ -37,6 +38,7 @@ class SettingsViewModel : ViewModel() {
     val showNetworkSettings: Boolean = corePreferences.showNetworkSettings
     val showContactsSettings: Boolean = corePreferences.showContactsSettings
     val showAdvancedSettings: Boolean = corePreferences.showAdvancedSettings
+    val showConferencesSettings: Boolean = corePreferences.showConferencesSettings
 
     val accounts = MutableLiveData<ArrayList<AccountSettingsViewModel>>()
 
@@ -63,6 +65,8 @@ class SettingsViewModel : ViewModel() {
     lateinit var contactsSettingsListener: SettingListenerStub
 
     lateinit var advancedSettingsListener: SettingListenerStub
+
+    lateinit var conferencesSettingsListener: SettingListenerStub
 
     val primaryAccountDisplayNameListener = object : SettingListenerStub() {
         override fun onTextValueChanged(newValue: String) {
@@ -107,12 +111,10 @@ class SettingsViewModel : ViewModel() {
         accounts.value.orEmpty().forEach(AccountSettingsViewModel::destroy)
 
         val list = arrayListOf<AccountSettingsViewModel>()
-        if (coreContext.core.accountList.isNotEmpty()) {
-            for (account in coreContext.core.accountList) {
-                val viewModel = AccountSettingsViewModel(account)
-                viewModel.accountsSettingsListener = accountClickListener
-                list.add(viewModel)
-            }
+        for (account in LinphoneUtils.getAccountsNotHidden()) {
+            val viewModel = AccountSettingsViewModel(account)
+            viewModel.accountsSettingsListener = accountClickListener
+            list.add(viewModel)
         }
 
         accounts.value = list

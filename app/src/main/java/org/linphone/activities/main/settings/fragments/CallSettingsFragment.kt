@@ -30,13 +30,11 @@ import androidx.lifecycle.ViewModelProvider
 import org.linphone.LinphoneApplication.Companion.corePreferences
 import org.linphone.R
 import org.linphone.activities.main.settings.viewmodels.CallSettingsViewModel
-import org.linphone.activities.navigateToEmptySetting
 import org.linphone.compatibility.Compatibility
 import org.linphone.core.tools.Log
 import org.linphone.databinding.SettingsCallFragmentBinding
 import org.linphone.mediastream.Version
 import org.linphone.telecom.TelecomHelper
-import org.linphone.utils.Event
 
 class CallSettingsFragment : GenericSettingFragment<SettingsCallFragmentBinding>() {
     private lateinit var viewModel: CallSettingsViewModel
@@ -51,8 +49,6 @@ class CallSettingsFragment : GenericSettingFragment<SettingsCallFragmentBinding>
 
         viewModel = ViewModelProvider(this)[CallSettingsViewModel::class.java]
         binding.viewModel = viewModel
-
-        binding.setBackClickListener { goBack() }
 
         viewModel.systemWideOverlayEnabledEvent.observe(
             viewLifecycleOwner
@@ -93,17 +89,17 @@ class CallSettingsFragment : GenericSettingFragment<SettingsCallFragmentBinding>
             viewLifecycleOwner
         ) {
             it.consume {
-                if (!Compatibility.hasTelecomManagerPermissions(requireContext())) {
-                    Compatibility.requestTelecomManagerPermissions(requireActivity(), 1)
-                } else if (!TelecomHelper.exists()) {
-                    corePreferences.useTelecomManager = true
-                    Log.w("[Telecom Helper] Doesn't exists yet, creating it")
-                    if (requireContext().packageManager.hasSystemFeature(PackageManager.FEATURE_CONNECTION_SERVICE)) {
+                if (Compatibility.hasTelecomManagerFeature(requireContext())) {
+                    if (!Compatibility.hasTelecomManagerPermissions(requireContext())) {
+                        Compatibility.requestTelecomManagerPermissions(requireActivity(), 1)
+                    } else if (!TelecomHelper.exists()) {
+                        corePreferences.useTelecomManager = true
+                        Log.w("[Telecom Helper] Doesn't exists yet, creating it")
                         TelecomHelper.create(requireContext())
                         updateTelecomManagerAccount()
-                    } else {
-                        Log.e("[Telecom Helper] Telecom Helper can't be created, device doesn't support connection service")
                     }
+                } else {
+                    Log.e("[Telecom Helper] Telecom Helper can't be created, device doesn't support connection service!")
                 }
             }
         }
@@ -130,6 +126,7 @@ class CallSettingsFragment : GenericSettingFragment<SettingsCallFragmentBinding>
         }
     }
 
+    @Deprecated("Deprecated in Java")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
 
@@ -138,7 +135,7 @@ class CallSettingsFragment : GenericSettingFragment<SettingsCallFragmentBinding>
         } else if (requestCode == 1) {
             if (!TelecomHelper.exists()) {
                 Log.w("[Telecom Helper] Doesn't exists yet, creating it")
-                if (requireContext().packageManager.hasSystemFeature(PackageManager.FEATURE_CONNECTION_SERVICE)) {
+                if (Compatibility.hasTelecomManagerFeature(requireContext())) {
                     TelecomHelper.create(requireContext())
                 } else {
                     Log.e("[Telecom Helper] Telecom Helper can't be created, device doesn't support connection service")
@@ -162,14 +159,7 @@ class CallSettingsFragment : GenericSettingFragment<SettingsCallFragmentBinding>
         corePreferences.useTelecomManager = enabled
     }
 
-    override fun goBack() {
-        if (sharedViewModel.isSlidingPaneSlideable.value == true) {
-            sharedViewModel.closeSlidingPaneEvent.value = Event(true)
-        } else {
-            navigateToEmptySetting()
-        }
-    }
-
+    @Deprecated("Deprecated in Java")
     override fun onRequestPermissionsResult(
         requestCode: Int,
         permissions: Array<out String>,
@@ -185,7 +175,7 @@ class CallSettingsFragment : GenericSettingFragment<SettingsCallFragmentBinding>
             }
         }
 
-        if (requireContext().packageManager.hasSystemFeature(PackageManager.FEATURE_CONNECTION_SERVICE)) {
+        if (Compatibility.hasTelecomManagerFeature(requireContext())) {
             TelecomHelper.create(requireContext())
             updateTelecomManagerAccount()
         } else {

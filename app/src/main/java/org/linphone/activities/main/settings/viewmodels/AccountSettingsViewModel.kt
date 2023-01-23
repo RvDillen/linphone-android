@@ -70,6 +70,10 @@ class AccountSettingsViewModel(val account: Account) : GenericSettingsViewModel(
         MutableLiveData<Event<Boolean>>()
     }
 
+    val accountDefaultEvent: MutableLiveData<Event<Boolean>> by lazy {
+        MutableLiveData<Event<Boolean>>()
+    }
+
     val displayUsernameInsteadOfIdentity = corePreferences.replaceSipUriByUsername
 
     private var accountToDelete: Account? = null
@@ -100,11 +104,21 @@ class AccountSettingsViewModel(val account: Account) : GenericSettingsViewModel(
             val params = account.params.clone()
             val identity = params.identityAddress
             if (identity != null) {
-                identity.username = newValue
-                params.identityAddress = identity
+                val newIdentityAddress = identity.clone()
+                newIdentityAddress.username = newValue
+                params.identityAddress = newIdentityAddress
                 account.params = params
             } else {
                 Log.e("[Account Settings] Account doesn't have an identity yet")
+
+                val domain = params.domain
+                val newIdentityAddress = Factory.instance().createAddress("sip:$newValue@$domain")
+                if (newIdentityAddress != null) {
+                    params.identityAddress = newIdentityAddress
+                    account.params = params
+                } else {
+                    Log.e("[Account Settings] Failed to create identity address sip:$newValue@$domain")
+                }
             }
         }
     }
@@ -202,6 +216,7 @@ class AccountSettingsViewModel(val account: Account) : GenericSettingsViewModel(
         override fun onBoolValueChanged(newValue: Boolean) {
             if (newValue) {
                 core.defaultAccount = account
+                accountDefaultEvent.value = Event(true)
             }
         }
     }
@@ -297,19 +312,14 @@ class AccountSettingsViewModel(val account: Account) : GenericSettingsViewModel(
     val stunServerListener = object : SettingListenerStub() {
         override fun onTextValueChanged(newValue: String) {
             val params = account.params.clone()
-            if (params.natPolicy == null) {
-                Log.w("[Account Settings] No NAT Policy object in account params yet")
-                val natPolicy = core.createNatPolicy()
-                natPolicy.stunServer = newValue
-                natPolicy.isStunEnabled = newValue.isNotEmpty()
-                params.natPolicy = natPolicy
-            } else {
-                params.natPolicy?.stunServer = newValue
-                params.natPolicy?.isStunEnabled = newValue.isNotEmpty()
-            }
+            val natPolicy = params.natPolicy
+            val newNatPolicy = natPolicy?.clone() ?: core.createNatPolicy()
+            newNatPolicy.stunServer = newValue
+            newNatPolicy.isStunEnabled = newValue.isNotEmpty()
+            params.natPolicy = newNatPolicy
+            account.params = params
             if (newValue.isEmpty()) ice.value = false
             stunServer.value = newValue
-            account.params = params
         }
     }
     val stunServer = MutableLiveData<String>()
@@ -317,7 +327,10 @@ class AccountSettingsViewModel(val account: Account) : GenericSettingsViewModel(
     val iceListener = object : SettingListenerStub() {
         override fun onBoolValueChanged(newValue: Boolean) {
             val params = account.params.clone()
-            params.natPolicy?.isIceEnabled = newValue
+            val natPolicy = params.natPolicy
+            val newNatPolicy = natPolicy?.clone() ?: core.createNatPolicy()
+            newNatPolicy.isIceEnabled = newValue
+            params.natPolicy = newNatPolicy
             account.params = params
         }
     }
@@ -391,6 +404,37 @@ class AccountSettingsViewModel(val account: Account) : GenericSettingsViewModel(
         }
     }
     val linkPhoneNumberEvent = MutableLiveData<Event<Boolean>>()
+    val hideLinkPhoneNumber = MutableLiveData<Boolean>()
+
+    val conferenceFactoryUriListener = object : SettingListenerStub() {
+        override fun onTextValueChanged(newValue: String) {
+            val params = account.params.clone()
+            Log.i("[Account Settings] Forcing conference factory on proxy config ${params.identityAddress?.asString()} to value: $newValue")
+            params.conferenceFactoryUri = newValue
+            account.params = params
+        }
+    }
+    val conferenceFactoryUri = MutableLiveData<String>()
+
+    val audioVideoConferenceFactoryUriListener = object : SettingListenerStub() {
+        override fun onTextValueChanged(newValue: String) {
+            val params = account.params.clone()
+            val uri = coreContext.core.interpretUrl(newValue, false)
+            Log.i("[Account Settings] Forcing audio/video conference factory on proxy config ${params.identityAddress?.asString()} to value: $newValue")
+            params.audioVideoConferenceFactoryAddress = uri
+            account.params = params
+        }
+    }
+    val audioVideoConferenceFactoryUri = MutableLiveData<String>()
+
+    val limeServerUrlListener = object : SettingListenerStub() {
+        override fun onTextValueChanged(newValue: String) {
+            val params = account.params.clone()
+            params.limeServerUrl = newValue
+            account.params = params
+        }
+    }
+    val limeServerUrl = MutableLiveData<String>()
 
     init {
         update()
@@ -446,6 +490,12 @@ class AccountSettingsViewModel(val account: Account) : GenericSettingsViewModel(
         prefix.value = params.internationalPrefix
         dialPrefix.value = params.useInternationalPrefixForCallsAndChats
         escapePlus.value = params.isDialEscapePlusEnabled
+
+        conferenceFactoryUri.value = params.conferenceFactoryUri
+        audioVideoConferenceFactoryUri.value = params.audioVideoConferenceFactoryAddress?.asStringUriOnly()
+        limeServerUrl.value = params.limeServerUrl
+
+        hideLinkPhoneNumber.value = corePreferences.hideLinkPhoneNumber || params.identityAddress?.domain != corePreferences.defaultDomain
     }
 
     private fun initTransportList() {

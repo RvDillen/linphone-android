@@ -25,13 +25,18 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import org.linphone.LinphoneApplication.Companion.coreContext
+import org.linphone.LinphoneApplication.Companion.ensureCoreExists
 import org.linphone.core.Call
 import org.linphone.core.Core
 import org.linphone.core.tools.Log
 
 class NotificationBroadcastReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
+        Log.i("[Notification Broadcast Receiver] Ensuring Core exists")
+        ensureCoreExists(context, false)
+
         val notificationId = intent.getIntExtra(NotificationsManager.INTENT_NOTIF_ID, 0)
+        Log.i("[Notification Broadcast Receiver] Got notification broadcast for ID [$notificationId]")
 
         if (intent.action == NotificationsManager.INTENT_REPLY_NOTIF_ACTION || intent.action == NotificationsManager.INTENT_MARK_AS_READ_ACTION) {
             handleChatIntent(context, intent, notificationId)
@@ -48,7 +53,7 @@ class NotificationBroadcastReceiver : BroadcastReceiver() {
         }
         val core: Core = coreContext.core
 
-        val remoteAddress = core.interpretUrl(remoteSipAddress)
+        val remoteAddress = core.interpretUrl(remoteSipAddress, false)
         if (remoteAddress == null) {
             Log.e("[Notification Broadcast Receiver] Couldn't interpret remote address $remoteSipAddress")
             return
@@ -59,7 +64,7 @@ class NotificationBroadcastReceiver : BroadcastReceiver() {
             Log.e("[Notification Broadcast Receiver] Local identity is null for notification id $notificationId")
             return
         }
-        val localAddress = core.interpretUrl(localIdentity)
+        val localAddress = core.interpretUrl(localIdentity, false)
         if (localAddress == null) {
             Log.e("[Notification Broadcast Receiver] Couldn't interpret local address $localIdentity")
             return
@@ -71,7 +76,6 @@ class NotificationBroadcastReceiver : BroadcastReceiver() {
             return
         }
 
-        room.markAsRead()
         if (intent.action == NotificationsManager.INTENT_REPLY_NOTIF_ACTION) {
             val reply = getMessageText(intent)?.toString()
             if (reply == null) {
@@ -85,6 +89,7 @@ class NotificationBroadcastReceiver : BroadcastReceiver() {
             msg.send()
             Log.i("[Notification Broadcast Receiver] Reply sent for notif id $notificationId")
         } else {
+            room.markAsRead()
             if (!coreContext.notificationsManager.dismissChatNotification(room)) {
                 Log.w("[Notification Broadcast Receiver] Notifications Manager failed to cancel notification")
                 val notificationManager = context.getSystemService(NotificationManager::class.java)
@@ -102,7 +107,7 @@ class NotificationBroadcastReceiver : BroadcastReceiver() {
 
         val core: Core = coreContext.core
 
-        val remoteAddress = core.interpretUrl(remoteSipAddress)
+        val remoteAddress = core.interpretUrl(remoteSipAddress, false)
         val call = if (remoteAddress != null) core.getCallByRemoteAddress2(remoteAddress) else null
         if (call == null) {
             Log.e("[Notification Broadcast Receiver] Couldn't find call from remote address $remoteSipAddress")

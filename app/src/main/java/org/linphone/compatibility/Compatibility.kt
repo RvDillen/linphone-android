@@ -25,13 +25,15 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Build
 import android.os.Vibrator
 import android.telephony.TelephonyManager
+import android.util.DisplayMetrics
+import android.util.Rational
 import android.view.View
+import android.view.Window
 import android.view.WindowManager
 import androidx.core.app.NotificationManagerCompat
 import androidx.fragment.app.Fragment
@@ -50,10 +52,7 @@ class Compatibility {
         const val BLUETOOTH_CONNECT = "android.permission.BLUETOOTH_CONNECT"
 
         fun hasPermission(context: Context, permission: String): Boolean {
-            return when (Version.sdkAboveOrEqual(Version.API23_MARSHMALLOW_60)) {
-                true -> Api23Compatibility.hasPermission(context, permission)
-                else -> context.packageManager.checkPermission(permission, context.packageName) == PackageManager.PERMISSION_GRANTED
-            }
+            return Api23Compatibility.hasPermission(context, permission)
         }
 
         // See https://developer.android.com/about/versions/11/privacy/permissions#phone-numbers
@@ -85,8 +84,10 @@ class Compatibility {
         fun hasTelecomManagerPermissions(context: Context): Boolean {
             return if (Version.sdkAboveOrEqual(Version.API30_ANDROID_11)) {
                 Api30Compatibility.hasTelecomManagerPermission(context)
+            } else if (Version.sdkAboveOrEqual(Version.API29_ANDROID_10)) {
+                Api29Compatibility.hasTelecomManagerPermission(context)
             } else {
-                Api26Compatibility.hasTelecomManagerPermission(context)
+                false
             }
         }
 
@@ -98,10 +99,38 @@ class Compatibility {
             }
         }
 
+        fun requestPostNotificationsPermission(fragment: Fragment, code: Int) {
+            if (Version.sdkAboveOrEqual(Version.API33_ANDROID_13_TIRAMISU)) {
+                Api33Compatibility.requestPostNotificationsPermission(fragment, code)
+            }
+        }
+
+        fun hasPostNotificationsPermission(context: Context): Boolean {
+            return if (Version.sdkAboveOrEqual(Version.API33_ANDROID_13_TIRAMISU)) {
+                Api33Compatibility.hasPostNotificationsPermission(context)
+            } else true
+        }
+
+        fun requestReadExternalStorageAndCameraPermissions(fragment: Fragment, code: Int) {
+            if (Version.sdkAboveOrEqual(Version.API33_ANDROID_13_TIRAMISU)) {
+                Api33Compatibility.requestReadMediaAndCameraPermissions(fragment, code)
+            } else {
+                Api23Compatibility.requestReadExternalStorageAndCameraPermissions(fragment, code)
+            }
+        }
+
+        fun hasReadExternalStoragePermission(context: Context): Boolean {
+            return if (Version.sdkAboveOrEqual(Version.API33_ANDROID_13_TIRAMISU)) {
+                Api33Compatibility.hasReadExternalStoragePermission(context)
+            } else {
+                Api23Compatibility.hasReadExternalStoragePermission(context)
+            }
+        }
+
         fun getDeviceName(context: Context): String {
             return when (Version.sdkAboveOrEqual(Version.API25_NOUGAT_71)) {
                 true -> Api25Compatibility.getDeviceName(context)
-                else -> Api21Compatibility.getDeviceName(context)
+                else -> Api23Compatibility.getDeviceName(context)
             }
         }
 
@@ -117,7 +146,7 @@ class Compatibility {
 
         fun setShowWhenLocked(activity: Activity, enable: Boolean) {
             if (Version.sdkStrictlyBelow(Version.API27_OREO_81)) {
-                Api21Compatibility.setShowWhenLocked(activity, enable)
+                Api23Compatibility.setShowWhenLocked(activity, enable)
             } else {
                 Api27Compatibility.setShowWhenLocked(activity, enable)
             }
@@ -125,7 +154,7 @@ class Compatibility {
 
         fun setTurnScreenOn(activity: Activity, enable: Boolean) {
             if (Version.sdkStrictlyBelow(Version.API27_OREO_81)) {
-                Api21Compatibility.setTurnScreenOn(activity, enable)
+                Api23Compatibility.setTurnScreenOn(activity, enable)
             } else {
                 Api27Compatibility.setTurnScreenOn(activity, enable)
             }
@@ -133,7 +162,7 @@ class Compatibility {
 
         fun requestDismissKeyguard(activity: Activity) {
             if (Version.sdkStrictlyBelow(Version.API27_OREO_81)) {
-                Api21Compatibility.requestDismissKeyguard(activity)
+                Api23Compatibility.requestDismissKeyguard(activity)
             } else {
                 Api27Compatibility.requestDismissKeyguard(activity)
             }
@@ -141,7 +170,7 @@ class Compatibility {
 
         fun getBitmapFromUri(context: Context, uri: Uri): Bitmap {
             return if (Version.sdkStrictlyBelow(Version.API29_ANDROID_10)) {
-                Api21Compatibility.getBitmapFromUri(context, uri)
+                Api23Compatibility.getBitmapFromUri(context, uri)
             } else {
                 Api29Compatibility.getBitmapFromUri(context, uri)
             }
@@ -223,7 +252,15 @@ class Compatibility {
             } else if (Version.sdkAboveOrEqual(Version.API26_O_80)) {
                 Api26Compatibility.startForegroundService(context, intent)
             } else {
-                Api21Compatibility.startForegroundService(context, intent)
+                Api23Compatibility.startForegroundService(context, intent)
+            }
+        }
+
+        fun startForegroundService(service: Service, notifId: Int, notif: Notification?) {
+            if (Version.sdkAboveOrEqual(Version.API31_ANDROID_12)) {
+                Api31Compatibility.startForegroundService(service, notifId, notif)
+            } else {
+                Api23Compatibility.startForegroundService(service, notifId, notif)
             }
         }
 
@@ -238,23 +275,68 @@ class Compatibility {
         /* Call */
 
         fun canDrawOverlay(context: Context): Boolean {
-            if (Version.sdkAboveOrEqual(Version.API23_MARSHMALLOW_60)) {
-                return Api23Compatibility.canDrawOverlay(context)
+            return Api23Compatibility.canDrawOverlay(context)
+        }
+
+        fun isInPictureInPictureMode(activity: Activity): Boolean {
+            if (Version.sdkAboveOrEqual(Version.API25_NOUGAT_71)) {
+                return Api25Compatibility.isInPictureInPictureMode(activity)
             }
             return false
         }
 
-        fun enterPipMode(activity: Activity) {
-            if (Version.sdkAboveOrEqual(Version.API26_O_80)) {
-                Api26Compatibility.enterPipMode(activity)
+        fun enterPipMode(activity: Activity, conference: Boolean) {
+            if (Version.sdkStrictlyBelow(Version.API31_ANDROID_12) && Version.sdkAboveOrEqual(Version.API26_O_80)) {
+                Api26Compatibility.enterPipMode(activity, conference)
             }
+        }
+
+        fun enableAutoEnterPiP(activity: Activity, enable: Boolean, conference: Boolean) {
+            if (Version.sdkAboveOrEqual(Version.API31_ANDROID_12)) {
+                Api31Compatibility.enableAutoEnterPiP(activity, enable, conference)
+            }
+        }
+
+        fun getPipRatio(
+            activity: Activity,
+            forcePortrait: Boolean = false,
+            forceLandscape: Boolean = false
+        ): Rational {
+            val displayMetrics = DisplayMetrics()
+            activity.windowManager.defaultDisplay.getMetrics(displayMetrics)
+            var height = displayMetrics.heightPixels
+            var width = displayMetrics.widthPixels
+
+            val aspectRatio = width / height
+            if (aspectRatio < 1 / 2.39) {
+                height = 2.39.toInt()
+                width = 1
+            } else if (aspectRatio > 2.39) {
+                width = 2.39.toInt()
+                height = 1
+            }
+
+            val ratio = if (width > height) {
+                if (forcePortrait) {
+                    Rational(height, width)
+                } else {
+                    Rational(width, height)
+                }
+            } else {
+                if (forceLandscape) {
+                    Rational(height, width)
+                } else {
+                    Rational(width, height)
+                }
+            }
+            return ratio
         }
 
         fun eventVibration(vibrator: Vibrator) {
             if (Version.sdkAboveOrEqual(Version.API26_O_80)) {
                 Api26Compatibility.eventVibration(vibrator)
             } else {
-                Api21Compatibility.eventVibration(vibrator)
+                Api23Compatibility.eventVibration(vibrator)
             }
         }
 
@@ -265,27 +347,15 @@ class Compatibility {
             return false
         }
 
-        /* Contacts */
-
-        fun createShortcutsToContacts(context: Context) {
-            if (Version.sdkAboveOrEqual(Version.API25_NOUGAT_71)) {
-                Api25Compatibility.createShortcutsToContacts(context)
-            }
-        }
-
-        fun removeShortcuts(context: Context) {
-            if (Version.sdkAboveOrEqual(Version.API25_NOUGAT_71)) {
-                Api25Compatibility.removeShortcuts(context)
+        fun hideAndroidSystemUI(hide: Boolean, window: Window) {
+            if (Version.sdkAboveOrEqual(Version.API30_ANDROID_11)) {
+                Api30Compatibility.hideAndroidSystemUI(hide, window)
+            } else {
+                Api23Compatibility.hideAndroidSystemUI(hide, window)
             }
         }
 
         /* Chat */
-
-        fun createShortcutsToChatRooms(context: Context) {
-            if (Version.sdkAboveOrEqual(Version.API25_NOUGAT_71)) {
-                Api25Compatibility.createShortcutsToChatRooms(context)
-            }
-        }
 
         fun removeChatRoomShortcut(context: Context, chatRoom: ChatRoom) {
             if (Version.sdkAboveOrEqual(Version.API30_ANDROID_11)) {
@@ -317,35 +387,44 @@ class Compatibility {
             if (Version.sdkAboveOrEqual(Version.API29_ANDROID_10)) {
                 return Api29Compatibility.addImageToMediaStore(context, content)
             }
-            return Api21Compatibility.addImageToMediaStore(context, content)
+            return Api23Compatibility.addImageToMediaStore(context, content)
         }
 
         suspend fun addVideoToMediaStore(context: Context, content: Content): Boolean {
             if (Version.sdkAboveOrEqual(Version.API29_ANDROID_10)) {
                 return Api29Compatibility.addVideoToMediaStore(context, content)
             }
-            return Api21Compatibility.addVideoToMediaStore(context, content)
+            return Api23Compatibility.addVideoToMediaStore(context, content)
         }
 
         suspend fun addAudioToMediaStore(context: Context, content: Content): Boolean {
             if (Version.sdkAboveOrEqual(Version.API29_ANDROID_10)) {
                 return Api29Compatibility.addAudioToMediaStore(context, content)
             }
-            return Api21Compatibility.addAudioToMediaStore(context, content)
+            return Api23Compatibility.addAudioToMediaStore(context, content)
         }
 
         fun getUpdateCurrentPendingIntentFlag(): Int {
             if (Version.sdkAboveOrEqual(Version.API31_ANDROID_12)) {
                 return Api31Compatibility.getUpdateCurrentPendingIntentFlag()
             }
-            return Api21Compatibility.getUpdateCurrentPendingIntentFlag()
+            return Api23Compatibility.getUpdateCurrentPendingIntentFlag()
         }
 
         fun getImeFlagsForSecureChatRoom(): Int {
             if (Version.sdkAboveOrEqual(Version.API26_O_80)) {
                 return Api26Compatibility.getImeFlagsForSecureChatRoom()
             }
-            return Api21Compatibility.getImeFlagsForSecureChatRoom()
+            return Api23Compatibility.getImeFlagsForSecureChatRoom()
+        }
+
+        fun hasTelecomManagerFeature(context: Context): Boolean {
+            if (Version.sdkAboveOrEqual(Version.API33_ANDROID_13_TIRAMISU)) {
+                return Api33Compatibility.hasTelecomManagerFeature(context)
+            } else if (Version.sdkAboveOrEqual(Version.API26_O_80)) {
+                return Api26Compatibility.hasTelecomManagerFeature(context)
+            }
+            return false
         }
     }
 }

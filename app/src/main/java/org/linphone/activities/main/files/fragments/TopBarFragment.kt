@@ -21,6 +21,7 @@ package org.linphone.activities.main.files.fragments
 
 import android.os.Bundle
 import android.view.View
+import android.webkit.MimeTypeMap
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -33,7 +34,6 @@ import org.linphone.compatibility.Compatibility
 import org.linphone.core.Content
 import org.linphone.core.tools.Log
 import org.linphone.databinding.FileViewerTopBarFragmentBinding
-import org.linphone.mediastream.Version
 import org.linphone.utils.FileUtils
 import org.linphone.utils.PermissionHelper
 
@@ -48,10 +48,6 @@ class TopBarFragment : GenericFragment<FileViewerTopBarFragmentBinding>() {
 
         binding.lifecycleOwner = viewLifecycleOwner
         useMaterialSharedAxisXForwardAnimation = false
-
-        binding.setBackClickListener {
-            goBack()
-        }
 
         binding.setExportClickListener {
             val contentToExport = content
@@ -90,44 +86,48 @@ class TopBarFragment : GenericFragment<FileViewerTopBarFragmentBinding>() {
     private fun exportContent(content: Content) {
         lifecycleScope.launch {
             var mediaStoreFilePath = ""
-            if (Version.sdkAboveOrEqual(Version.API29_ANDROID_10) || PermissionHelper.get().hasWriteExternalStoragePermission()) {
-                Log.i("[File Viewer] Exporting image through Media Store API")
-                when (content.type) {
-                    "image" -> {
+            if (PermissionHelper.get().hasWriteExternalStoragePermission()) {
+                val filePath = content.filePath.orEmpty()
+                Log.i("[File Viewer] Trying to export file [$filePath] through Media Store API")
+
+                val extension = FileUtils.getExtensionFromFileName(filePath)
+                val mime = MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension)
+                when {
+                    FileUtils.isMimeImage(mime) -> {
                         val export = lifecycleScope.async {
                             Compatibility.addImageToMediaStore(requireContext(), content)
                         }
                         if (export.await()) {
-                            Log.i("[File Viewer] Adding image ${content.name} to Media Store terminated: ${content.userData}")
+                            Log.i("[File Viewer] Successfully exported image [${content.name}] to Media Store: ${content.userData}")
                             mediaStoreFilePath = content.userData.toString()
                         } else {
                             Log.e("[File Viewer] Something went wrong while copying file to Media Store...")
                         }
                     }
-                    "video" -> {
+                    FileUtils.isMimeVideo(mime) -> {
                         val export = lifecycleScope.async {
                             Compatibility.addVideoToMediaStore(requireContext(), content)
                         }
                         if (export.await()) {
-                            Log.i("[File Viewer] Adding video ${content.name} to Media Store terminated: ${content.userData}")
+                            Log.i("[File Viewer] Successfully exported video [${content.name}] to Media Store: ${content.userData}")
                             mediaStoreFilePath = content.userData.toString()
                         } else {
                             Log.e("[File Viewer] Something went wrong while copying file to Media Store...")
                         }
                     }
-                    "audio" -> {
+                    FileUtils.isMimeAudio(mime) -> {
                         val export = lifecycleScope.async {
                             Compatibility.addAudioToMediaStore(requireContext(), content)
                         }
                         if (export.await()) {
-                            Log.i("[File Viewer] Adding audio ${content.name} to Media Store terminated: ${content.userData}")
+                            Log.i("[File Viewer] Successfully exported audio [${content.name}] to Media Store: ${content.userData}")
                             mediaStoreFilePath = content.userData.toString()
                         } else {
                             Log.e("[File Viewer] Something went wrong while copying file to Media Store...")
                         }
                     }
                     else -> {
-                        Log.w("[File Viewer] File ${content.name} isn't either an image, an audio file or a video, can't add it to the Media Store")
+                        Log.w("[File Viewer] File [${content.name}] isn't either an image, an audio file or a video, can't add it to the Media Store")
                     }
                 }
             } else {
@@ -138,14 +138,14 @@ class TopBarFragment : GenericFragment<FileViewerTopBarFragmentBinding>() {
                 if (mediaStoreFilePath.isEmpty()) {
                     Log.w("[File Viewer] Media store file path is empty, media store export failed?")
 
-                    val filePath = content.plainFilePath.orEmpty()
+                    val filePath = content.exportPlainFile().orEmpty()
                     plainFilePath = filePath.ifEmpty { content.filePath.orEmpty() }
                     Log.i("[File Viewer] Plain file path is: $plainFilePath")
                     if (plainFilePath.isNotEmpty()) {
                         if (!FileUtils.openFileInThirdPartyApp(requireActivity(), plainFilePath)) {
                             (requireActivity() as SnackBarActivity).showSnackBar(R.string.chat_message_no_app_found_to_handle_file_mime_type)
                             if (plainFilePath != content.filePath.orEmpty()) {
-                                Log.i("[File Viewer] No app to open plain file path: $plainFilePath, destroying it")
+                                Log.i("[File Viewer] No app to open plain file path [$plainFilePath], destroying it")
                                 FileUtils.deleteFile(plainFilePath)
                             }
                             plainFilePath = ""

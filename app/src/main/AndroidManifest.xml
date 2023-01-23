@@ -13,17 +13,27 @@
     <!-- Needed for auto start at boot and to ensure the service won't be killed by OS while in call -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
+    <!-- Starting Android 13 we need to ask notification permission -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+
     <!-- Needed for full screen intent in incoming call notifications -->
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
-    <!-- To vibrate when pressing DTMF keys on numpad -->
+    <!-- To vibrate when pressing DTMF keys on numpad & incoming calls -->
     <uses-permission android:name="android.permission.VIBRATE" />
 
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <!-- Needed to attach file(s) in chat room fragment -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32"/>
+    <!-- Starting Android 13 you need those 3 permissions instead (https://developer.android.com/about/versions/13/behavior-changes-13) -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
+    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
+
     <!-- Needed to shared downloaded files if setting is on -->
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="28" />
 
-    <!-- Both permissions below are for contacts sync account -->
+    <!-- Both permissions below are for contacts sync account, needed to store presence in native contact if enabled -->
     <uses-permission android:name="android.permission.AUTHENTICATE_ACCOUNTS" />
     <uses-permission android:name="android.permission.GET_ACCOUNTS" />
 
@@ -40,16 +50,34 @@
     (https://developer.android.com/guide/topics/connectivity/bluetooth/permissions) -->
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
 
+    <!-- Needed to check current Do not disturb policy -->
+    <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
+
+    <!-- Needed starting Android 12 for broadcast receiver
+    to be triggered when BT device is connected / disconnected
+    (https://developer.android.com/guide/topics/connectivity/bluetooth/permissions) -->
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+
+    <!-- Needed for foreground service
+    (https://developer.android.com/guide/components/foreground-services) -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+
     <application
         android:name=".LinphoneApplication"
         android:allowBackup="false"
+        android:enableOnBackInvokedCallback="true"
         android:icon="@mipmap/ic_launcher"
         android:label="${appLabel}"
+        android:localeConfig="@xml/locales_config"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:extractNativeLibs="${extractNativeLibs}"
         android:theme="@style/AppTheme"
         android:allowNativeHeapPointerTagging="false"
         android:requestLegacyExternalStorage="true">
+	
+        <meta-data
+            android:name="com.google.android.gms.car.application"
+            android:resource="@xml/automotive_app_desc"/>
 
         <!-- Restrictions/AppConfig -->
         <meta-data android:name="android.content.APP_RESTRICTIONS" android:resource="@xml/restrictions" />
@@ -63,10 +91,10 @@
             android:requestLegacyExternalStorage="true"
             android:theme="@style/AppTheme">
 
-        <intent-filter>
-            <action android:name="android.intent.action.MAIN" />
-            <category android:name="android.intent.category.LAUNCHER" />
-        </intent-filter>
+            <intent-filter>
+            	<action android:name="android.intent.action.MAIN" />
+            	<category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
         </activity>
 
         <activity android:name=".activities.main.MainActivity"
@@ -148,20 +176,12 @@
         <activity android:name=".activities.assistant.AssistantActivity"
             android:windowSoftInputMode="adjustResize"/>
 
-        <activity android:name=".activities.call.CallActivity"
+        <activity android:name=".activities.voip.CallActivity"
             android:launchMode="singleTask"
+            android:turnScreenOn="true"
+            android:showWhenLocked="true"
             android:resizeableActivity="true"
             android:supportsPictureInPicture="true" />
-
-        <activity android:name=".activities.call.IncomingCallActivity"
-            android:launchMode="singleTask"
-            android:showWhenLocked="true"
-            android:turnScreenOn="true"
-            android:noHistory="true" />
-
-        <activity android:name=".activities.call.OutgoingCallActivity"
-            android:launchMode="singleTask"
-            android:noHistory="true" />
 
         <activity
             android:name=".activities.chat_bubble.ChatBubbleActivity"

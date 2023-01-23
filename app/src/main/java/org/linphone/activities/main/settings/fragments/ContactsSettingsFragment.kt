@@ -28,13 +28,11 @@ import org.linphone.LinphoneApplication.Companion.corePreferences
 import org.linphone.R
 import org.linphone.activities.main.settings.SettingListenerStub
 import org.linphone.activities.main.settings.viewmodels.ContactsSettingsViewModel
-import org.linphone.activities.navigateToEmptySetting
 import org.linphone.activities.navigateToLdapSettings
-import org.linphone.compatibility.Compatibility
 import org.linphone.core.tools.Log
 import org.linphone.databinding.SettingsContactsFragmentBinding
-import org.linphone.utils.Event
 import org.linphone.utils.PermissionHelper
+import org.linphone.utils.ShortcutsHelper
 
 class ContactsSettingsFragment : GenericSettingFragment<SettingsContactsFragmentBinding>() {
     private lateinit var viewModel: ContactsSettingsViewModel
@@ -50,18 +48,16 @@ class ContactsSettingsFragment : GenericSettingFragment<SettingsContactsFragment
         viewModel = ViewModelProvider(this)[ContactsSettingsViewModel::class.java]
         binding.viewModel = viewModel
 
-        binding.setBackClickListener { goBack() }
-
         viewModel.launcherShortcutsEvent.observe(
             viewLifecycleOwner
         ) {
             it.consume { newValue ->
                 if (newValue) {
-                    Compatibility.createShortcutsToContacts(requireContext())
+                    ShortcutsHelper.createShortcutsToContacts(requireContext())
                 } else {
-                    Compatibility.removeShortcuts(requireContext())
+                    ShortcutsHelper.removeShortcuts(requireContext())
                     if (corePreferences.chatRoomShortcuts) {
-                        Compatibility.createShortcutsToChatRooms(requireContext())
+                        ShortcutsHelper.createShortcutsToChatRooms(requireContext())
                     }
                 }
             }
@@ -92,12 +88,15 @@ class ContactsSettingsFragment : GenericSettingFragment<SettingsContactsFragment
             }
         }
 
-        if (!PermissionHelper.required(requireContext()).hasReadContactsPermission()) {
-            Log.i("[Contacts Settings] Asking for READ_CONTACTS permission")
-            requestPermissions(arrayOf(android.Manifest.permission.READ_CONTACTS), 0)
+        if (corePreferences.enableNativeAddressBookIntegration) {
+            if (!PermissionHelper.required(requireContext()).hasReadContactsPermission()) {
+                Log.i("[Contacts Settings] Asking for READ_CONTACTS permission")
+                requestPermissions(arrayOf(android.Manifest.permission.READ_CONTACTS), 0)
+            }
         }
     }
 
+    @Deprecated("Deprecated in Java")
     override fun onRequestPermissionsResult(
         requestCode: Int,
         permissions: Array<out String>,
@@ -109,8 +108,7 @@ class ContactsSettingsFragment : GenericSettingFragment<SettingsContactsFragment
                 if (granted) {
                     Log.i("[Contacts Settings] READ_CONTACTS permission granted")
                     viewModel.readContactsPermissionGranted.value = true
-                    coreContext.contactsManager.onReadContactsPermissionGranted()
-                    coreContext.contactsManager.fetchContactsAsync()
+                    coreContext.fetchContacts()
                 } else {
                     Log.w("[Contacts Settings] READ_CONTACTS permission denied")
                 }
@@ -120,19 +118,10 @@ class ContactsSettingsFragment : GenericSettingFragment<SettingsContactsFragment
                 if (granted) {
                     Log.i("[Contacts Settings] WRITE_CONTACTS permission granted")
                     corePreferences.storePresenceInNativeContact = true
-                    coreContext.contactsManager.storePresenceInformationForAllContacts()
                 } else {
                     Log.w("[Contacts Settings] WRITE_CONTACTS permission denied")
                 }
             }
-        }
-    }
-
-    override fun goBack() {
-        if (sharedViewModel.isSlidingPaneSlideable.value == true) {
-            sharedViewModel.closeSlidingPaneEvent.value = Event(true)
-        } else {
-            navigateToEmptySetting()
         }
     }
 

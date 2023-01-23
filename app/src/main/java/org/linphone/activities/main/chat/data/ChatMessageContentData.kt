@@ -19,16 +19,20 @@
  */
 package org.linphone.activities.main.chat.data
 
-import android.graphics.Bitmap
 import android.text.Spannable
 import android.text.SpannableString
 import android.text.Spanned
 import android.text.style.UnderlineSpan
+import android.webkit.MimeTypeMap
 import android.widget.Toast
 import androidx.lifecycle.MutableLiveData
 import androidx.media.AudioFocusRequestCompat
+import java.io.BufferedReader
+import java.io.FileReader
+import java.lang.StringBuilder
 import java.text.SimpleDateFormat
 import java.util.*
+import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.launchIn
@@ -38,8 +42,9 @@ import org.linphone.R
 import org.linphone.core.*
 import org.linphone.core.tools.Log
 import org.linphone.utils.AppUtils
+import org.linphone.utils.AudioRouteUtils
 import org.linphone.utils.FileUtils
-import org.linphone.utils.ImageUtils
+import org.linphone.utils.TimestampUtils
 
 class ChatMessageContentData(
     private val chatMessage: ChatMessage,
@@ -52,24 +57,34 @@ class ChatMessageContentData(
     val isImage = MutableLiveData<Boolean>()
     val isVideo = MutableLiveData<Boolean>()
     val isAudio = MutableLiveData<Boolean>()
-    val videoPreview = MutableLiveData<Bitmap>()
     val isPdf = MutableLiveData<Boolean>()
     val isGenericFile = MutableLiveData<Boolean>()
     val isVoiceRecording = MutableLiveData<Boolean>()
+    val isConferenceSchedule = MutableLiveData<Boolean>()
+    val isConferenceUpdated = MutableLiveData<Boolean>()
+    val isConferenceCancelled = MutableLiveData<Boolean>()
 
     val fileName = MutableLiveData<String>()
     val filePath = MutableLiveData<String>()
 
     val downloadable = MutableLiveData<Boolean>()
-    val downloadEnabled = MutableLiveData<Boolean>()
-    val downloadProgressInt = MutableLiveData<Int>()
-    val downloadProgressString = MutableLiveData<String>()
+    val fileTransferProgress = MutableLiveData<Boolean>()
+    val fileTransferProgressInt = MutableLiveData<Int>()
     val downloadLabel = MutableLiveData<Spannable>()
 
     val voiceRecordDuration = MutableLiveData<Int>()
     val formattedDuration = MutableLiveData<String>()
     val voiceRecordPlayingPosition = MutableLiveData<Int>()
     val isVoiceRecordPlaying = MutableLiveData<Boolean>()
+
+    val conferenceSubject = MutableLiveData<String>()
+    val conferenceDescription = MutableLiveData<String>()
+    val conferenceParticipantCount = MutableLiveData<String>()
+    val conferenceDate = MutableLiveData<String>()
+    val conferenceTime = MutableLiveData<String>()
+    val conferenceDuration = MutableLiveData<String>()
+    var conferenceAddress = MutableLiveData<String>()
+    val showDuration = MutableLiveData<Boolean>()
 
     val isAlone: Boolean
         get() {
@@ -104,18 +119,18 @@ class ChatMessageContentData(
             total: Int
         ) {
             if (c.filePath == getContent().filePath) {
-                val percent = offset * 100 / total
-                Log.d("[Content] Download progress is: $offset / $total ($percent%)")
-
-                downloadProgressInt.value = percent
-                downloadProgressString.value = "$percent%"
+                if (fileTransferProgress.value == false) {
+                    fileTransferProgress.value = true
+                }
+                val percent = ((offset * 100.0) / total).toInt() // Conversion from int to double and back to int is required
+                Log.d("[Content] Transfer progress is: $offset / $total -> $percent%")
+                fileTransferProgressInt.value = percent
             }
         }
 
         override fun onMsgStateChanged(message: ChatMessage, state: ChatMessage.State) {
-            downloadEnabled.value = state != ChatMessage.State.FileTransferInProgress
-
             if (state == ChatMessage.State.FileTransferDone || state == ChatMessage.State.FileTransferError) {
+                fileTransferProgress.value = false
                 updateContent()
 
                 if (state == ChatMessage.State.FileTransferDone) {
@@ -135,6 +150,8 @@ class ChatMessageContentData(
         isVoiceRecordPlaying.value = false
         voiceRecordDuration.value = 0
         voiceRecordPlayingPosition.value = 0
+        fileTransferProgress.value = false
+        fileTransferProgressInt.value = 0
 
         updateContent()
         chatMessage.addListener(chatMessageListener)
@@ -154,18 +171,34 @@ class ChatMessageContentData(
     }
 
     fun download() {
+        if (chatMessage.isFileTransferInProgress) {
+            Log.w("[Content] Another FileTransfer content for this message is currently being downloaded, can't start another one for now")
+            listener?.onError(R.string.chat_message_download_already_in_progress)
+            return
+        }
+
         val content = getContent()
         val filePath = content.filePath
-        if (content.isFileTransfer && (filePath == null || filePath.isEmpty())) {
-            val contentName = content.name
-            if (contentName != null) {
-                val file = FileUtils.getFileStoragePath(contentName)
-                content.filePath = file.path
-                downloadEnabled.value = false
-
-                Log.i("[Content] Started downloading $contentName into ${content.filePath}")
-                chatMessage.downloadContent(content)
+        if (content.isFileTransfer) {
+            if (filePath == null || filePath.isEmpty()) {
+                val contentName = content.name
+                if (contentName != null) {
+                    val file = FileUtils.getFileStoragePath(contentName)
+                    content.filePath = file.path
+                    Log.i("[Content] Started downloading $contentName into ${content.filePath}")
+                } else {
+                    Log.e("[Content] Content name is null, can't download it!")
+                    return
+                }
+            } else {
+                Log.w("[Content] File path already set [$filePath] using it (auto download that failed probably)")
             }
+
+            if (!chatMessage.downloadContent(content)) {
+                Log.e("[Content] Failed to start content download!")
+            }
+        } else {
+            Log.e("[Content] Content is not a FileTransfer, can't download it!")
         }
     }
 
@@ -203,37 +236,60 @@ class ChatMessageContentData(
         spannable.setSpan(UnderlineSpan(), 0, spannable.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
         downloadLabel.value = spannable
 
+        isImage.value = false
+        isVideo.value = false
+        isAudio.value = false
+        isPdf.value = false
+        isVoiceRecording.value = false
+        isConferenceSchedule.value = false
+        isConferenceUpdated.value = false
+        isConferenceCancelled.value = false
+
         if (content.isFile || (content.isFileTransfer && chatMessage.isOutgoing)) {
             val path = if (isFileEncrypted) {
                 Log.i("[Content] Content is encrypted, requesting plain file path")
-                content.plainFilePath
+                content.exportPlainFile()
             } else {
                 content.filePath ?: ""
             }
             downloadable.value = content.filePath.orEmpty().isEmpty()
 
+            val isVoiceRecord = content.isVoiceRecording
+            isVoiceRecording.value = isVoiceRecord
+
+            val isConferenceIcs = content.isIcalendar
+            isConferenceSchedule.value = isConferenceIcs
+
             if (path.isNotEmpty()) {
-                Log.i("[Content] Found displayable content: $path")
-                val isVoiceRecord = content.isVoiceRecording
                 filePath.value = path
-                isImage.value = FileUtils.isExtensionImage(path)
-                isVideo.value = FileUtils.isExtensionVideo(path) && !isVoiceRecord
-                isAudio.value = FileUtils.isExtensionAudio(path) && !isVoiceRecord
-                isPdf.value = FileUtils.isExtensionPdf(path)
-                isVoiceRecording.value = isVoiceRecord
+                val extension = FileUtils.getExtensionFromFileName(path)
+                val mime = MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension)
+                isImage.value = FileUtils.isMimeImage(mime)
+                isVideo.value = FileUtils.isMimeVideo(mime) && !isVoiceRecord
+                isAudio.value = FileUtils.isMimeAudio(mime) && !isVoiceRecord
+                isPdf.value = FileUtils.isMimePdf(mime)
+                val type = when {
+                    isImage.value == true -> "image"
+                    isVideo.value == true -> "video"
+                    isAudio.value == true -> "audio"
+                    isPdf.value == true -> "pdf"
+                    isVoiceRecord -> "voice recording"
+                    isConferenceIcs -> "conference invitation"
+                    else -> "unknown"
+                }
+                Log.i("[Content] Extension for file [$path] is [$extension], deduced type from MIME is [$type]")
 
                 if (isVoiceRecord) {
                     val duration = content.fileDuration // duration is in ms
                     voiceRecordDuration.value = duration
                     formattedDuration.value = SimpleDateFormat("mm:ss", Locale.getDefault()).format(duration)
-                    Log.i("[Voice Recording] Duration is ${voiceRecordDuration.value} ($duration)")
+                    Log.i("[Content] Voice recording duration is ${voiceRecordDuration.value} ($duration)")
+                } else if (isConferenceIcs) {
+                    parseConferenceInvite(content)
                 }
-
-                if (isVideo.value == true) {
-                    scope.launch {
-                        videoPreview.postValue(ImageUtils.getVideoPreview(path))
-                    }
-                }
+            } else if (isConferenceIcs) {
+                Log.i("[Content] Found content with icalendar file")
+                parseConferenceInvite(content)
             } else {
                 Log.w("[Content] Found ${if (content.isFile) "file" else "file transfer"} content with empty path...")
                 isImage.value = false
@@ -241,20 +297,95 @@ class ChatMessageContentData(
                 isAudio.value = false
                 isPdf.value = false
                 isVoiceRecording.value = false
+                isConferenceSchedule.value = false
             }
-        } else {
+        } else if (content.isFileTransfer) {
             downloadable.value = true
-            isImage.value = FileUtils.isExtensionImage(fileName.value!!)
-            isVideo.value = FileUtils.isExtensionVideo(fileName.value!!)
-            isAudio.value = FileUtils.isExtensionAudio(fileName.value!!)
-            isPdf.value = FileUtils.isExtensionPdf(fileName.value!!)
+            val extension = FileUtils.getExtensionFromFileName(fileName.value!!)
+            val mime = MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension)
+            isImage.value = FileUtils.isMimeImage(mime)
+            isVideo.value = FileUtils.isMimeVideo(mime)
+            isAudio.value = FileUtils.isMimeAudio(mime)
+            isPdf.value = FileUtils.isMimePdf(mime)
             isVoiceRecording.value = false
+            isConferenceSchedule.value = false
+        } else if (content.isIcalendar) {
+            Log.i("[Content] Found content with icalendar body")
+            isConferenceSchedule.value = true
+            parseConferenceInvite(content)
+        } else {
+            Log.w("[Content] Found content that's neither a file or a file transfer")
         }
 
-        isGenericFile.value = !isPdf.value!! && !isAudio.value!! && !isVideo.value!! && !isImage.value!! && !isVoiceRecording.value!!
-        downloadEnabled.value = !chatMessage.isFileTransferInProgress
-        downloadProgressInt.value = 0
-        downloadProgressString.value = "0%"
+        isGenericFile.value = !isPdf.value!! && !isAudio.value!! && !isVideo.value!! && !isImage.value!! && !isVoiceRecording.value!! && !isConferenceSchedule.value!!
+    }
+
+    private fun parseConferenceInvite(content: Content) {
+        val conferenceInfo = Factory.instance().createConferenceInfoFromIcalendarContent(content)
+        val conferenceUri = conferenceInfo?.uri?.asStringUriOnly()
+        if (conferenceInfo != null && conferenceUri != null) {
+            conferenceAddress.value = conferenceUri!!
+            Log.i("[Content] Created conference info from ICS with address ${conferenceAddress.value}")
+            conferenceSubject.value = conferenceInfo.subject
+            conferenceDescription.value = conferenceInfo.description
+
+            val state = conferenceInfo.state
+            isConferenceUpdated.value = state == ConferenceInfo.State.Updated
+            isConferenceCancelled.value = state == ConferenceInfo.State.Cancelled
+
+            conferenceDate.value = TimestampUtils.dateToString(conferenceInfo.dateTime)
+            conferenceTime.value = TimestampUtils.timeToString(conferenceInfo.dateTime)
+
+            val minutes = conferenceInfo.duration
+            val hours = TimeUnit.MINUTES.toHours(minutes.toLong())
+            val remainMinutes = minutes - TimeUnit.HOURS.toMinutes(hours).toInt()
+            conferenceDuration.value = TimestampUtils.durationToString(hours.toInt(), remainMinutes)
+            showDuration.value = minutes > 0
+
+            // Check if organizer is part of participants list
+            var participantsCount = conferenceInfo.participants.size
+            val organizer = conferenceInfo.organizer
+            var organizerFound = false
+            if (organizer != null) {
+                for (participant in conferenceInfo.participants) {
+                    if (participant.weakEqual(organizer)) {
+                        organizerFound = true
+                        break
+                    }
+                }
+            }
+            if (!organizerFound) participantsCount += 1 // +1 for organizer
+            conferenceParticipantCount.value = String.format(AppUtils.getString(R.string.conference_invite_participants_count), participantsCount)
+        } else if (conferenceInfo == null) {
+            if (content.filePath != null) {
+                try {
+                    val br = BufferedReader(FileReader(content.filePath))
+                    var line: String?
+                    val textBuilder = StringBuilder()
+                    while (br.readLine().also { line = it } != null) {
+                        textBuilder.append(line)
+                        textBuilder.append('\n')
+                    }
+                    br.close()
+                    Log.e("[Content] Failed to create conference info from ICS file [${content.filePath}]: $textBuilder")
+                } catch (e: Exception) {
+                    Log.e("[Content] Failed to read content of ICS file [${content.filePath}]: $e")
+                }
+            } else {
+                Log.e("[Content] Failed to create conference info from ICS: ${content.utf8Text}")
+            }
+        } else if (conferenceInfo.uri == null) {
+            Log.e("[Content] Failed to find the conference URI in conference info [$conferenceInfo]")
+        }
+    }
+
+    fun callConferenceAddress() {
+        val address = conferenceAddress.value
+        if (address == null) {
+            Log.e("[Content] Can't call null conference address!")
+            return
+        }
+        listener?.onCallConference(address, conferenceSubject.value)
     }
 
     /** Voice recording specifics */
@@ -278,7 +409,9 @@ class ChatMessageContentData(
         voiceRecordingPlayer.start()
         isVoiceRecordPlaying.value = true
         tickerFlow().onEach {
-            voiceRecordPlayingPosition.postValue(voiceRecordingPlayer.currentPosition)
+            withContext(Dispatchers.Main) {
+                voiceRecordPlayingPosition.value = voiceRecordingPlayer.currentPosition
+            }
         }.launchIn(scope)
     }
 
@@ -306,25 +439,10 @@ class ChatMessageContentData(
 
     private fun initVoiceRecordPlayer() {
         Log.i("[Voice Recording] Creating player for voice record")
-        // In case no headphones/headset is connected, use speaker sound card to play recordings, otherwise use earpiece
-        // If none are available, default one will be used
-        var headphonesCard: String? = null
-        var speakerCard: String? = null
-        var earpieceCard: String? = null
-        for (device in coreContext.core.audioDevices) {
-            if (device.hasCapability(AudioDevice.Capabilities.CapabilityPlay)) {
-                if (device.type == AudioDevice.Type.Speaker) {
-                    speakerCard = device.id
-                } else if (device.type == AudioDevice.Type.Earpiece) {
-                    earpieceCard = device.id
-                } else if (device.type == AudioDevice.Type.Headphones || device.type == AudioDevice.Type.Headset) {
-                    headphonesCard = device.id
-                }
-            }
-        }
-        Log.i("[Voice Recording] Found headset/headphones sound card [$headphonesCard], speaker sound card [$speakerCard] and earpiece sound card [$earpieceCard]")
+        val playbackSoundCard = AudioRouteUtils.getAudioPlaybackDeviceIdForCallRecordingOrVoiceMessage()
+        Log.i("[Voice Recording] Using device $playbackSoundCard to make the voice message playback")
 
-        val localPlayer = coreContext.core.createLocalPlayer(headphonesCard ?: speakerCard ?: earpieceCard, null, null)
+        val localPlayer = coreContext.core.createLocalPlayer(playbackSoundCard, null, null)
         if (localPlayer != null) {
             voiceRecordingPlayer = localPlayer
         } else {
@@ -359,4 +477,10 @@ interface OnContentClickedListener {
     fun onContentClicked(content: Content)
 
     fun onSipAddressClicked(sipUri: String)
+
+    fun onWebUrlClicked(url: String)
+
+    fun onCallConference(address: String, subject: String?)
+
+    fun onError(messageId: Int)
 }

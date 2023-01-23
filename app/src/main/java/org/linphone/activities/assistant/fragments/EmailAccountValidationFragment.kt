@@ -23,6 +23,7 @@ import android.os.Bundle
 import android.view.View
 import androidx.lifecycle.ViewModelProvider
 import org.linphone.LinphoneApplication.Companion.coreContext
+import org.linphone.LinphoneApplication.Companion.corePreferences
 import org.linphone.R
 import org.linphone.activities.GenericFragment
 import org.linphone.activities.assistant.AssistantActivity
@@ -31,7 +32,7 @@ import org.linphone.activities.navigateToAccountLinking
 import org.linphone.databinding.AssistantEmailAccountValidationFragmentBinding
 
 class EmailAccountValidationFragment : GenericFragment<AssistantEmailAccountValidationFragmentBinding>() {
-    private lateinit var sharedViewModel: SharedAssistantViewModel
+    private lateinit var sharedAssistantViewModel: SharedAssistantViewModel
     private lateinit var viewModel: EmailAccountValidationViewModel
 
     override fun getLayoutId(): Int = R.layout.assistant_email_account_validation_fragment
@@ -41,24 +42,28 @@ class EmailAccountValidationFragment : GenericFragment<AssistantEmailAccountVali
 
         binding.lifecycleOwner = viewLifecycleOwner
 
-        sharedViewModel = requireActivity().run {
+        sharedAssistantViewModel = requireActivity().run {
             ViewModelProvider(this)[SharedAssistantViewModel::class.java]
         }
 
-        viewModel = ViewModelProvider(this, EmailAccountValidationViewModelFactory(sharedViewModel.getAccountCreator()))[EmailAccountValidationViewModel::class.java]
+        viewModel = ViewModelProvider(this, EmailAccountValidationViewModelFactory(sharedAssistantViewModel.getAccountCreator()))[EmailAccountValidationViewModel::class.java]
         binding.viewModel = viewModel
 
         viewModel.leaveAssistantEvent.observe(
             viewLifecycleOwner
         ) {
             it.consume {
-                coreContext.contactsManager.updateLocalContacts()
+                coreContext.newAccountConfigured(true)
 
-                val args = Bundle()
-                args.putBoolean("AllowSkip", true)
-                args.putString("Username", viewModel.accountCreator.username)
-                args.putString("Password", viewModel.accountCreator.password)
-                navigateToAccountLinking(args)
+                if (!corePreferences.hideLinkPhoneNumber) {
+                    val args = Bundle()
+                    args.putBoolean("AllowSkip", true)
+                    args.putString("Username", viewModel.accountCreator.username)
+                    args.putString("Password", viewModel.accountCreator.password)
+                    navigateToAccountLinking(args)
+                } else {
+                    requireActivity().finish()
+                }
             }
         }
 
