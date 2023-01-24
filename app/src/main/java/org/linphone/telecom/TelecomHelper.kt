@@ -25,6 +25,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.graphics.drawable.Icon
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.telecom.PhoneAccount
 import android.telecom.PhoneAccountHandle
@@ -83,6 +84,9 @@ class TelecomHelper private constructor(context: Context) {
     }
 
     fun isIncomingCallPermitted(): Boolean {
+        // CLB - Special MYCO handling
+        if (Build.MODEL.contains("Myco"))
+            return true
         val incomingCallPermitted = telecomManager.isIncomingCallPermitted(account.accountHandle)
         Log.i("[Telecom Helper] Is incoming call permitted? $incomingCallPermitted")
         return incomingCallPermitted

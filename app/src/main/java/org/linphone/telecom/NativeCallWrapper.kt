@@ -72,23 +72,10 @@ class NativeCallWrapper(var callId: String) : Connection() {
     }
 
     override fun onCallAudioStateChanged(state: CallAudioState) {
-        Log.i("[Connection] Audio state changed: $state")
+        Log.i("[Connection] with id: $callId Audio state changed: $state")
 
         val call = getCall()
         if (call != null) {
-            if (getState() != STATE_ACTIVE && getState() != STATE_DIALING) {
-                Log.w("[Connection] Call state isn't STATE_ACTIVE or STATE_DIALING, ignoring mute mic & audio route directive from TelecomManager")
-                return
-            }
-
-            if (state.isMuted != call.microphoneMuted) {
-                Log.w("[Connection] Connection audio state asks for changing in mute: ${state.isMuted}, currently is ${call.microphoneMuted}")
-                if (state.isMuted) {
-                    Log.w("[Connection] Muting microphone")
-                    call.microphoneMuted = true
-                }
-            }
-
             when (state.route) {
                 CallAudioState.ROUTE_EARPIECE -> AudioRouteUtils.routeAudioToEarpiece(call, true)
                 CallAudioState.ROUTE_SPEAKER -> AudioRouteUtils.routeAudioToSpeaker(call, true)
