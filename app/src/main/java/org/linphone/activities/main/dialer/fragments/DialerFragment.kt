@@ -29,6 +29,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.view.View
 import android.widget.Toast
@@ -46,6 +47,7 @@ import org.linphone.activities.main.viewmodels.DialogViewModel
 import org.linphone.activities.navigateToConferenceScheduling
 import org.linphone.activities.navigateToConfigFileViewer
 import org.linphone.activities.navigateToContacts
+import org.linphone.clb.CallStateCLB
 import org.linphone.compatibility.Compatibility
 import org.linphone.core.tools.Log
 import org.linphone.databinding.DialerFragmentBinding
@@ -186,8 +188,9 @@ class DialerFragment : SecureFragment<DialerFragmentBinding>() {
 
         // CLB: no check for update
         // checkForUpdate()
-
-        checkPermissions()
+        if (Version.sdkAboveOrEqual(Version.API23_MARSHMALLOW_60)) {
+            checkReadPhoneStatePermission()
+        }
     }
 
     override fun onPause() {
