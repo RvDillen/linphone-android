@@ -181,7 +181,8 @@
             android:turnScreenOn="true"
             android:showWhenLocked="true"
             android:resizeableActivity="true"
-            android:supportsPictureInPicture="true" />
+            android:supportsPictureInPicture="true"
+	    noHistory="true" />
 
         <activity
             android:name=".activities.chat_bubble.ChatBubbleActivity"
