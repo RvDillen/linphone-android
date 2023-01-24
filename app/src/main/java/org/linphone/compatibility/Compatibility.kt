@@ -264,14 +264,6 @@ class Compatibility {
             }
         }
 
-        fun startForegroundService(service: Service, notifId: Int, notif: Notification?) {
-            if (Version.sdkAboveOrEqual(Version.API31_ANDROID_12)) {
-                Api31Compatibility.startForegroundService(service, notifId, notif)
-            } else {
-                Api21Compatibility.startForegroundService(service, notifId, notif)
-            }
-        }
-
         /* Call */
 
         fun canDrawOverlay(context: Context): Boolean {

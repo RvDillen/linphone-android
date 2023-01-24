@@ -35,7 +35,7 @@ class CoreService : CoreService() {
     }
 
     fun IsCoreServiceReady(): Boolean {
-        val result: Boolean = (coreContext.notificationsManager.service != null)
+        val result: Boolean = (coreContext.notificationsManager.getService() != null)
         return result
     }
 

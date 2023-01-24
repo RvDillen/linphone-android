@@ -52,6 +52,6 @@ class CoreContextExt() {
     }
 
     fun IsServiceReady(): Boolean {
-        return LinphoneApplication.coreContext.notificationsManager.service != null
+        return LinphoneApplication.coreContext.notificationsManager.getService() != null
     }
 }

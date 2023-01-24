@@ -253,6 +253,10 @@ class NotificationsManager(private val context: Context) {
         }
     }
 
+    fun getService(): CoreService? {
+        return service
+    }
+    
     fun onCoreReady() {
         coreContext.core.addListener(listener)
     }

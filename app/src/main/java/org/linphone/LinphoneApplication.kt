@@ -99,8 +99,8 @@ class LinphoneApplication : Application(), ImageLoaderFactory {
 
             Log.i("[Application] Core context is being created ${if (pushReceived) "from push" else ""}")
             coreContext = CoreContext(context, corePreferences.config, service, useAutoStartDescription)
-	    
-	    if (coreContext.core.provisioningUri == null) {
+
+            if (coreContext.core.provisioningUri == null) {
                 val configUrl = "http://config.clb.nl/linphonerc.xml"
                 coreContext.core.setProvisioningUri(configUrl)
                 Log.i("[Application] Provisioning URL is not configured, set to default CLB URL: $configUrl")
@@ -108,14 +108,14 @@ class LinphoneApplication : Application(), ImageLoaderFactory {
                 val configUrl = coreContext.core.provisioningUri
                 Log.i("[Application] Provisioning URL already configured: $configUrl")
             }
-	    
+
             coreContext.start()
-	    
-	    // CLB Registration
+
+            // CLB Registration
             val registerCLB: RegisterCLB = org.linphone.clb.RegisterCLB(coreContext.context.applicationContext)
             registerCLB.RegisterReceivers()
-	    
-	    // Use
+
+            // Use
             Timer().schedule(2000) {
                 try {
                     // CLB Forcing init of Callstate
@@ -133,8 +133,8 @@ class LinphoneApplication : Application(), ImageLoaderFactory {
         fun contextExists(): Boolean {
             return ::coreContext.isInitialized
         }
-	
-	private fun CreateConfigCLB(context: Context): Config {
+
+        private fun CreateConfigCLB(context: Context): Config {
 
             // Get restrictions data (AppConfigHelper)
             val ach = AppConfigHelper(context, corePreferences)

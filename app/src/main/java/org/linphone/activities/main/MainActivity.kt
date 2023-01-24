@@ -21,7 +21,6 @@ package org.linphone.activities.main
 
 import android.annotation.SuppressLint
 import android.annotation.TargetApi
-import android.app.Activity
 import android.app.role.RoleManager
 import android.content.ComponentCallbacks2
 import android.content.Intent
@@ -35,7 +34,6 @@ import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
 import androidx.annotation.StringRes
-import android.view.inputmethod.InputMethodManager
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.view.ViewCompat

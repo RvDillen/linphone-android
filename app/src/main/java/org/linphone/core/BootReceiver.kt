@@ -35,7 +35,7 @@ class BootReceiver : BroadcastReceiver() {
             Log.i("[Boot Receiver] Device is starting, autoStart is $autoStart")
             if (autoStart) {
                 startService(context)
-	    }
+            }
         } else if (intent.action.equals(Intent.ACTION_MY_PACKAGE_REPLACED, ignoreCase = true)) {
             val autoStart = corePreferences.autoStart
             Log.i("[Boot Receiver] App has been updated, autoStart is $autoStart")
