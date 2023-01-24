@@ -43,6 +43,7 @@ import org.linphone.R
 import org.linphone.activities.chat_bubble.ChatBubbleActivity
 import org.linphone.activities.main.MainActivity
 import org.linphone.activities.voip.CallActivity
+import org.linphone.clb.CallStateCLB
 import org.linphone.compatibility.Compatibility
 import org.linphone.contact.getPerson
 import org.linphone.contact.getThumbnailUri
@@ -131,10 +132,12 @@ class NotificationsManager(private val context: Context) {
                 Call.State.End, Call.State.Error -> dismissCallNotification(call)
                 Call.State.Released -> {
                     if (LinphoneUtils.isCallLogMissed(call.callLog)) {
+                        /* CLB exclusive!: Do NOT show 'missed call notification' and icon!! =>
                         displayMissedCallNotification(call.remoteAddress)
+                        */
                     }
                 }
-                else -> displayCallNotification(call)
+                else -> displayCallNotification(call, true)
             }
         }
 
@@ -371,6 +374,12 @@ class NotificationsManager(private val context: Context) {
         currentForegroundServiceNotificationId = SERVICE_NOTIF_ID
         Log.i("[Notifications Manager] Starting service as foreground [$currentForegroundServiceNotificationId]")
         Compatibility.startForegroundService(coreService, currentForegroundServiceNotificationId, serviceNotification)
+
+        // CLB Forcing init of Callstate
+        // (coreContext.core)
+        var instance = CallStateCLB.instance()
+
+        instance.Restart()
     }
 
     private fun startForeground(notificationId: Int, callNotification: Notification) {

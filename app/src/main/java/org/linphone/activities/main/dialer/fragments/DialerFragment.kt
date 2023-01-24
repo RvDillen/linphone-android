@@ -184,7 +184,8 @@ class DialerFragment : SecureFragment<DialerFragmentBinding>() {
         Log.i("[Dialer] Pending call transfer mode = ${sharedViewModel.pendingCallTransfer}")
         viewModel.transferVisibility.value = sharedViewModel.pendingCallTransfer
 
-        checkForUpdate()
+        // CLB: no check for update
+        // checkForUpdate()
 
         checkPermissions()
     }
@@ -206,6 +207,15 @@ class DialerFragment : SecureFragment<DialerFragmentBinding>() {
         uploadLogsInitiatedByUs = false
 
         viewModel.enteredUri.value = sharedViewModel.dialerUri
+
+        /* CLB Preferences
+        try {
+            PermissionHelper.instance().CheckPermissions(this.activity)
+            PermissionHelper.instance().CheckOverlayPermission(this.activity)
+        } catch (e: Exception) {
+            Log.e("PermissionHelper exception : $e.message") // handlerma
+        }
+         */
     }
 
     @Deprecated("Deprecated in Java")
@@ -218,10 +228,9 @@ class DialerFragment : SecureFragment<DialerFragmentBinding>() {
             if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 Log.i("[Dialer] READ_PHONE_STATE permission has been granted")
                 coreContext.initPhoneStateListener()
-                // If first permission has been granted, continue to ask for permissions,
-                // otherwise don't do it or it will loop indefinitely
-                checkPermissions()
+                CallStateCLB.instance().Restart()
             }
+            checkTelecomManagerPermissions()
         } else if (requestCode == 1) {
             var allGranted = true
             for (result in grantResults) {
@@ -244,8 +253,8 @@ class DialerFragment : SecureFragment<DialerFragmentBinding>() {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
     }
 
-    private fun checkPermissions() {
-        if (!PermissionHelper.get().hasReadPhoneStatePermission()) {
+    private fun checkReadPhoneStatePermission() {
+        if (!PermissionHelper.get().hasReadPhoneStatePermission() && !Build.MODEL.contains("Myco")) {
             Log.i("[Dialer] Asking for READ_PHONE_STATE permission")
             requestPermissions(arrayOf(Manifest.permission.READ_PHONE_STATE), 0)
         } else if (!PermissionHelper.get().hasPostNotificationsPermission()) {
