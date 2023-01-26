@@ -142,7 +142,10 @@ class CallLogsListViewModel : ViewModel() {
             list.add(previousCallLogGroup)
         }
 
-        return list
+        // CLB: Remove calls from CLB Hardware from History
+        val listNoCSerie = org.linphone.clb.CallFilter.RemoveCallsFromHardware(list)
+
+        return ArrayList(listNoCSerie);
     }
 
     private fun updateCallLogs() {
