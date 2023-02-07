@@ -2,10 +2,10 @@ package org.linphone.clb;
 
 import android.util.Log;
 
+
 import org.linphone.activities.main.history.data.GroupedCallLogData;
-import org.linphone.core.Address;
-import org.linphone.core.Call;
-import org.linphone.core.CallLog;
+import org.linphone.core.*;
+
 
 import java.util.ArrayList;
 import java.util.List;
@@ -25,26 +25,50 @@ public class CallFilter {
         try {
             int size = logs.size();
             for (int i = 0; i < size; i++) {
-                boolean fromHardWare = false;
+                boolean fromHardware = false;
                 GroupedCallLogData groupLog = logs.get(i);
                 CallLog log = groupLog.getLastCallLog();
                 if (log.getDir() == Call.Dir.Outgoing) {
-                    Address toAdress = log.getToAddress();
-                    String sipUri = toAdress.asStringUriOnly().toLowerCase();
-                    if (sipUri.contains("clbinfo") || sipUri.contains(("clbsessionid"))) {
-                        fromHardWare = true;
+                    Address toAddress = log.getToAddress();
+                    String sipUri = toAddress.asStringUriOnly().toLowerCase();
+                    if (sipUri.contains("clbinfo") || sipUri.contains("clbsessionid")) {
+                        fromHardware = true;
                     }
                 }
 
-                if (!fromHardWare) {
+                if (!fromHardware) {
                     nonHardwareCalls.add(groupLog);
                 }
             }
         } catch (Exception e) {
-            String messgae = e.getMessage();
-            Log.e("tag", "Exception RemoveCallsFromHardware: " + e.getMessage());
+            String message = e.getMessage();
+            Log.e("tag", "Exception RemoveCallsFromHardware: " + message);
         }
 
         return nonHardwareCalls;
+    }
+
+    public static List<CallLog> CallsFromHardwareToRemove_5_0_3(CallLog[] logs) {
+        ArrayList<CallLog> hardwareCalls = new ArrayList<CallLog>();
+
+        try {
+            int size = logs.length;
+            for (int i = 0; i < size; i++) {
+                boolean fromHardware = false;
+                CallLog log = logs[i];
+                if (log.getDir() == Call.Dir.Outgoing) {
+                    Address toAddress = log.getToAddress();
+                    String sipUri = toAddress.asStringUriOnly().toLowerCase();
+                    if (sipUri.contains("clbinfo") || sipUri.contains("clbsessionid")) {
+                        hardwareCalls.add(log);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            String message = e.getMessage();
+            Log.e("tag", "Exception RemoveCallsFromHardware: " + message);
+        }
+
+        return hardwareCalls;
     }
 }

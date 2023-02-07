@@ -145,14 +145,29 @@ class CallLogsListViewModel : ViewModel() {
         // CLB: Remove calls from CLB Hardware from History
         val listNoCSerie = org.linphone.clb.CallFilter.RemoveCallsFromHardware(list)
 
-        return ArrayList(listNoCSerie);
+        return ArrayList(listNoCSerie)
     }
 
     private fun updateCallLogs() {
         callLogs.value.orEmpty().forEach(GroupedCallLogData::destroy)
+        Log.i("[Call Logs] ${coreContext.core.callLogs.size} call logs found")
 
+        // CLB BG-14101
+        // For some reason, SIP calls are stored in the logs without the additional uri parameters
+        // They must be removed completely when they become available. Otherwise they are only hidden until Linphone restarts
+        // This is ONLY possible from a class that has coreContext.core access (CLB CallFilter does not have this access)
+        var allCalls = coreContext.core.callLogs
+        val callsToRemove = org.linphone.clb.CallFilter.CallsFromHardwareToRemove_5_0_3(allCalls)
+        Log.i("[Call Logs] Removing ${callsToRemove.size} call logs (CLB calls)")
+
+        // Erase all CLB Hardware calls
+        for (call in callsToRemove) {
+            coreContext.core.removeCallLog(call)
+        }
+
+        // Get all callLogs for history view
         val allCallLogs = coreContext.core.callLogs
-        Log.i("[Call Logs] ${allCallLogs.size} call logs found")
+        Log.i("[Call Logs] ${allCallLogs.size} call logs found (no CLB calls)")
 
         callLogs.value = when (filter.value) {
             CallLogsFilter.MISSED -> computeCallLogs(allCallLogs, missed = true, conference = false)

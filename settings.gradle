@@ -15,11 +15,26 @@ dependencyResolutionManagement {
 
         maven {
             name "linphone.org maven repository"
-            url "https://linphone.org/maven_repository"
+            url "https://linphone.org/maven_repository/"
             content {
                 includeGroup "org.linphone"
             }
         }
+
+        // CLB proprietary Maven repo. e.g. fallback for when Linphone's own repo fails.
+        maven { name "CLB maven repository"
+            url "https://repository.clb.nl:8443/repository/clb-maven/"
+            content {
+                includeGroup "org.linphone"
+            }
+        }
+        // When building fails, verify the desired Linphone SDK version is available at the CLB Maven repo.
+        // (see: build.gradle:app and search for something like "implementation 'org.linphone:linphone-sdk-android:5.2+'").
+
+        // If the version is not available and a build was successfully completed previously
+        // Open the local Gradle cache (default location: %userprofile%\.gradle\caches\modules-2\files-2.1 )
+        // Check if the desired version is present.
+        // If it does exist, upload the version from cache into CLB Maven
     }
 }
 include ':app'
