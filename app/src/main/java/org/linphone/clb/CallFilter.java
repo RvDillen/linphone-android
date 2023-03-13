@@ -42,7 +42,7 @@ public class CallFilter {
             }
         } catch (Exception e) {
             String message = e.getMessage();
-            Log.e("tag", "Exception RemoveCallsFromHardware: " + message);
+            Log.e("CallFilter", "Exception RemoveCallsFromHardware: " + message);
         }
 
         return nonHardwareCalls;
@@ -54,19 +54,25 @@ public class CallFilter {
         try {
             int size = logs.length;
             for (int i = 0; i < size; i++) {
-                boolean fromHardware = false;
                 CallLog log = logs[i];
+                String sipUri = log.getToAddress().asStringUriOnly().toLowerCase();
+                String sipMsg = "SipUri from Call Log: " + sipUri;
+                Log.d("CallFilter", sipMsg);
+
                 if (log.getDir() == Call.Dir.Outgoing) {
                     Address toAddress = log.getToAddress();
-                    String sipUri = toAddress.asStringUriOnly().toLowerCase();
+                    //String sipUri = toAddress.asStringUriOnly().toLowerCase();
                     if (sipUri.contains("clbinfo") || sipUri.contains("clbsessionid")) {
                         hardwareCalls.add(log);
+                    }
+                    else if (sipUri.contains("ext")) {
+                        Log.d("CallFilter", "Call log modification skipped for: '" + sipUri + "' (No CLB info found).");
                     }
                 }
             }
         } catch (Exception e) {
             String message = e.getMessage();
-            Log.e("tag", "Exception RemoveCallsFromHardware: " + message);
+            Log.e("CallFilter", "Exception RemoveCallsFromHardware: " + message);
         }
 
         return hardwareCalls;
