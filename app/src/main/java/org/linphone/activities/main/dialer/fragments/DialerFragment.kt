@@ -174,7 +174,13 @@ class DialerFragment : SecureFragment<DialerFragmentBinding>() {
             Log.i("[Dialer] Found URI to call: $address")
             val skipAutoCall = arguments?.getBoolean("SkipAutoCallStart") ?: false
 
-            if (corePreferences.callRightAway && !skipAutoCall) {
+            // Always start CLB calls immediately
+            var clbCall = false
+            if (address.contains("clbinfo") || address.contains("clbsessionid")) {
+                clbCall = true
+            }
+
+            if ((corePreferences.callRightAway && !skipAutoCall) || clbCall) {
                 Log.i("[Dialer] Call right away setting is enabled, start the call to $address")
                 viewModel.directCall(address)
             } else {

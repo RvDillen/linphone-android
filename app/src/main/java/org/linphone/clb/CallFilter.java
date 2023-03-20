@@ -26,6 +26,7 @@ public class CallFilter {
             int size = logs.size();
             for (int i = 0; i < size; i++) {
                 boolean fromHardware = false;
+
                 GroupedCallLogData groupLog = logs.get(i);
                 CallLog log = groupLog.getLastCallLog();
                 if (log.getDir() == Call.Dir.Outgoing) {
@@ -56,17 +57,16 @@ public class CallFilter {
             for (int i = 0; i < size; i++) {
                 CallLog log = logs[i];
                 String sipUri = log.getToAddress().asStringUriOnly().toLowerCase();
-                String sipMsg = "SipUri from Call Log: " + sipUri;
-                Log.d("CallFilter", sipMsg);
 
                 if (log.getDir() == Call.Dir.Outgoing) {
-                    Address toAddress = log.getToAddress();
-                    //String sipUri = toAddress.asStringUriOnly().toLowerCase();
+
                     if (sipUri.contains("clbinfo") || sipUri.contains("clbsessionid")) {
                         hardwareCalls.add(log);
                     }
-                    else if (sipUri.contains("ext")) {
-                        Log.d("CallFilter", "Call log modification skipped for: '" + sipUri + "' (No CLB info found).");
+                    else if (sipUri.startsWith("sip:ext1@") || sipUri.startsWith("sip:ext2@")) {
+                        // BG-14101 CLB info is lost in CallHistory SIP-URI and items become visible unintentionally.
+                        // 2023-03-20 (Discussed with PO): Also filter ext1 or ext2 from CallHistory. Risk that other items use these entries is relatively small.
+                        hardwareCalls.add(log);
                     }
                 }
             }
