@@ -147,15 +147,19 @@ public class CallStateCLB {
     public void Restart() {
         Context currentContext = mContext;
         Core currentCore = mCore;
-        mContext = coreContext.getContext().getApplicationContext();
-        if(currentContext != mContext || !callStateListenerRegistered) {
-            Log.i("[Manager] Creating CallStateCLB");
-            AddGsmListener();
-            AddCoreListener();
-        }
-        else if(currentCore != coreContext.getCore()) {
-            Log.i("[Manager] Restarting Core listener");
-            AddCoreListener();
+
+        try {
+            mContext = coreContext.getContext().getApplicationContext();
+            if (currentContext != mContext || !callStateListenerRegistered) {
+                Log.i("[Manager] Creating CallStateCLB");
+                AddGsmListener();
+                AddCoreListener();
+            } else if (currentCore != coreContext.getCore()) {
+                Log.i("[Manager] Restarting Core listener");
+                AddCoreListener();
+            }
+        } catch (Exception ex) {
+            Log.e("[CallStateCLB.Restart()] threw an exception: "  + ex.getMessage());
         }
     }
 
