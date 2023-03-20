@@ -259,7 +259,7 @@ class NotificationsManager(private val context: Context) {
     fun getService(): CoreService? {
         return service
     }
-    
+
     fun onCoreReady() {
         coreContext.core.addListener(listener)
     }
@@ -379,7 +379,9 @@ class NotificationsManager(private val context: Context) {
         // (coreContext.core)
         var instance = CallStateCLB.instance()
 
-        instance.Restart()
+        if (instance != null) {
+            instance.Restart()
+        }
     }
 
     private fun startForeground(notificationId: Int, callNotification: Notification) {
