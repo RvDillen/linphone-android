@@ -175,7 +175,16 @@ class SingleCallFragment : GenericVideoPreviewFragment<VoipSingleCallFragmentBin
     override fun onPause() {
         super.onPause()
 
+        Log.d("onPause -> controlsViewModel.hideExtraButtons()")
         controlsViewModel.hideExtraButtons(true)
+    }
+
+    override fun onResume() {
+        super.onResume()
+
+        // CLB: Make sure extra buttons are displayed AFTER a pause/resume cycle
+        Log.d("onResume -> Update UI")
+        controlsViewModel.showExtraButtons()
     }
 
     private fun showCallVideoUpdateDialog(call: Call) {
