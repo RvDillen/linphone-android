@@ -60,7 +60,11 @@ class ChatMessageSendingViewModel(private val chatRoom: ChatRoom) : ViewModel() 
 
     val attachFileEnabled = MutableLiveData<Boolean>()
 
+    val attachFilePending = MutableLiveData<Boolean>()
+
     val sendMessageEnabled = MutableLiveData<Boolean>()
+
+    val attachingFileInProgress = MutableLiveData<Boolean>()
 
     val isReadOnly = MutableLiveData<Boolean>()
 
@@ -138,6 +142,10 @@ class ChatMessageSendingViewModel(private val chatRoom: ChatRoom) : ViewModel() 
     override fun onCleared() {
         pendingChatMessageToReplyTo.value?.destroy()
 
+        for (pendingAttachment in attachments.value.orEmpty()) {
+            removeAttachment(pendingAttachment)
+        }
+
         if (this::recorder.isInitialized) {
             if (recorder.state != RecorderState.Closed) {
                 recorder.close()
@@ -190,6 +198,10 @@ class ChatMessageSendingViewModel(private val chatRoom: ChatRoom) : ViewModel() 
         list.remove(attachment)
         attachments.value = list
 
+        val pathToDelete = attachment.path
+        Log.i("[Chat Message Sending] Attachment is being removed, delete local copy [$pathToDelete]")
+        FileUtils.deleteFile(pathToDelete)
+
         sendMessageEnabled.value = textToSend.value.orEmpty().trim().isNotEmpty() || list.isNotEmpty() || isPendingVoiceRecord.value == true
         if (!corePreferences.allowMultipleFilesAndTextInSameMessage) {
             attachFileEnabled.value = list.isEmpty()
@@ -199,6 +211,10 @@ class ChatMessageSendingViewModel(private val chatRoom: ChatRoom) : ViewModel() 
     fun sendMessage() {
         if (!isPlayerClosed()) {
             stopVoiceRecordPlayer()
+        }
+
+        if (isVoiceRecording.value == true) {
+            stopVoiceRecorder()
         }
 
         val pendingMessageToReplyTo = pendingChatMessageToReplyTo.value
@@ -391,7 +407,7 @@ class ChatMessageSendingViewModel(private val chatRoom: ChatRoom) : ViewModel() 
         }
     }
 
-    fun stopVoiceRecording() {
+    private fun stopVoiceRecorder() {
         if (recorder.state == RecorderState.Running) {
             Log.i("[Chat Message Sending] Pausing / closing voice recorder")
             recorder.pause()
@@ -406,6 +422,11 @@ class ChatMessageSendingViewModel(private val chatRoom: ChatRoom) : ViewModel() 
         }
 
         isVoiceRecording.value = false
+    }
+
+    fun stopVoiceRecording() {
+        stopVoiceRecorder()
+
         if (corePreferences.sendVoiceRecordingRightAway) {
             Log.i("[Chat Message Sending] Sending voice recording right away")
             sendMessage()

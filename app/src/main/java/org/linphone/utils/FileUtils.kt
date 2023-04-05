@@ -37,13 +37,12 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import org.linphone.LinphoneApplication.Companion.coreContext
+import org.linphone.LinphoneApplication.Companion.corePreferences
 import org.linphone.R
 import org.linphone.core.tools.Log
 
 class FileUtils {
     companion object {
-        const val VFS_PLAIN_FILE_EXTENSION = ".bctbx_evfs_plain"
-
         fun getNameFromFilePath(filePath: String): String {
             var name = filePath
             val i = filePath.lastIndexOf('/')
@@ -54,15 +53,11 @@ class FileUtils {
         }
 
         fun getExtensionFromFileName(fileName: String): String {
-            val realFileName = if (fileName.endsWith(VFS_PLAIN_FILE_EXTENSION)) {
-                fileName.substring(0, fileName.length - VFS_PLAIN_FILE_EXTENSION.length)
-            } else fileName
-
-            var extension = MimeTypeMap.getFileExtensionFromUrl(realFileName)
+            var extension = MimeTypeMap.getFileExtensionFromUrl(fileName)
             if (extension.isNullOrEmpty()) {
-                val i = realFileName.lastIndexOf('.')
+                val i = fileName.lastIndexOf('.')
                 if (i > 0) {
-                    extension = realFileName.substring(i + 1)
+                    extension = fileName.substring(i + 1)
                 }
             }
 
@@ -102,21 +97,10 @@ class FileUtils {
         }
 
         fun clearExistingPlainFiles() {
-            for (file in coreContext.context.filesDir.listFiles().orEmpty()) {
-                if (file.path.endsWith(VFS_PLAIN_FILE_EXTENSION)) {
-                    Log.w("[File Utils] Found forgotten plain file: ${file.path}, deleting it")
-                    deleteFile(file.path)
-                }
-            }
-            for (file in coreContext.context.getExternalFilesDir(Environment.DIRECTORY_PICTURES)?.listFiles().orEmpty()) {
-                if (file.path.endsWith(VFS_PLAIN_FILE_EXTENSION)) {
-                    Log.w("[File Utils] Found forgotten plain file: ${file.path}, deleting it")
-                    deleteFile(file.path)
-                }
-            }
-            for (file in coreContext.context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)?.listFiles().orEmpty()) {
-                if (file.path.endsWith(VFS_PLAIN_FILE_EXTENSION)) {
-                    Log.w("[File Utils] Found forgotten plain file: ${file.path}, deleting it")
+            val dir = File(corePreferences.vfsCachePath)
+            if (dir.exists()) {
+                for (file in dir.listFiles().orEmpty()) {
+                    Log.w("[File Utils] [VFS] Found forgotten plain file [${file.path}], deleting it")
                     deleteFile(file.path)
                 }
             }
@@ -144,14 +128,10 @@ class FileUtils {
             val path = coreContext.context.cacheDir
             Log.i("[File Utils] Cache directory is: $path")
 
-            val realFileName = if (fileName.endsWith(VFS_PLAIN_FILE_EXTENSION)) {
-                fileName.substring(0, fileName.length - VFS_PLAIN_FILE_EXTENSION.length)
-            } else fileName
-            var file = File(path, realFileName)
-
+            var file = File(path, fileName)
             var prefix = 1
             while (file.exists()) {
-                file = File(path, prefix.toString() + "_" + realFileName)
+                file = File(path, prefix.toString() + "_" + fileName)
                 Log.w("[File Utils] File with that name already exists, renamed to ${file.name}")
                 prefix += 1
             }
@@ -184,7 +164,7 @@ class FileUtils {
                             filePath = dataUri.toString()
                             Log.i("[File Utils] Using data URI $filePath")
                         }
-                        filePath = cleanFilePath(filePath)
+                        filePath = copyToLocalStorage(filePath)
                         if (filePath != null) list.add(filePath)
                     }
                     return list
@@ -201,13 +181,13 @@ class FileUtils {
                         filePath = temporaryImageFilePath.absolutePath
                         Log.i("[File Utils] Data URI is null, using $filePath")
                     }
-                    filePath = cleanFilePath(filePath)
+                    filePath = copyToLocalStorage(filePath)
                     if (filePath != null) return arrayListOf(filePath)
                 }
             } else if (temporaryImageFilePath?.exists() == true) {
                 filePath = temporaryImageFilePath.absolutePath
                 Log.i("[File Utils] Data is null, using $filePath")
-                filePath = cleanFilePath(filePath)
+                filePath = copyToLocalStorage(filePath)
                 if (filePath != null) return arrayListOf(filePath)
             }
             return arrayListOf()
@@ -237,10 +217,10 @@ class FileUtils {
                 filePath = temporaryImageFilePath.absolutePath
                 Log.i("[File Utils] Data is null, using $filePath")
             }
-            return cleanFilePath(filePath)
+            return copyToLocalStorage(filePath)
         }
 
-        private suspend fun cleanFilePath(filePath: String?): String? {
+        suspend fun copyToLocalStorage(filePath: String?): String? {
             if (filePath != null) {
                 val uriToParse = Uri.parse(filePath)
                 if (filePath.startsWith("content://com.android.contacts/contacts/lookup/")) {
@@ -299,7 +279,9 @@ class FileUtils {
                     } else {
                         Log.e("[File Utils] Copy failed")
                     }
-                    remoteFile?.close()
+                    withContext(Dispatchers.IO) {
+                        remoteFile?.close()
+                    }
                 }
             } catch (e: IOException) {
                 Log.e("[File Utils] getFilePath exception: ", e)
@@ -534,6 +516,14 @@ class FileUtils {
             inStream.close()
             outStream.flush()
             outStream.close()
+        }
+
+        fun countFilesInDirectory(path: String): Int {
+            val dir = File(path)
+            if (dir.exists()) {
+                return dir.listFiles().orEmpty().size
+            }
+            return -1
         }
     }
 }

@@ -505,14 +505,17 @@ class DetailChatRoomFragment : MasterFragment<ChatRoomDetailFragmentBinding, Cha
             viewLifecycleOwner
         ) {
             it.consume { url ->
+                val uri = Uri.parse(url)
                 val browserIntent = Intent(
                     Intent.ACTION_VIEW,
-                    Uri.parse(url)
+                    uri
                 )
                 try {
                     startActivity(browserIntent)
                 } catch (se: SecurityException) {
-                    Log.e("[Chat Room] Failed to start browser intent, $se")
+                    Log.e("[Chat Room] Failed to start browser intent from uri [$uri]: $se")
+                } catch (anfe: ActivityNotFoundException) {
+                    Log.e("[Chat Room] Failed to find app matching intent from uri [$uri]: $anfe")
                 }
             }
         }
@@ -695,9 +698,18 @@ class DetailChatRoomFragment : MasterFragment<ChatRoomDetailFragmentBinding, Cha
             chatSendingViewModel.textToSend.value = textToShare
         }
         if (filesToShare?.isNotEmpty() == true) {
-            for (path in filesToShare) {
-                Log.i("[Chat Room] Found $path file to share")
-                chatSendingViewModel.addAttachment(path)
+            lifecycleScope.launch {
+                withContext(Dispatchers.Main) {
+                    chatSendingViewModel.attachingFileInProgress.value = true
+                    for (filePath in filesToShare) {
+                        val path = FileUtils.copyToLocalStorage(filePath)
+                        Log.i("[Chat Room] Found [$filePath] file to share, matching path is [$path]")
+                        if (path != null) {
+                            chatSendingViewModel.addAttachment(path)
+                        }
+                    }
+                    chatSendingViewModel.attachingFileInProgress.value = false
+                }
             }
         }
 
@@ -708,11 +720,13 @@ class DetailChatRoomFragment : MasterFragment<ChatRoomDetailFragmentBinding, Cha
                 Log.i("[Chat Room] Found rich content URI: $uri")
                 lifecycleScope.launch {
                     withContext(Dispatchers.Main) {
+                        chatSendingViewModel.attachingFileInProgress.value = true
                         val path = FileUtils.getFilePath(requireContext(), uri)
-                        Log.i("[Chat Room] Rich content URI: $uri matching path is: $path")
+                        Log.i("[Chat Room] Rich content URI [$uri] matching path is [$path]")
                         if (path != null) {
                             chatSendingViewModel.addAttachment(path)
                         }
+                        chatSendingViewModel.attachingFileInProgress.value = false
                     }
                 }
             }
@@ -809,15 +823,21 @@ class DetailChatRoomFragment : MasterFragment<ChatRoomDetailFragmentBinding, Cha
 
     @Deprecated("Deprecated in Java")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        chatSendingViewModel.attachFilePending.value = false
         if (resultCode == Activity.RESULT_OK) {
             lifecycleScope.launch {
-                for (
-                    fileToUploadPath in FileUtils.getFilesPathFromPickerIntent(
-                        data,
-                        chatSendingViewModel.temporaryFileUploadPath
-                    )
-                ) {
-                    chatSendingViewModel.addAttachment(fileToUploadPath)
+                withContext(Dispatchers.Main) {
+                    chatSendingViewModel.attachingFileInProgress.value = true
+                    for (
+                        fileToUploadPath in FileUtils.getFilesPathFromPickerIntent(
+                            data,
+                            chatSendingViewModel.temporaryFileUploadPath
+                        )
+                    ) {
+                        Log.i("[Chat Room] Found [$fileToUploadPath] file from intent")
+                        chatSendingViewModel.addAttachment(fileToUploadPath)
+                    }
+                    chatSendingViewModel.attachingFileInProgress.value = false
                 }
             }
         }
@@ -919,6 +939,10 @@ class DetailChatRoomFragment : MasterFragment<ChatRoomDetailFragmentBinding, Cha
             LayoutInflater.from(context),
             R.layout.chat_room_menu, null, false
         )
+        val readOnly = chatRoom.isReadOnly
+        popupView.ephemeralEnabled = !readOnly
+        popupView.devicesEnabled = !readOnly
+        popupView.meetingEnabled = !readOnly
 
         val itemSize = AppUtils.getDimension(R.dimen.chat_room_popup_item_height).toInt()
         var totalSize = itemSize * 8
@@ -1040,15 +1064,15 @@ class DetailChatRoomFragment : MasterFragment<ChatRoomDetailFragmentBinding, Cha
             popupWindow.dismiss()
             val contactId = viewModel.contact.value?.refKey
             if (contactId != null) {
-                Log.i("[Chat Room] Displaying contact $contactId")
-                navigateToContact(contactId)
+                Log.i("[Chat Room] Displaying native contact [$contactId]")
+                navigateToNativeContact(contactId)
             } else {
                 val copy = viewModel.getRemoteAddress()?.clone()
                 if (copy != null) {
                     copy.clean()
                     val address = copy.asStringUriOnly()
-                    Log.i("[Chat Room] Displaying friend with address $address")
-                    navigateToContact(address)
+                    Log.i("[Chat Room] Displaying friend with address [$address]")
+                    navigateToFriend(address)
                 }
             }
         }
@@ -1110,6 +1134,7 @@ class DetailChatRoomFragment : MasterFragment<ChatRoomDetailFragmentBinding, Cha
     }
 
     private fun pickFile() {
+        chatSendingViewModel.attachFilePending.value = true
         val intentsList = ArrayList<Intent>()
 
         val pickerIntent = Intent(Intent.ACTION_GET_CONTENT)
@@ -1180,16 +1205,10 @@ class DetailChatRoomFragment : MasterFragment<ChatRoomDetailFragmentBinding, Cha
             {
                 dialog.dismiss()
                 lifecycleScope.launch {
-                    Log.w("[Chat Room] Content is encrypted, requesting plain file path")
+                    Log.i("[Chat Room] [VFS] Content is encrypted, requesting plain file path for file [${content.filePath}]")
                     val plainFilePath = content.exportPlainFile()
-                    Log.i("[Chat Room] Making a copy of [$plainFilePath] to the cache directory before exporting it")
-                    val cacheCopyPath = FileUtils.copyFileToCache(plainFilePath)
-                    if (cacheCopyPath != null) {
-                        Log.i("[Chat Room] Cache copy has been made: $cacheCopyPath")
-                        FileUtils.deleteFile(plainFilePath)
-                        if (!FileUtils.openFileInThirdPartyApp(requireActivity(), cacheCopyPath)) {
-                            showDialogToSuggestOpeningFileAsText()
-                        }
+                    if (!FileUtils.openFileInThirdPartyApp(requireActivity(), plainFilePath)) {
+                        showDialogToSuggestOpeningFileAsText()
                     }
                 }
             },

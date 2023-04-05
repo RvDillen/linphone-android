@@ -10,6 +10,77 @@ Group changes to describe their impact on the project, as follows:
     Fixed for any bug fixes.
     Security to invite users to upgrade in case of vulnerabilities.
 
+## [5.0.10] - 2023-01-04
+
+### Fixed
+- Plain copy of encrypted files (when VFS is enabled) not cleaned
+- Avatar display issue if contact's "initials" contains more than 1 emoji or an emoji + a character
+
+## [5.0.9] - 2023-03-30
+
+### Fixed
+- Admin weren't visible for non admin users in group chat rooms
+- Crash when clicking on URI in chat if not matching app is found on Android to handle it
+- LIME update threshold wasn't set, causing a request to be made after each REGISTER
+
+### Changed
+- Now SDK automatically handles TextureView's listener, removed it from app
+- Bumped license year to 2023
+- Force remove LIME X3DH server URL for third party accounts
+
+### Fixed
+- Plain copy of encrypted files (when VFS is enabled) not cleaned
+
+## [5.0.8] - 2023-03-20
+
+### Fixed
+- Trying to prevent crash in call history
+- Color icon in dark mode in chat for files & replies
+
+### Changed
+- Updated translations
+
+## [5.0.7] - 2023-02-27
+
+### Fixed
+- Fixed navigating to a contact that doesn't have a native ID, but using it's SIP address instead
+- Fixed account creator resolved country name & create button not enabled
+
+### Changed
+- Updated translations
+
+## [5.0.6] - 2023-02-17
+
+### Fixed
+- Wrong country displayed in assistant after picking it in the list if another country has the same international prefix (such as +1)
+- SIP URI clickable pattern missing '~'
+- Crash that happens sometimes when CallActivity is destroyed
+- Pressing send message button while recording a voice message not sending it
+- Missing ephemeral icon next to send message icon
+- Headers colors in IMDN details
+- Pixel issue in call quality indicator 2 icon
+
+### Changed
+- Improved incoming call layout when receiving early-media video
+- Disable some actions in left chat rooms
+- Hidden "Echo Tester" setting unless in debug mode as it can mislead user and isn't useful for end user
+
+## [5.0.5] - 2023-01-19
+
+### Fixed
+- Issue with how replies where added to chat message notification from reply action
+
+## [5.0.4] - 2023-01-18
+
+### Added
+- Show a progress bar while importing files to the chat sending area
+
+### Changed
+- Prevent keyboard from auto-replacing some user input such as username, breaking SIP URIs unknowingly
+
+### Fixed
+- Prevent copy of files that weren't sent in chat to be kept in app local folder
+
 ## [5.0.3] - 2023-01-13
 
 ### Added

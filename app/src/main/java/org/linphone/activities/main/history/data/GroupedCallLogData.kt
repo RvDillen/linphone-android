@@ -23,14 +23,29 @@ import org.linphone.activities.main.history.viewmodels.CallLogViewModel
 import org.linphone.core.CallLog
 
 class GroupedCallLogData(callLog: CallLog) {
-    var lastCallLog: CallLog = callLog
     val callLogs = arrayListOf(callLog)
+
+    var lastCallLog: CallLog = callLog
+    var lastCallLogId: String? = callLog.callId
     val lastCallLogViewModel: CallLogViewModel
         get() {
-            return CallLogViewModel(lastCallLog)
+            if (::_lastCallLogViewModel.isInitialized) {
+                return _lastCallLogViewModel
+            }
+            _lastCallLogViewModel = CallLogViewModel(lastCallLog)
+            return _lastCallLogViewModel
         }
 
+    private lateinit var _lastCallLogViewModel: CallLogViewModel
+
     fun destroy() {
-        lastCallLogViewModel.destroy()
+        if (::_lastCallLogViewModel.isInitialized) {
+            lastCallLogViewModel
+        }
+    }
+
+    fun updateLastCallLog(callLog: CallLog) {
+        lastCallLog = callLog
+        lastCallLogId = callLog.callId
     }
 }

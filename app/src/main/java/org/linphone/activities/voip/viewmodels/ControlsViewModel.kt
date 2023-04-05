@@ -55,6 +55,8 @@ class ControlsViewModel : ViewModel() {
 
     val isOutgoingEarlyMedia = MutableLiveData<Boolean>()
 
+    val isIncomingEarlyMediaVideo = MutableLiveData<Boolean>()
+
     val showExtras = MutableLiveData<Boolean>()
 
     val fullScreenMode = MutableLiveData<Boolean>()
@@ -113,8 +115,9 @@ class ControlsViewModel : ViewModel() {
             message: String
         ) {
             Log.i("[Call Controls] State changed: $state")
-
             isOutgoingEarlyMedia.value = state == Call.State.OutgoingEarlyMedia
+            isIncomingEarlyMediaVideo.value = state == Call.State.IncomingEarlyMedia && call.remoteParams?.isVideoEnabled == true
+
             if (state == Call.State.StreamsRunning) {
                 if (!call.currentParams.isVideoEnabled && fullScreenMode.value == true) {
                     fullScreenMode.value = false
@@ -213,6 +216,12 @@ class ControlsViewModel : ViewModel() {
             proximitySensorEnabled.value = shouldProximitySensorBeEnabled()
         }
 
+        val currentCall = coreContext.core.currentCall ?: coreContext.core.calls.firstOrNull()
+        val state = currentCall?.state ?: Call.State.Idle
+        Log.i("[Call Controls] Current state is: $state")
+        isOutgoingEarlyMedia.value = state == Call.State.OutgoingEarlyMedia
+        isIncomingEarlyMediaVideo.value = state == Call.State.IncomingEarlyMedia && currentCall?.remoteParams?.isVideoEnabled == true
+
         updateUI()
 
         if (corePreferences.enableAnimations) bounceAnimator.start()
@@ -234,7 +243,10 @@ class ControlsViewModel : ViewModel() {
     }
 
     fun answer() {
-        val currentCall = coreContext.core.currentCall
+        val currentCall = coreContext.core.currentCall ?: coreContext.core.calls.find {
+            call ->
+            call.state == Call.State.IncomingReceived || call.state == Call.State.IncomingEarlyMedia
+        }
         if (currentCall != null) {
             coreContext.answerCall(currentCall)
         } else {
@@ -474,6 +486,16 @@ class ControlsViewModel : ViewModel() {
     }
 
     private fun shouldProximitySensorBeEnabled(): Boolean {
-        return forceDisableProximitySensor.value == false && !(isVideoEnabled.value ?: false) && !(nonEarpieceOutputAudioDevice.value ?: false)
+        if (forceDisableProximitySensor.value == true) {
+            Log.i("[Call Controls] Forcing proximity sensor to be disabled (usually in incoming/outgoing call fragments)")
+        } else if (isVideoEnabled.value == true) {
+            Log.i("[Call Controls] Active call current params says video is enabled, proximity sensor will be disabled")
+        } else if (nonEarpieceOutputAudioDevice.value == true) {
+            Log.i("[Call Controls] Current audio route is not earpiece, proximity sensor will be disabled")
+        }
+
+        return forceDisableProximitySensor.value == false &&
+            !(isVideoEnabled.value ?: false) &&
+            !(nonEarpieceOutputAudioDevice.value ?: false)
     }
 }

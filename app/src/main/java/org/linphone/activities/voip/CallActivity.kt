@@ -41,6 +41,7 @@ import org.linphone.activities.voip.viewmodels.ControlsViewModel
 import org.linphone.activities.voip.viewmodels.StatisticsListViewModel
 import org.linphone.compatibility.Compatibility
 import org.linphone.core.Call
+import org.linphone.core.GlobalState
 import org.linphone.core.tools.Log
 import org.linphone.databinding.VoipActivityBinding
 import org.linphone.mediastream.Version
@@ -103,6 +104,7 @@ class CallActivity : ProximitySensorActivity() {
         controlsViewModel.proximitySensorEnabled.observe(
             this
         ) { enabled ->
+            Log.i("[Call Activity] ${if (enabled) "Enabling" else "Disabling"} proximity sensor (if possible)")
             enableProximitySensor(enabled)
         }
 
@@ -132,11 +134,12 @@ class CallActivity : ProximitySensorActivity() {
         callsViewModel.currentCallData.observe(
             this
         ) { callData ->
-            if (callData.call.conference == null) {
-                Log.i("[Call Activity] Current call isn't linked to a conference, changing fragment")
+            val call = callData.call
+            if (call.conference == null) {
+                Log.i("[Call Activity] Current call isn't linked to a conference, switching to SingleCall fragment")
                 navigateToActiveCall()
             } else {
-                Log.i("[Call Activity] Current call is linked to a conference, changing fragment")
+                Log.i("[Call Activity] Current call is linked to a conference, switching to ConferenceCall fragment")
                 navigateToConferenceCall()
             }
         }
@@ -154,10 +157,10 @@ class CallActivity : ProximitySensorActivity() {
             this
         ) { exists ->
             if (exists) {
-                Log.i("[Call Activity] Found active conference, changing fragment")
+                Log.i("[Call Activity] Found active conference, changing  switching to ConferenceCall fragment")
                 navigateToConferenceCall()
             } else if (coreContext.core.callsNb > 0) {
-                Log.i("[Call Activity] Conference no longer exists, changing fragment")
+                Log.i("[Call Activity] Conference no longer exists, switching to SingleCall fragment")
                 navigateToActiveCall()
             }
         }
@@ -240,8 +243,10 @@ class CallActivity : ProximitySensorActivity() {
     }
 
     override fun onDestroy() {
-        coreContext.core.nativeVideoWindowId = null
-        coreContext.core.nativePreviewWindowId = null
+        if (coreContext.core.globalState != GlobalState.Off) {
+            coreContext.core.nativeVideoWindowId = null
+            coreContext.core.nativePreviewWindowId = null
+        }
 
         super.onDestroy()
     }

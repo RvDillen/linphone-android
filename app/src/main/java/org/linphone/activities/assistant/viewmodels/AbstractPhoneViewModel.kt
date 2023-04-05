@@ -20,9 +20,7 @@
 
 package org.linphone.activities.assistant.viewmodels
 
-import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
-import androidx.lifecycle.Transformations
 import androidx.lifecycle.ViewModel
 import org.linphone.activities.assistant.fragments.CountryPickerFragment
 import org.linphone.core.AccountCreator
@@ -39,9 +37,7 @@ abstract class AbstractPhoneViewModel(val accountCreator: AccountCreator) :
     val phoneNumber = MutableLiveData<String>()
     val phoneNumberError = MutableLiveData<String>()
 
-    val countryName: LiveData<String> = Transformations.switchMap(prefix) {
-        getCountryNameFromPrefix(it)
-    }
+    val countryName = MutableLiveData<String>()
 
     init {
         prefix.value = "+"
@@ -49,10 +45,11 @@ abstract class AbstractPhoneViewModel(val accountCreator: AccountCreator) :
 
     override fun onCountryClicked(dialPlan: DialPlan) {
         prefix.value = "+${dialPlan.countryCallingCode}"
+        countryName.value = dialPlan.country
     }
 
     fun isPhoneNumberOk(): Boolean {
-        return countryName.value.orEmpty().isNotEmpty() && phoneNumber.value.orEmpty().isNotEmpty() && phoneNumberError.value.orEmpty().isEmpty()
+        return prefix.value.orEmpty().isNotEmpty() && phoneNumber.value.orEmpty().isNotEmpty() && phoneNumberError.value.orEmpty().isEmpty()
     }
 
     fun updateFromPhoneNumberAndOrDialPlan(number: String?, dialPlan: DialPlan?) {
@@ -60,6 +57,7 @@ abstract class AbstractPhoneViewModel(val accountCreator: AccountCreator) :
         if (dialPlan != null) {
             Log.i("[Assistant] Found prefix from dial plan: ${dialPlan.countryCallingCode}")
             prefix.value = internationalPrefix
+            getCountryNameFromPrefix(internationalPrefix)
         }
 
         if (number != null) {
@@ -72,16 +70,12 @@ abstract class AbstractPhoneViewModel(val accountCreator: AccountCreator) :
         }
     }
 
-    private fun getCountryNameFromPrefix(prefix: String?): MutableLiveData<String> {
-        val country = MutableLiveData<String>()
-        country.value = ""
-
+    private fun getCountryNameFromPrefix(prefix: String?) {
         if (prefix != null && prefix.isNotEmpty()) {
             val countryCode = if (prefix.first() == '+') prefix.substring(1) else prefix
             val dialPlan = PhoneNumberUtils.getDialPlanFromCountryCallingPrefix(countryCode)
             Log.i("[Assistant] Found dial plan $dialPlan from country code: $countryCode")
-            country.value = dialPlan?.country
+            countryName.value = dialPlan?.country
         }
-        return country
     }
 }

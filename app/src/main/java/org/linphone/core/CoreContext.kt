@@ -350,6 +350,10 @@ class CoreContext(
         collator.strength = Collator.NO_DECOMPOSITION
 
         if (corePreferences.vfsEnabled) {
+            val notClearedCount = FileUtils.countFilesInDirectory(corePreferences.vfsCachePath)
+            if (notClearedCount > 0) {
+                Log.w("[Context] [VFS] There are [$notClearedCount] plain files not cleared from previous app lifetime, removing them now")
+            }
             FileUtils.clearExistingPlainFiles()
         }
 
@@ -473,6 +477,13 @@ class CoreContext(
 
                 if (paramsChanged) {
                     Log.i("[Context] Account params have been updated, apply changes")
+                    account.params = params
+                }
+            } else {
+                if (account.params.limeServerUrl == corePreferences.limeServerUrl) {
+                    Log.w("[Context] Found linphone LIME X3DH server URL for third party account, removing it")
+                    val params = account.params.clone()
+                    params.limeServerUrl = null
                     account.params = params
                 }
             }
@@ -873,7 +884,7 @@ class CoreContext(
             return
         }
         if (corePreferences.vfsEnabled) {
-            Log.w("[Context] Do not make received file(s) public when VFS is enabled")
+            Log.w("[Context] [VFS] Do not make received file(s) public when VFS is enabled")
             return
         }
         if (!corePreferences.makePublicMediaFilesDownloaded) {
@@ -895,7 +906,7 @@ class CoreContext(
 
     fun addContentToMediaStore(content: Content) {
         if (corePreferences.vfsEnabled) {
-            Log.w("[Context] Do not make received file(s) public when VFS is enabled")
+            Log.w("[Context] [VFS] Do not make received file(s) public when VFS is enabled")
             return
         }
         if (!corePreferences.makePublicMediaFilesDownloaded) {
@@ -1102,10 +1113,10 @@ class CoreContext(
 
         fun activateVFS() {
             try {
-                Log.i("[Context] Activating VFS")
+                Log.i("[Context] [VFS] Activating VFS")
                 val preferences = corePreferences.encryptedSharedPreferences
                 if (preferences == null) {
-                    Log.e("[Context] Can't get encrypted SharedPreferences, can't init VFS")
+                    Log.e("[Context] [VFS] Can't get encrypted SharedPreferences, can't init VFS")
                     return
                 }
 
@@ -1125,9 +1136,9 @@ class CoreContext(
                     32
                 )
 
-                Log.i("[Context] VFS activated")
+                Log.i("[Context] [VFS] VFS activated")
             } catch (e: Exception) {
-                Log.f("[Context] Unable to activate VFS encryption: $e")
+                Log.f("[Context] [VFS] Unable to activate VFS encryption: $e")
             }
         }
     }

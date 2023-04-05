@@ -314,8 +314,13 @@ internal fun DetailChatRoomFragment.navigateToContacts(sipUriToAdd: String) {
     findMasterNavController().navigate(Uri.parse(deepLink))
 }
 
-internal fun DetailChatRoomFragment.navigateToContact(id: String) {
+internal fun DetailChatRoomFragment.navigateToNativeContact(id: String) {
     val deepLink = "linphone-android://contact/view/$id"
+    findMasterNavController().navigate(Uri.parse(deepLink))
+}
+
+internal fun DetailChatRoomFragment.navigateToFriend(address: String) {
+    val deepLink = "linphone-android://contact/view-friend/$address"
     findMasterNavController().navigate(Uri.parse(deepLink))
 }
 
@@ -626,8 +631,13 @@ internal fun DetailCallLogFragment.navigateToContacts(sipUriToAdd: String) {
     findMasterNavController().navigate(Uri.parse(deepLink))
 }
 
-internal fun DetailCallLogFragment.navigateToContact(id: String) {
+internal fun DetailCallLogFragment.navigateToNativeContact(id: String) {
     val deepLink = "linphone-android://contact/view/$id"
+    findMasterNavController().navigate(Uri.parse(deepLink))
+}
+
+internal fun DetailCallLogFragment.navigateToFriend(address: String) {
+    val deepLink = "linphone-android://contact/view-friend/$address"
     findMasterNavController().navigate(Uri.parse(deepLink))
 }
 
@@ -943,6 +953,26 @@ internal fun SingleCallFragment.navigateToConferenceLayout() {
             R.id.action_singleCallFragment_to_conferenceLayoutFragment,
             null,
             popupTo()
+        )
+    }
+}
+
+internal fun SingleCallFragment.navigateToIncomingCall() {
+    if (findNavController().currentDestination?.id == R.id.singleCallFragment) {
+        findNavController().navigate(
+            R.id.action_global_incomingCallFragment,
+            null,
+            popupTo(R.id.singleCallFragment, true)
+        )
+    }
+}
+
+internal fun SingleCallFragment.navigateToOutgoingCall() {
+    if (findNavController().currentDestination?.id == R.id.singleCallFragment) {
+        findNavController().navigate(
+            R.id.action_global_outgoingCallFragment,
+            null,
+            popupTo(R.id.singleCallFragment, true)
         )
     }
 }
