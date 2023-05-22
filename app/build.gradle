@@ -159,11 +159,23 @@ android {
         }
         // See https://developer.android.com/studio/releases/gradle-plugin#3-6-0-behavior for why extractNativeLibs is set to true in debug flavor
         if (variant.buildType.name == "release" || variant.buildType.name == "releaseWithCrashlytics") {
-            variant.getMergedFlavor().manifestPlaceholders = [linphone_address_mime_type: "vnd.android.cursor.item/vnd." + getPackageName() + ".provider.sip_address",
-                                                              linphone_file_provider: getPackageName() + ".fileprovider",
-                                                              appLabel: "@string/app_name",
-                                                              firebaseServiceEnabled: enableFirebaseService,
-                                                              extractNativeLibs: "false"]
+            if (variant.getFlavorName() == "clbTypeM") {
+
+                // Special appLabel for typeM build
+                // Verify/Test on API33 device: Is it a 'problem' that the root-package-name is used instead of the actual package name for address_mime_type and file_provider?
+                variant.getMergedFlavor().manifestPlaceholders = [linphone_address_mime_type: "vnd.android.cursor.item/vnd." + getPackageName() + ".provider.sip_address",
+                                                                  linphone_file_provider    : getPackageName() + ".fileprovider",
+                                                                  appLabel                  : "@string/app_name_typem",
+                                                                  firebaseServiceEnabled    : enableFirebaseService,
+                                                                  extractNativeLibs         : "false"]
+            }
+            else {
+                variant.getMergedFlavor().manifestPlaceholders = [linphone_address_mime_type: "vnd.android.cursor.item/vnd." + getPackageName() + ".provider.sip_address",
+                                                                  linphone_file_provider    : getPackageName() + ".fileprovider",
+                                                                  appLabel                  : "@string/app_name",
+                                                                  firebaseServiceEnabled    : enableFirebaseService,
+                                                                  extractNativeLibs         : "false"]
+            }
         } else {
             variant.getMergedFlavor().manifestPlaceholders = [linphone_address_mime_type: "vnd.android.cursor.item/vnd." + getPackageName() + ".provider.sip_address",
                                                               linphone_file_provider: getPackageName() + ".debug.fileprovider",

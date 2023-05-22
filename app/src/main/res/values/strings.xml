@@ -7,6 +7,7 @@
 <resources xmlns:tools="http://schemas.android.com/tools" tools:ignore="MissingTranslation">
     <string name="app_name" translatable="false">&appName; CLB</string>
     <string name="app_name_debug" translatable="false">&appName; CLB (debug)</string>
+    <string name="app_name_typem" translatable="false">&appName; M CLB</string>
     <string name="user_agent_app_name" translatable="false">&appName;Android</string>
     <string name="service_name">&appName; Service</string>
     <string name="service_auto_start_description">&appName; has been started automatically</string>
