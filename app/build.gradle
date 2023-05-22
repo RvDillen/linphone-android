@@ -21,7 +21,7 @@ static def getPackageNameOrg() {
     return "org.linphone"
 }
 
-static def getPackageNameMads() {
+static def getPackageNameTypeM() {
     return "nl.clb.typem.linphone"
 }
 
@@ -131,9 +131,9 @@ android {
             dimension "all"
             applicationId getPackageName()
         }
-        clbMads {
+        clbTypeM {
             dimension "all"
-            applicationId getPackageNameMads()
+            applicationId getPackageNameTypeM()
         }
         clbConfig {
             dimension "all"

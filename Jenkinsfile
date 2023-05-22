@@ -38,7 +38,7 @@ pipeline {
 			parallel {				
 				stage('Store artifacts') {
 					steps {
-						archiveArtifacts(artifacts: 'app/build/outputs/apk/linphone/release/*.*,app/build/outputs/bundle/clbRelease/*.*,app/build/outputs/bundle/clbMadsRelease/*.*,app/build/outputs/bundle/clbConfigRelease/*.*')
+						archiveArtifacts(artifacts: 'app/build/outputs/apk/linphone/release/*.*,app/build/outputs/bundle/clbRelease/*.*,app/build/outputs/bundle/clbTypeMRelease/*.*,app/build/outputs/bundle/clbConfigRelease/*.*')
 					}
 				}
 			}
