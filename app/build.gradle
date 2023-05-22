@@ -21,9 +21,14 @@ static def getPackageNameOrg() {
     return "org.linphone"
 }
 
+static def getPackageNameMads() {
+    return "nl.clb.typem.linphone"
+}
+
 static def getPackageNameConfig() {
     return "nl.clb.linphoneconfig"
 }
+
 
 def firebaseEnabled = new File(projectDir.absolutePath +'/google-services.json').exists()
 
@@ -125,6 +130,10 @@ android {
         clb {
             dimension "all"
             applicationId getPackageName()
+        }
+        clbMads {
+            dimension "all"
+            applicationId getPackageNameMads()
         }
         clbConfig {
             dimension "all"
