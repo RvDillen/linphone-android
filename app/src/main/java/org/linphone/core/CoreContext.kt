@@ -675,17 +675,35 @@ class CoreContext(
     }
 
     fun startCall(to: String) {
-        var stringAddress = to.trim()
+        // CLB Added check on split of ;
+        val tox = to.trim()
+        val tos: List<String> = tox.split(";")
+        var stringAddress = tos[0]
         if (android.util.Patterns.PHONE.matcher(to).matches()) {
-            val contact = contactsManager.findContactByPhoneNumber(to)
-            val alias = contact?.getContactForPhoneNumberOrAddress(to)
+            val contact = contactsManager.findContactByPhoneNumber(stringAddress)
+            val alias = contact?.getContactForPhoneNumberOrAddress(stringAddress)
             if (alias != null) {
                 Log.i("[Context] Found matching alias $alias for phone number $to, using it")
                 stringAddress = alias
             }
         }
 
-        val address: Address? = core.interpretUrl(stringAddress, LinphoneUtils.applyInternationalPrefix())
+        var address: Address? = core.interpretUrl(stringAddress, LinphoneUtils.applyInternationalPrefix())
+
+        if (address == null) {
+            Log.e("[Context] Failed to parse $stringAddress, abort outgoing call")
+            callErrorMessageResourceId.value = Event(context.getString(R.string.call_error_network_unreachable))
+            return
+        }
+
+        if (tos.size > 1) {
+            stringAddress = address.asString()
+            for (i in 1 until tos.size) {
+                stringAddress = stringAddress + ";" + tos[i]
+            }
+            address = core.interpretUrl(stringAddress, LinphoneUtils.applyInternationalPrefix())
+        }
+
         if (address == null) {
             Log.e("[Context] Failed to parse $stringAddress, abort outgoing call")
             callErrorMessageResourceId.value = Event(context.getString(R.string.call_error_network_unreachable))
