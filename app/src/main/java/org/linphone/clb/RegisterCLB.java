@@ -3,6 +3,12 @@ package org.linphone.clb;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.IntentFilter;
+import android.os.Handler;
+import android.os.HandlerThread;
+import android.os.Looper;
+
+import androidx.annotation.Nullable;
+
 import org.linphone.core.tools.Log;
 
 /**
@@ -24,7 +30,7 @@ public class RegisterCLB {
     public static final String ACTION_LOGIN = "org.linphone.action.LOGIN";
     public static final String ACTION_LOGOUT = "org.linphone.action.LOGOUT";
 
-    private static String TAG = "RegisterCLB";
+    private static final String TAG = "RegisterCLB";
 
     private static boolean isRegistered = false;
 
@@ -33,11 +39,6 @@ public class RegisterCLB {
     private BroadcastReceiver mLoginReceiver;
     private BroadcastReceiver mLogoutReceiver;
 
-    private IntentFilter mHangupIntentFilter;
-    private IntentFilter mDirectCallIntentFilter;
-    private IntentFilter mLoginIntentFilter;
-    private IntentFilter mLogoutIntentFilter;
-
     Context mContext;
 
     public RegisterCLB(Context c) {
@@ -45,30 +46,33 @@ public class RegisterCLB {
     }
 
     public void RegisterReceivers() {
-
+        HandlerThread broadcastHandlerThread = new HandlerThread("BroadcastRegisterThread");
+        broadcastHandlerThread.start();
+        Looper looper = broadcastHandlerThread.getLooper();
+        Handler broadcastHandler = new Handler(looper);
         if (isRegistered) return;
 
         Log.i("[Manager] Registering receivers");
         // ACTION_ENDCALL
-        mHangupIntentFilter = new IntentFilter(ACTION_ENDCALL);
+        IntentFilter mHangupIntentFilter = new IntentFilter(ACTION_ENDCALL);
         mHangupReceiver = new HangupReceiver();
-        RegisterReceiver(mHangupIntentFilter, mHangupReceiver, "Register Hangup receiver");
+        RegisterReceiver(mHangupIntentFilter, mHangupReceiver, "Register Hangup receiver", null);
 
         // ACTION_CALL
-        mDirectCallIntentFilter = new IntentFilter(ACTION_CALL);
+        IntentFilter mDirectCallIntentFilter = new IntentFilter(ACTION_CALL);
         mDirectCallReceiver = new DirectCallReceiver();
         RegisterReceiver(
-                mDirectCallIntentFilter, mDirectCallReceiver, "Register Direct call receiver");
+                mDirectCallIntentFilter, mDirectCallReceiver, "Register Direct call receiver", null);
 
         // ACTION_LOGIN
-        mLoginIntentFilter = new IntentFilter(ACTION_LOGIN);
+        IntentFilter mLoginIntentFilter = new IntentFilter(ACTION_LOGIN);
         mLoginReceiver = new LoginReceiver();
-        RegisterReceiver(mLoginIntentFilter, mLoginReceiver, "Register Login receiver");
+        RegisterReceiver(mLoginIntentFilter, mLoginReceiver, "Register Login receiver", broadcastHandler);
 
         // ACTION_LOGOUT
-        mLogoutIntentFilter = new IntentFilter(ACTION_LOGOUT);
+        IntentFilter mLogoutIntentFilter = new IntentFilter(ACTION_LOGOUT);
         mLogoutReceiver = new LogoutReceiver();
-        RegisterReceiver(mLogoutIntentFilter, mLogoutReceiver, "Register Logout receiver");
+        RegisterReceiver(mLogoutIntentFilter, mLogoutReceiver, "Register Logout receiver", broadcastHandler);
 
         isRegistered = true;
     }
@@ -87,12 +91,15 @@ public class RegisterCLB {
     }
 
     private void RegisterReceiver(
-            IntentFilter ifilter, BroadcastReceiver bcReceiver, String message) {
+            IntentFilter ifilter, BroadcastReceiver bcReceiver, String message, @Nullable Handler handler) {
 
         try {
             ifilter.setPriority(99999999);
             android.util.Log.i(TAG, message);
-            mContext.registerReceiver(bcReceiver, ifilter);
+            if(handler == null)
+                mContext.registerReceiver(bcReceiver, ifilter);
+            else
+                mContext.registerReceiver(bcReceiver, ifilter, null, handler);
         } catch (IllegalArgumentException e) {
             android.util.Log.e(TAG, "Failure of " + message + ": " + e.getMessage());
             e.printStackTrace();
