@@ -7,7 +7,11 @@
     <string name="service_description">Dit is vereist om oproepen te ontvangen in de achtergrond</string>
     <string name="sync_account_name">&appName; contacten</string>
     <string name="about_privacy_policy">Bekijk onze privacyverklaring</string>
+    <!-- Logs -->
+    <string name="logs_upload_failure">Uploaden van logs is gefaald!</string>
+    <string name="logs_reset_complete">Logs zijn verwijderd</string>
     <string name="logs_url_copied_to_clipboard">Logs URL gekopieerd naar klembord</string>
+
     <string name="phone_number">Telefoonnummer</string>
     <string name="phone_numbers">Telefoonnummers</string>
     <string name="select_your_country">Selecteer uw land</string>
@@ -27,11 +31,16 @@
     <string name="today">Vandaag</string>
     <string name="yesterday">Gisteren</string>
     <string name="transport">Transport</string>
+
+    <!-- Launch screen -->
     <string name="app_description">de <i>vrije</i> SIP client</string>
+
+    <!-- Status fragment -->
     <string name="status_connected">Verbonden</string>
     <string name="status_not_connected">Niet verbonden</string>
     <string name="status_in_progress">Bezig met verbinden</string>
     <string name="status_error">Verbinding mislukt</string>
+
     <string name="no_account_configured">Geen account geconfigureerd</string>
     <string name="about">Over</string>
     <string name="assistant">Assistent</string>
@@ -107,6 +116,23 @@
     <string name="call_outgoing_title">Uitgaande oproep</string>
     <string name="call_notification_paused">Gepauzeerde oproep</string>
     <string name="call_notification_outgoing">Uitgaande oproep</string>
+    <string name="call_action_participants_list">Deelnemerslijst</string>
+    <string name="call_action_calls_list">Geprekkenlijst</string>
+    <string name="call_action_numpad">Toetsen</string>
+    <string name="call_action_change_conf_layout">Wijzig layout</string>
+    <string name="call_action_statistics">Statistieken</string>
+    <string name="call_action_add_call">Nieuw gesprek</string>
+    <string name="call_action_transfer_call">Doorverbinden</string>
+    <string name="call_remote_recording">Dit gesprek wordt openomen.</string>
+    <string name="call_remotely_paused_title">Het gesprek is gepauzeerd.</string>
+    <string name="call_locally_paused_title">U heeft het gesprek gepauzeerd.</string>
+    <string name="call_locally_paused_subtitle">Klik op de play knop om te hervatten.</string>
+    <string name="call_screenshot_taken">Screenshot gemaakt: %s</string>
+    <string name="call_context_action_resume">Gesprek hervatten</string>
+    <string name="call_context_action_pause">Gesprek pauzeren</string>
+    <string name="call_context_action_transfer">Doorverbinden</string>
+    <string name="call_context_action_answer">Gesprek beantwoorden</string>
+    <string name="call_context_action_hangup">Gesprek beïndigen</string>
     <string name="call_notification_active">In gesprek</string>
     <string name="call_error_declined">Oproep werd geweigerd</string>
     <string name="call_error_user_busy">Gebruiker is bezet</string>
@@ -130,5 +156,5 @@
     <string name="restrictions_linphonerc_description">Gebruik dit veld om Linphone RC configuratie data te plaatsen. Alleen valide XML indeling wordt ondersteund. Raadpleeg de CLB handleiding voor meer informatie.</string>
     <string name="restrictions_linphonercxml_description">Gebruik dit veld om Linphone RC XML configuratie data te plaatsen. Alleen valide XML indeling wordt ondersteund. Raadpleeg de CLB handleiding voor meer informatie.</string>
 
-    <string name="about_weblate_translation">Help ons &appName; vertalen</string>
+    <string name="about_weblate_translation">Help ons &appName; te vertalen</string>
 </resources>
