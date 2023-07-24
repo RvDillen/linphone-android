@@ -203,6 +203,7 @@ class ControlsViewModel : ViewModel() {
         audioRoutesMenuTranslateY.value = AppUtils.getDimension(R.dimen.voip_audio_routes_menu_translate_y)
         audioRoutesSelected.value = false
         forceDisableProximitySensor.value = false
+        showExtras.value = false // CLB: Explicitly initialize as false, default is 'null' and will introduce unwanted behaviour when checking for equality against 'true' or 'false'
 
         nonEarpieceOutputAudioDevice.value = coreContext.core.outputAudioDevice?.type != AudioDevice.Type.Earpiece
         proximitySensorEnabled.value = shouldProximitySensorBeEnabled()
