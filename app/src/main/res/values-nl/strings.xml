@@ -112,6 +112,12 @@
         <item quantity="one">%s is aan het schrijven…</item>
         <item quantity="other">%s zijn aan het schrijven…</item>
     </plurals>
+    <!-- Heads-up notification -->
+    <string name="incoming_call_notification_title">Inkomend gesprek</string>
+    <string name="incoming_group_call_notification_title">Inkomend groeps gesprek</string>
+    <string name="incoming_call_notification_hangup_action_label">Ophangen</string>
+    <string name="incoming_call_notification_answer_action_label">Beantwoorden</string>
+
     <string name="call_incoming_title">Inkomende oproep</string>
     <string name="call_outgoing_title">Uitgaande oproep</string>
     <string name="call_notification_paused">Gepauzeerde oproep</string>
