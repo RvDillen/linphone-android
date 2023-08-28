@@ -11,9 +11,6 @@ ext.versionMajor = 5
 ext.versionMinor = 1
 ext.versionRelease = 0
 
-def appVersionName = "5.1.0"
-def appVersionCode = 51000
-
 static def getPackageName() {
     return "nl.clb.linphone"
 }
@@ -31,7 +28,7 @@ static def getPackageNameConfig() {
 }
 
 
-def firebaseEnabled = new File(projectDir.absolutePath +'/google-services.json').exists()
+def firebaseAvailable = new File(projectDir.absolutePath +'/google-services.json').exists()
 
 def crashlyticsAvailable = new File(projectDir.absolutePath +'/google-services.json').exists() && new File(LinphoneSdkBuildDir + '/libs/').exists() && new File(LinphoneSdkBuildDir + '/libs-debug/').exists()
 
@@ -41,7 +38,7 @@ if (firebaseAvailable) {
     apply plugin: 'com.google.gms.google-services'
 }
 
-if (crashlyticsEnabled) {
+if (crashlyticsAvailable) {
     apply plugin: 'com.google.firebase.crashlytics'
 }
 
@@ -85,7 +82,6 @@ android {
         targetCompatibility = 17
     }
 
-    compileSdkVersion 34
     defaultConfig {
         minSdkVersion 23
         targetSdkVersion 34
@@ -97,9 +93,6 @@ android {
         versionNameSuffix = 'clb'
         setProperty("archivesBaseName", applicationId + "-" + versionName)
     }
-
-    flavorDimensions "all"
-
     productFlavors {
         clb {
             dimension "all"
@@ -265,11 +258,11 @@ dependencies {
     implementation "androidx.security:security-crypto-ktx:1.1.0-alpha06"
     implementation "androidx.window:window:1.1.0"
 
-    def emoji_version = "1.4.0-rc01"
+    def emoji_version = "1.4.0"
     implementation "androidx.emoji2:emoji2:$emoji_version"
     implementation "androidx.emoji2:emoji2-emojipicker:$emoji_version"
 
-    def nav_version = "2.6.0"
+    def nav_version = "2.7.1"
     implementation "androidx.navigation:navigation-fragment-ktx:$nav_version"
     implementation "androidx.navigation:navigation-ui-ktx:$nav_version"
 
@@ -306,7 +299,7 @@ dependencies {
         implementation 'com.google.firebase:firebase-messaging'
     }
 
-    implementation 'org.linphone:linphone-sdk-android:5.2+'
+    implementation 'org.linphone:linphone-sdk-android:5.2.98'
 
     // Only enable leak canary prior to release
     // debugImplementation 'com.squareup.leakcanary:leakcanary-android:2.10'
