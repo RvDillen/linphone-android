@@ -53,7 +53,6 @@ class AdvancedSettingsViewModel : LogsUploadViewModel() {
 
     val sendDebugLogsListener = object : SettingListenerStub() {
         override fun onClicked() {
-
             // CLB : Add Linphone RC configuration to logfile
             LinphonePreferencesCLB.instance().ExportLinphoneRcFile(coreContext.context)
             //

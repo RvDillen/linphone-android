@@ -8,7 +8,6 @@
     <string name="sync_account_name">&appName; contacten</string>
     <string name="about_privacy_policy">Bekijk onze privacyverklaring</string>
     <!-- Logs -->
-    <string name="logs_upload_failure">Uploaden van logs is gefaald!</string>
     <string name="logs_reset_complete">Logs zijn verwijderd</string>
     <string name="logs_url_copied_to_clipboard">Logs URL gekopieerd naar klembord</string>
 
@@ -164,7 +163,6 @@
     <string name="service_name">&appName; Service</string>
     <string name="transport_tls">TLS</string>
     <string name="dialer_transfer_succeded">Oproep wordt doorgeschakeld</string>
-    <string name="logs_reset_complete">Logs werden gewist</string>
     <string name="dialer_transfer_failed">Kan oproep niet doorschakelen</string>
     <string name="chat_security_event_lime_identity_key_changed">LIME identiteitssleutel gewijzigd voor %s</string>
     <string name="chat_security_event_man_in_the_middle_detected">Man-in-the-middle aanval gedetecteerd voor %s</string>

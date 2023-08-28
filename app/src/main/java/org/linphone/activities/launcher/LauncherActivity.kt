@@ -51,10 +51,11 @@ class LauncherActivity : GenericActivity() {
             Log.i("[Launcher] Starting...")
         }
 
-        if (clbCall)
+        if (clbCall) {
             setContentView(R.layout.clb_launcher_activity)
-        else
+        } else {
             setContentView(R.layout.launcher_activity)
+        }
 
         lockHelper.lockScreen()
     }
@@ -84,8 +85,9 @@ class LauncherActivity : GenericActivity() {
         }
 
         // CLB : OnOutgoingStarted => just display launch screen so microphone keeps enabled (on A11)
-        if (clbCall)
+        if (clbCall) {
             return
+        }
 
         LinphonePreferencesCLB.instance().CheckPermissions(this)
 

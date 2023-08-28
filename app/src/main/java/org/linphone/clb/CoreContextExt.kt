@@ -20,14 +20,12 @@ class CoreContextExt() {
     }
 
     fun OnOutgoingStarted(isJustHangup: Boolean) {
-
         if (Build.VERSION.SDK_INT > Version.API28_PIE_90) {
             coreContext.notificationsManager.startForeground()
         }
 
         // A11(+): Show activity briefly, otherwise microphone is blocked by android (BG-12130).
         if (Build.VERSION.SDK_INT > Version.API29_ANDROID_10) {
-
             val intent = Intent(coreContext.context, LauncherActivity::class.java)
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             intent.addFlags(Intent.FLAG_ACTIVITY_NO_USER_ACTION)
@@ -36,10 +34,12 @@ class CoreContextExt() {
 
             // Show launcher screen briefly, except when device is locked with pattern/pincode, show all stuff
             var state = "OnOutgoingStarted"
-            if (isJustHangup)
+            if (isJustHangup) {
                 state = "OnOutgoingEnded"
-            if (!isDeviceLocked(coreContext.context))
+            }
+            if (!isDeviceLocked(coreContext.context)) {
                 intent.putExtra("CLB", state)
+            }
 
             coreContext.context.startActivity(intent)
         }

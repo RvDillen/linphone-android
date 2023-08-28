@@ -289,16 +289,22 @@ class TelecomConnectionService : ConnectionService() {
         val callId = call.callLog.callId
         val connection = TelecomHelper.get().findConnectionForCallId(callId.orEmpty())
         if (connection == null) {
-            Log.e("[Telecom Connection Service] Retrying failed to find connection for call id: $callId")
+            Log.e(
+                "[Telecom Connection Service] Retrying failed to find connection for call id: $callId"
+            )
             // CLB: Added post delayed to try again if at first the connection wasn't found.
             Handler(Looper.getMainLooper()).postDelayed(
                 {
                     val connection = TelecomHelper.get().findConnectionForCallId(callId.orEmpty())
                     if (connection == null) {
-                        Log.e("[Telecom Connection Service] Failed to find connection for call id: $callId")
+                        Log.e(
+                            "[Telecom Connection Service] Failed to find connection for call id: $callId"
+                        )
                         return@postDelayed
                     }
-                    Log.i("[Telecom Connection Service] found connection for call id delayed: $callId")
+                    Log.i(
+                        "[Telecom Connection Service] found connection for call id delayed: $callId"
+                    )
 
                     if (connection.state != Connection.STATE_HOLDING) {
                         connection.setActive()

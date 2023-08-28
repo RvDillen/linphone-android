@@ -589,7 +589,9 @@ class CoreContext(
                 }
             } else {
                 if (account.params.limeServerUrl == corePreferences.limeServerUrl) {
-                    Log.w("[Context] Found linphone LIME X3DH server URL for third party account, removing it")
+                    Log.w(
+                        "[Context] Found linphone LIME X3DH server URL for third party account, removing it"
+                    )
                     val params = account.params.clone()
                     params.limeServerUrl = null
                     account.params = params
@@ -814,7 +816,7 @@ class CoreContext(
             }
         }
 
-        val address: Address? = core.interpretUrl(
+        var address: Address? = core.interpretUrl(
             stringAddress,
             LinphoneUtils.applyInternationalPrefix()
         )
@@ -832,9 +834,16 @@ class CoreContext(
                 stringAddress = stringAddress + ";" + tos[i]
             }
             address = core.interpretUrl(
-                stringAddress, 
+                stringAddress,
                 LinphoneUtils.applyInternationalPrefix()
             )
+        }
+        if (address == null) {
+            Log.e("[Context] Failed to parse $stringAddress, abort outgoing call")
+            callErrorMessageResourceId.value = Event(
+                context.getString(R.string.call_error_network_unreachable)
+            )
+            return
         }
 
         startCall(address)
@@ -1150,9 +1159,7 @@ class CoreContext(
     }
 
     private fun onOutgoingStarted() {
-
         if (CallStateCLB.instance().IsCallFromCLB()) {
-
             val coreExt = org.linphone.clb.kt.CoreContextExt()
             // val isJustHangUp = CallStateCLB.instance().IsJustHangUp()
             coreExt.OnOutgoingStarted(false) // Just hangup fails on 4.5.2
@@ -1172,7 +1179,6 @@ class CoreContext(
     }
 
     fun onCallStarted() {
-
         // CLB => Not showing Activity on direct call
         if (CallStateCLB.instance().IsCallFromCLB()) {
             return

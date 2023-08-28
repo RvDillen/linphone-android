@@ -83,6 +83,7 @@ android {
     }
 
     defaultConfig {
+		compileSdkVersion 34
         minSdkVersion 23
         targetSdkVersion 34
         versionCode computeVersionCode()
@@ -93,6 +94,7 @@ android {
         versionNameSuffix = 'clb'
         setProperty("archivesBaseName", applicationId + "-" + versionName)
     }
+    flavorDimensions "all"
     productFlavors {
         clb {
             dimension "all"

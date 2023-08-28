@@ -85,8 +85,9 @@ class TelecomHelper private constructor(context: Context) {
 
     fun isIncomingCallPermitted(): Boolean {
         // CLB - Special MYCO handling
-        if (Build.MODEL.contains("Myco"))
+        if (Build.MODEL.contains("Myco")) {
             return true
+        }
         val incomingCallPermitted = telecomManager.isIncomingCallPermitted(account.accountHandle)
         Log.i("[Telecom Helper] Is incoming call permitted? $incomingCallPermitted")
         return incomingCallPermitted

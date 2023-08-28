@@ -306,6 +306,20 @@ class DialerFragment : SecureFragment<DialerFragmentBinding>() {
         }
     }
 
+    private fun checkPermissions() {
+        if (!PermissionHelper.get().hasReadPhoneStatePermission()) {
+            Log.i("[Dialer] Asking for READ_PHONE_STATE permission")
+            requestPermissions(arrayOf(Manifest.permission.READ_PHONE_STATE), 0)
+        } else if (!PermissionHelper.get().hasPostNotificationsPermission()) {
+            // Don't check the following the previous permission is being asked
+            Log.i("[Dialer] Asking for POST_NOTIFICATIONS permission")
+            Compatibility.requestPostNotificationsPermission(this, 2)
+        } else if (Version.sdkAboveOrEqual(Version.API26_O_80)) {
+            // Don't check the following the previous permissions are being asked
+            checkTelecomManagerPermissions()
+        }
+    }
+
     @TargetApi(Version.API26_O_80)
     private fun checkTelecomManagerPermissions() {
         if (!corePreferences.useTelecomManager) {

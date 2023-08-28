@@ -193,13 +193,6 @@ class SingleCallFragment : GenericVideoPreviewFragment<VoipSingleCallFragmentBin
         }
     }
 
-    override fun onResume() {
-        super.onResume()
-
-        coreContext.core.nativeVideoWindowId = binding.remoteVideoSurface
-        setupLocalVideoPreview(binding.localPreviewVideoSurface, binding.switchCamera)
-    }
-
     override fun onPause() {
         super.onPause()
 
@@ -211,12 +204,16 @@ class SingleCallFragment : GenericVideoPreviewFragment<VoipSingleCallFragmentBin
     override fun onResume() {
         super.onResume()
 
+        coreContext.core.nativeVideoWindowId = binding.remoteVideoSurface
+        setupLocalVideoPreview(binding.localPreviewVideoSurface, binding.switchCamera)
+
         // CLB: Make sure extra buttons are displayed/hidden AFTER a pause/resume cycle
         Log.d("onResume -> Update UI")
-        if (controlsViewModel.showExtras.value == true)
+        if (controlsViewModel.showExtras.value == true) {
             controlsViewModel.showExtraButtons()
-        else
+        } else {
             controlsViewModel.hideExtraButtons(true)
+        }
     }
 
     private fun showCallVideoUpdateDialog(call: Call) {

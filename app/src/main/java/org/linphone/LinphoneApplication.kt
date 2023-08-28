@@ -82,8 +82,9 @@ class LinphoneApplication : Application(), ImageLoaderFactory {
             }
 
             // CLB Config changed ? => write to log (log is available now)
-            if (LinphonePreferencesCLB.instance().HasLogInfo())
+            if (LinphonePreferencesCLB.instance().HasLogInfo()) {
                 LinphonePreferencesCLB.instance().WriteLogLines()
+            }
             Log.i("[Application] Core config & preferences created")
         }
 
@@ -112,7 +113,9 @@ class LinphoneApplication : Application(), ImageLoaderFactory {
             if (coreContext.core.provisioningUri == null) {
                 val configUrl = "http://config.clb.nl/linphonerc.xml"
                 coreContext.core.setProvisioningUri(configUrl)
-                Log.i("[Application] Provisioning URL is not configured, set to default CLB URL: $configUrl")
+                Log.i(
+                    "[Application] Provisioning URL is not configured, set to default CLB URL: $configUrl"
+                )
             } else {
                 val configUrl = coreContext.core.provisioningUri
                 Log.i("[Application] Provisioning URL already configured: $configUrl")
@@ -120,9 +123,12 @@ class LinphoneApplication : Application(), ImageLoaderFactory {
 
             if (!skipCoreStart) {
                 coreContext.start()
+            }
 
             // CLB Registration
-            val registerCLB: RegisterCLB = org.linphone.clb.RegisterCLB(coreContext.context.applicationContext)
+            val registerCLB: RegisterCLB = org.linphone.clb.RegisterCLB(
+                coreContext.context.applicationContext
+            )
             registerCLB.RegisterReceivers()
 
             // Use
@@ -145,7 +151,6 @@ class LinphoneApplication : Application(), ImageLoaderFactory {
         }
 
         private fun CreateConfigCLB(context: Context): Config {
-
             // Get restrictions data (AppConfigHelper)
             val ach = AppConfigHelper(context, corePreferences)
 
@@ -162,7 +167,11 @@ class LinphoneApplication : Application(), ImageLoaderFactory {
                 // CLB LinphoneRC changes? => Update
                 // val linphonercData =
                 //    this::class.java.classLoader.getResource("assets/clb_linphonerc_test").readText()
-                if (LinphonePreferencesCLB.instance().UpdateFromLinphoneRcData(linphonercData, corePreferences.configPath)) {
+                if (LinphonePreferencesCLB.instance().UpdateFromLinphoneRcData(
+                        linphonercData,
+                        corePreferences.configPath
+                    )
+                ) {
                     LogConfig("Store AppConfig linphoneRc hash")
                     ach.storeRcHash()
                 }
@@ -170,7 +179,10 @@ class LinphoneApplication : Application(), ImageLoaderFactory {
                 LogConfig("Hashes are equal, no changes... skipping config from bundle.")
 
                 // Verify the 'old' method (i.e. linphonerc file in '/Downloads' folder)
-                LinphonePreferencesCLB.instance().MoveLinphoneRcFromDownloads(context, corePreferences)
+                LinphonePreferencesCLB.instance().MoveLinphoneRcFromDownloads(
+                    context,
+                    corePreferences
+                )
             }
 
             android.util.Log.i("[CLB]", "Create Linphone Config")
@@ -186,7 +198,11 @@ class LinphoneApplication : Application(), ImageLoaderFactory {
                 corePreferences.firstStart = false
                 val linphonercXmlData = ach.linphoneRcXml
 
-                if (LinphonePreferencesCLB.instance().UpdateFromLinphoneXmlData(linphonercXmlData, config)) {
+                if (LinphonePreferencesCLB.instance().UpdateFromLinphoneXmlData(
+                        linphonercXmlData,
+                        config
+                    )
+                ) {
                     LogConfig("Store AppConfig linphoneRc XML hash")
                     ach.storeRcXmlHash()
                 }
@@ -205,7 +221,6 @@ class LinphoneApplication : Application(), ImageLoaderFactory {
         }
 
         private fun TestConfigClbParsing() {
-
             val testConfig1 = "[sip] contact=\"Linphone Android\" <sip:linphone.android@unknown-host> "
             var stringResult = "[sip]\r\ncontact=\"Linphone Android\" <sip:linphone.android@unknown-host>"
             var stringOutput = AppConfigHelper.parseLinphoneRc(testConfig1)
@@ -232,8 +247,9 @@ class LinphoneApplication : Application(), ImageLoaderFactory {
 
         private fun LogResult(item: String, result: Boolean) {
             var stringResult = "FAIL"
-            if (result)
+            if (result) {
                 stringResult = "OK"
+            }
 
             android.util.Log.d("[CLB]", "Parsing " + item + ": [" + stringResult + "]")
         }
