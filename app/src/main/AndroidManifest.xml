@@ -61,6 +61,12 @@
     <!-- Needed for foreground service
     (https://developer.android.com/guide/components/foreground-services) -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <!-- Needed for Android 14
+    https://developer.android.com/about/versions/14/behavior-changes-14#fgs-types -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_PHONE_CALL" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
 
     <application
         android:name=".LinphoneApplication"
@@ -70,7 +76,6 @@
         android:label="${appLabel}"
         android:localeConfig="@xml/locales_config"
         android:roundIcon="@mipmap/ic_launcher_round"
-        android:extractNativeLibs="${extractNativeLibs}"
         android:theme="@style/AppTheme"
         android:allowNativeHeapPointerTagging="false"
         android:requestLegacyExternalStorage="true">
@@ -96,6 +101,10 @@
             	<category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <meta-data
+            android:name="com.google.android.gms.car.application"
+            android:resource="@xml/automotive_app_desc"/>
 
         <activity android:name=".activities.main.MainActivity"
             android:exported="true"
@@ -142,6 +151,7 @@
                 <action android:name="android.intent.action.VIEW" />
                 <action android:name="android.intent.action.DIAL" />
                 <action android:name="android.intent.action.CALL" />
+                <action android:name="android.intent.action.CALL_BUTTON" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="tel" />
@@ -149,6 +159,7 @@
                 <data android:scheme="sips" />
                 <data android:scheme="linphone" />
                 <data android:scheme="sip-linphone" />
+                <data android:scheme="linphone-config" />
             </intent-filter>
 
             <intent-filter>
@@ -195,7 +206,14 @@
         <service
             android:name=".core.CoreService"
             android:exported="false"
-            android:foregroundServiceType="phoneCall|camera|microphone"
+            android:foregroundServiceType="phoneCall|camera|microphone|dataSync"
+            android:stopWithTask="false"
+            android:label="@string/app_name" />
+
+        <service
+            android:name="org.linphone.core.tools.service.PushService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync"
             android:stopWithTask="false"
             android:label="@string/app_name" />
 

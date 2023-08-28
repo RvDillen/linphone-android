@@ -39,7 +39,9 @@ class EmailAccountCreationViewModelFactory(private val accountCreator: AccountCr
     }
 }
 
-class EmailAccountCreationViewModel(val accountCreator: AccountCreator) : ViewModel() {
+class EmailAccountCreationViewModel(accountCreator: AccountCreator) : AbstractPushTokenViewModel(
+    accountCreator
+) {
     val username = MutableLiveData<String>()
     val usernameError = MutableLiveData<String>()
 
@@ -74,7 +76,9 @@ class EmailAccountCreationViewModel(val accountCreator: AccountCreator) : ViewMo
             when (status) {
                 AccountCreator.Status.AccountExist, AccountCreator.Status.AccountExistWithAlias -> {
                     waitForServerAnswer.value = false
-                    usernameError.value = AppUtils.getString(R.string.assistant_error_username_already_exists)
+                    usernameError.value = AppUtils.getString(
+                        R.string.assistant_error_username_already_exists
+                    )
                 }
                 AccountCreator.Status.AccountNotExist -> {
                     val createAccountStatus = creator.createAccount()
@@ -95,7 +99,7 @@ class EmailAccountCreationViewModel(val accountCreator: AccountCreator) : ViewMo
             status: AccountCreator.Status,
             response: String?
         ) {
-            Log.i("[Account Creation] onCreateAccount status is $status")
+            Log.i("[Assistant] [Account Creation] onCreateAccount status is $status")
             waitForServerAnswer.value = false
 
             when (status) {
@@ -144,11 +148,8 @@ class EmailAccountCreationViewModel(val accountCreator: AccountCreator) : ViewMo
         super.onCleared()
     }
 
-    fun create() {
-        accountCreator.username = username.value
-        accountCreator.password = password.value
-        accountCreator.email = email.value
-        accountCreator.displayName = displayName.value
+    override fun onFlexiApiTokenReceived() {
+        Log.i("[Assistant] [Account Creation] Using FlexiAPI auth token [${accountCreator.token}]")
 
         waitForServerAnswer.value = true
         val status = accountCreator.isAccountExist
@@ -156,6 +157,31 @@ class EmailAccountCreationViewModel(val accountCreator: AccountCreator) : ViewMo
         if (status != AccountCreator.Status.RequestOk) {
             waitForServerAnswer.value = false
             onErrorEvent.value = Event("Error: ${status.name}")
+        }
+    }
+
+    override fun onFlexiApiTokenRequestError() {
+        Log.e("[Assistant] [Account Creation] Failed to get an auth token from FlexiAPI")
+        waitForServerAnswer.value = false
+        onErrorEvent.value = Event("Error: Failed to get an auth token from account manager server")
+    }
+
+    fun create() {
+        accountCreator.username = username.value
+        accountCreator.password = password.value
+        accountCreator.email = email.value
+        accountCreator.displayName = displayName.value
+
+        val token = accountCreator.token.orEmpty()
+        if (token.isNotEmpty()) {
+            Log.i(
+                "[Assistant] [Account Creation] We already have an auth token from FlexiAPI [$token], continue"
+            )
+            onFlexiApiTokenReceived()
+        } else {
+            Log.i("[Assistant] [Account Creation] Requesting an auth token from FlexiAPI")
+            waitForServerAnswer.value = true
+            requestFlexiApiToken()
         }
     }
 

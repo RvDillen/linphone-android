@@ -35,6 +35,7 @@ import org.linphone.core.*
 import org.linphone.core.tools.Log
 import org.linphone.utils.AppUtils
 import org.linphone.utils.LinphoneUtils
+import org.linphone.utils.TimestampUtils
 
 class ChatRoomViewModelFactory(private val chatRoom: ChatRoom) :
     ViewModelProvider.NewInstanceFactory() {
@@ -51,6 +52,7 @@ class ChatRoomViewModel(val chatRoom: ChatRoom) : ViewModel(), ContactDataInterf
     override val securityLevel: MutableLiveData<ChatRoomSecurityLevel> = MutableLiveData<ChatRoomSecurityLevel>()
     override val showGroupChatAvatar: Boolean
         get() = conferenceChatRoom && !oneToOneChatRoom
+    override val presenceStatus: MutableLiveData<ConsolidatedPresence> = MutableLiveData<ConsolidatedPresence>()
     override val coroutineScope: CoroutineScope = viewModelScope
 
     val subject = MutableLiveData<String>()
@@ -67,7 +69,7 @@ class ChatRoomViewModel(val chatRoom: ChatRoom) : ViewModel(), ContactDataInterf
 
     val securityLevelContentDescription = MutableLiveData<Int>()
 
-    val peerSipUri = MutableLiveData<String>()
+    val lastPresenceInfo = MutableLiveData<String>()
 
     val ephemeralEnabled = MutableLiveData<Boolean>()
 
@@ -109,7 +111,10 @@ class ChatRoomViewModel(val chatRoom: ChatRoom) : ViewModel(), ContactDataInterf
     private var addressToCall: Address? = null
 
     private val bounceAnimator: ValueAnimator by lazy {
-        ValueAnimator.ofFloat(AppUtils.getDimension(R.dimen.tabs_fragment_unread_count_bounce_offset), 0f).apply {
+        ValueAnimator.ofFloat(
+            AppUtils.getDimension(R.dimen.tabs_fragment_unread_count_bounce_offset),
+            0f
+        ).apply {
             addUpdateListener {
                 val value = it.animatedValue as Float
                 chatUnreadCountTranslateY.value = value
@@ -230,6 +235,7 @@ class ChatRoomViewModel(val chatRoom: ChatRoom) : ViewModel(), ContactDataInterf
     }
 
     fun contactLookup() {
+        presenceStatus.value = ConsolidatedPresence.Offline
         displayName.value = when {
             basicChatRoom -> LinphoneUtils.getDisplayName(
                 chatRoom.peerAddress
@@ -262,11 +268,11 @@ class ChatRoomViewModel(val chatRoom: ChatRoom) : ViewModel(), ContactDataInterf
         val localAddress = chatRoom.localAddress.clone()
         localAddress.clean() // Remove GRUU
         val addresses = Array(chatRoom.participants.size) {
-            index ->
+                index ->
             chatRoom.participants[index].address
         }
         val localAccount = coreContext.core.accountList.find {
-            account ->
+                account ->
             account.params.identityAddress?.weakEqual(localAddress) ?: false
         }
 
@@ -295,7 +301,9 @@ class ChatRoomViewModel(val chatRoom: ChatRoom) : ViewModel(), ContactDataInterf
             if (chatRoom.participants.isNotEmpty()) {
                 chatRoom.participants[0].address
             } else {
-                Log.e("[Chat Room] ${chatRoom.peerAddress} doesn't have any participant (state ${chatRoom.state})!")
+                Log.e(
+                    "[Chat Room] ${chatRoom.peerAddress} doesn't have any participant (state ${chatRoom.state})!"
+                )
                 null
             }
         }
@@ -304,7 +312,59 @@ class ChatRoomViewModel(val chatRoom: ChatRoom) : ViewModel(), ContactDataInterf
     private fun searchMatchingContact() {
         val remoteAddress = getRemoteAddress()
         if (remoteAddress != null) {
-            contact.value = coreContext.contactsManager.findContactByAddress(remoteAddress)
+            val friend = coreContext.contactsManager.findContactByAddress(remoteAddress)
+            if (friend != null) {
+                contact.value = friend!!
+                presenceStatus.value = friend.consolidatedPresence
+                computeLastSeenLabel(friend)
+                friend.addListener {
+                    presenceStatus.value = it.consolidatedPresence
+                    computeLastSeenLabel(friend)
+                }
+            }
+        }
+    }
+
+    private fun computeLastSeenLabel(friend: Friend) {
+        if (friend.consolidatedPresence == ConsolidatedPresence.Online) {
+            lastPresenceInfo.value = AppUtils.getString(R.string.chat_room_presence_online)
+            return
+        } else if (friend.consolidatedPresence == ConsolidatedPresence.DoNotDisturb) {
+            lastPresenceInfo.value = AppUtils.getString(R.string.chat_room_presence_do_not_disturb)
+            return
+        }
+
+        val timestamp = friend.presenceModel?.latestActivityTimestamp ?: -1L
+        lastPresenceInfo.value = if (timestamp != -1L) {
+            when {
+                TimestampUtils.isToday(timestamp) -> {
+                    val time = TimestampUtils.timeToString(timestamp, timestampInSecs = true)
+                    val text =
+                        AppUtils.getString(R.string.chat_room_presence_last_seen_online_today)
+                    "$text $time"
+                }
+
+                TimestampUtils.isYesterday(timestamp) -> {
+                    val time = TimestampUtils.timeToString(timestamp, timestampInSecs = true)
+                    val text = AppUtils.getString(
+                        R.string.chat_room_presence_last_seen_online_yesterday
+                    )
+                    "$text $time"
+                }
+
+                else -> {
+                    val date = TimestampUtils.toString(
+                        timestamp,
+                        onlyDate = true,
+                        shortDate = false,
+                        hideYear = true
+                    )
+                    val text = AppUtils.getString(R.string.chat_room_presence_last_seen_online)
+                    "$text $date"
+                }
+            }
+        } else {
+            AppUtils.getString(R.string.chat_room_presence_away)
         }
     }
 
@@ -349,26 +409,25 @@ class ChatRoomViewModel(val chatRoom: ChatRoom) : ViewModel(), ContactDataInterf
             composing += if (composing.isNotEmpty()) ", " else ""
             composing += contact?.name ?: LinphoneUtils.getDisplayName(address)
         }
-        composingList.value = AppUtils.getStringWithPlural(R.plurals.chat_room_remote_composing, chatRoom.composingAddresses.size, composing)
+        composingList.value = AppUtils.getStringWithPlural(
+            R.plurals.chat_room_remote_composing,
+            chatRoom.composingAddresses.size,
+            composing
+        )
     }
 
     private fun updateParticipants() {
         val participants = chatRoom.participants
-        peerSipUri.value = if (oneToOneChatRoom && !basicChatRoom) {
-            participants.firstOrNull()?.address?.asStringUriOnly()
-                ?: chatRoom.peerAddress.asStringUriOnly()
-        } else {
-            chatRoom.peerAddress.asStringUriOnly()
-        }
 
         oneParticipantOneDevice = oneToOneChatRoom &&
             chatRoom.me?.devices?.size == 1 &&
             participants.firstOrNull()?.devices?.size == 1
 
-        addressToCall = if (basicChatRoom)
+        addressToCall = if (basicChatRoom) {
             chatRoom.peerAddress
-        else
+        } else {
             participants.firstOrNull()?.address
+        }
 
         onlyParticipantOnlyDeviceAddress = participants.firstOrNull()?.devices?.firstOrNull()?.address
     }
@@ -376,7 +435,8 @@ class ChatRoomViewModel(val chatRoom: ChatRoom) : ViewModel(), ContactDataInterf
     private fun updateUnreadMessageCount() {
         val count = chatRoom.unreadMessagesCount
         unreadMessagesCount.value = count
-        if (count > 0 && corePreferences.enableAnimations) bounceAnimator.start()
-        else if (count == 0 && bounceAnimator.isStarted) bounceAnimator.end()
+        if (count > 0 && corePreferences.enableAnimations) {
+            bounceAnimator.start()
+        } else if (count == 0 && bounceAnimator.isStarted) bounceAnimator.end()
     }
 }

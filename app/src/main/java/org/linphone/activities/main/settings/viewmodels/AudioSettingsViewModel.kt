@@ -39,12 +39,18 @@ class AudioSettingsViewModel : GenericSettingsViewModel() {
         MutableLiveData<Event<Boolean>>()
     }
 
-    val echoCancellationListener = object : SettingListenerStub() {
+    val softwareEchoCancellerListener = object : SettingListenerStub() {
         override fun onBoolValueChanged(newValue: Boolean) {
             core.isEchoCancellationEnabled = newValue
+            if (!newValue) {
+                core.resetEchoCancellationCalibration()
+                softwareEchoCalibration.value = prefs.getString(
+                    R.string.audio_settings_echo_canceller_calibration_summary
+                )
+            }
         }
     }
-    val echoCancellation = MutableLiveData<Boolean>()
+    val softwareEchoCanceller = MutableLiveData<Boolean>()
     val listener = object : CoreListenerStub() {
         override fun onEcCalibrationResult(core: Core, status: EcCalibratorStatus, delayMs: Int) {
             if (status == EcCalibratorStatus.InProgress) return
@@ -52,7 +58,7 @@ class AudioSettingsViewModel : GenericSettingsViewModel() {
         }
     }
 
-    val echoCancellerCalibrationListener = object : SettingListenerStub() {
+    val softwareEchoCancellerCalibrationListener = object : SettingListenerStub() {
         override fun onClicked() {
             if (PermissionHelper.get().hasRecordAudioPermission()) {
                 startEchoCancellerCalibration()
@@ -61,7 +67,7 @@ class AudioSettingsViewModel : GenericSettingsViewModel() {
             }
         }
     }
-    val echoCalibration = MutableLiveData<String>()
+    val softwareEchoCalibration = MutableLiveData<String>()
 
     val echoTesterListener = object : SettingListenerStub() {
         override fun onClicked() {
@@ -137,7 +143,7 @@ class AudioSettingsViewModel : GenericSettingsViewModel() {
         override fun onTextValueChanged(newValue: String) {
             try {
                 core.micGainDb = newValue.toFloat()
-            } catch (nfe: NumberFormatException) {
+            } catch (_: NumberFormatException) {
             }
         }
     }
@@ -147,7 +153,7 @@ class AudioSettingsViewModel : GenericSettingsViewModel() {
         override fun onTextValueChanged(newValue: String) {
             try {
                 core.playbackGainDb = newValue.toFloat()
-            } catch (nfe: NumberFormatException) {
+            } catch (_: NumberFormatException) {
             }
         }
     }
@@ -156,10 +162,12 @@ class AudioSettingsViewModel : GenericSettingsViewModel() {
     val audioCodecs = MutableLiveData<ArrayList<ViewDataBinding>>()
 
     init {
-        echoCancellation.value = core.isEchoCancellationEnabled
+        softwareEchoCanceller.value = core.isEchoCancellationEnabled
         adaptiveRateControl.value = core.isAdaptiveRateControlEnabled
-        echoCalibration.value = if (core.isEchoCancellationEnabled) {
-            prefs.getString(R.string.audio_settings_echo_cancellation_calibration_value).format(prefs.echoCancellerCalibration)
+        softwareEchoCalibration.value = if (core.echoCancellationCalibration > 0) {
+            prefs.getString(R.string.audio_settings_echo_cancellation_calibration_value).format(
+                core.echoCancellationCalibration
+            )
         } else {
             prefs.getString(R.string.audio_settings_echo_canceller_calibration_summary)
         }
@@ -181,39 +189,53 @@ class AudioSettingsViewModel : GenericSettingsViewModel() {
 
         core.addListener(listener)
         core.startEchoCancellerCalibration()
-        echoCalibration.value = prefs.getString(R.string.audio_settings_echo_cancellation_calibration_started)
+        softwareEchoCalibration.value = prefs.getString(
+            R.string.audio_settings_echo_cancellation_calibration_started
+        )
     }
 
     fun echoCancellerCalibrationFinished(status: EcCalibratorStatus, delay: Int) {
         core.removeListener(listener)
 
         when (status) {
-            EcCalibratorStatus.InProgress -> {
-                echoCalibration.value = prefs.getString(R.string.audio_settings_echo_cancellation_calibration_started)
-            }
             EcCalibratorStatus.DoneNoEcho -> {
-                echoCalibration.value = prefs.getString(R.string.audio_settings_echo_cancellation_calibration_no_echo)
+                softwareEchoCalibration.value = prefs.getString(
+                    R.string.audio_settings_echo_cancellation_calibration_no_echo
+                )
+                softwareEchoCanceller.value = false
             }
             EcCalibratorStatus.Done -> {
-                echoCalibration.value = prefs.getString(R.string.audio_settings_echo_cancellation_calibration_value).format(delay)
+                softwareEchoCalibration.value = prefs.getString(
+                    R.string.audio_settings_echo_cancellation_calibration_value
+                ).format(delay)
+                softwareEchoCanceller.value = true
             }
             EcCalibratorStatus.Failed -> {
-                echoCalibration.value = prefs.getString(R.string.audio_settings_echo_cancellation_calibration_failed)
+                softwareEchoCalibration.value = prefs.getString(
+                    R.string.audio_settings_echo_cancellation_calibration_failed
+                )
+            }
+            EcCalibratorStatus.InProgress -> { // We should never get here but still
+                softwareEchoCalibration.value = prefs.getString(
+                    R.string.audio_settings_echo_cancellation_calibration_started
+                )
             }
         }
-
-        echoCancellation.value = status != EcCalibratorStatus.DoneNoEcho
     }
 
     fun startEchoTester() {
         echoTesterIsRunning = true
-        echoTesterStatus.value = prefs.getString(R.string.audio_settings_echo_tester_summary_is_running)
+        echoTesterStatus.value = prefs.getString(
+            R.string.audio_settings_echo_tester_summary_is_running
+        )
         core.startEchoTester(0)
     }
 
     fun stopEchoTester() {
         echoTesterIsRunning = false
-        echoTesterStatus.value = prefs.getString(R.string.audio_settings_echo_tester_summary_is_stopped)
+        echoTesterStatus.value = prefs.getString(
+            R.string.audio_settings_echo_tester_summary_is_stopped
+        )
         core.stopEchoTester()
     }
 

@@ -50,8 +50,11 @@
         <item quantity="other">%d days</item>
     </plurals>
     <string name="share_uploaded_logs_link">Share logs link using…</string>
+    <string name="yes">Yes</string>
+    <string name="no">No</string>
 
     <!-- Errors -->
+    <string name="error_unexpected">Unexpected error…</string>
 
     <!-- Date & Time -->
     <string name="today">Today</string>
@@ -114,6 +117,7 @@
     <string name="contact_local_sync_account">Store locally</string>
     <string name="contact_cant_be_deleted">This contact can\'t be deleted</string>
     <string name="contacts_ldap_query_more_results_available">More results are available, refine your search</string>
+    <string name="contacts_new_contact_wont_be_visible_warning_dialog">You are about to create a new contact without a SIP URI nor a phone number, thus it won\'t be visible in &appName;.\n\nDo you want to create it anyway?</string>
 
     <!-- Dialer -->
     <string name="dialer_address_bar_hint">Enter a number or an address</string>
@@ -138,6 +142,7 @@
 
     <!-- Chat -->
     <string name="no_chat_history">No conversations</string>
+    <string name="chat_room_last_message_sender_format">%s:</string>
     <string name="chat_remote_is_composing">Remote is writing&#8230;</string>
     <string name="chat_event_conference_created">You have joined the group</string>
     <string name="chat_event_conference_destroyed">You have left the group</string>
@@ -232,6 +237,14 @@
     <string name="chat_message_removal_info">Message will be deleted</string>
     <string name="chat_message_abort_removal">Abort</string>
     <string name="chat_message_download_already_in_progress">Please wait for first download to finish before starting a new one</string>
+    <string name="chat_message_voice_recording_received_notification">You have received a voice message</string>
+    <string name="chat_message_voice_recording">Voice message</string>
+    <string name="chat_room_presence_online">Online</string>
+    <string name="chat_room_presence_last_seen_online_today">Online today at</string>
+    <string name="chat_room_presence_last_seen_online_yesterday">Online yesterday at</string>
+    <string name="chat_room_presence_last_seen_online">Online on</string>
+    <string name="chat_room_presence_away">Away</string>
+    <string name="chat_room_presence_do_not_disturb">Do not disturb</string>
 
     <!-- Recordings -->
     <string name="recordings_empty_list">No recordings</string>
@@ -343,6 +356,7 @@
     <string name="call_action_statistics">Call statistics</string>
     <string name="call_action_add_call">Start new call</string>
     <string name="call_action_transfer_call">Transfer call</string>
+    <string name="call_action_attended_transfer_call">Attended transfer</string>
     <string name="call_context_action_resume">Resume call</string>
     <string name="call_context_action_pause">Pause call</string>
     <string name="call_context_action_transfer">Transfer call</string>
@@ -407,6 +421,8 @@
     <string name="assistant_generic_account_warning">Some features require a &appName; account, such as group messaging or ephemeral messaging.\n\nThese features are hidden when you register with a third party SIP account.\n\nTo enable it in a commercial project, please contact us.</string>
     <string name="assistant_generic_account_warning_contact_link" translatable="false">https://www.linphone.org/contact</string>
     <string name="assistant_generic_account_warning_continue_button_text">I understand</string>
+    <string name="assistant_alternative_way_create_account">To create an account using your email:</string>
+    <string name="assistant_no_push_warning">Your device doesn\'t seem to be able to receive push notifications.\n\nAs we now require them for the account creation process, you won\'t be able to create an account inside the app, but you can create it on our website:</string>
 
     <!-- Assistant errors -->
     <string name="assistant_error_phone_number_invalid_characters">Only digits are expected here</string>
@@ -417,11 +433,12 @@
     <string name="assistant_error_invalid_email_address">Email address is invalid</string>
     <string name="assistant_error_username_too_long">Username has too many characters</string>
     <string name="assistant_error_invalid_credentials">Account does not exist or password does not match</string>
+    <string name="assistant_error_invalid_international_prefix">Wrong international prefix</string>
 
     <!-- Assistant login -->
     <string name="assistant_linphone_account">Use your &appName; account</string>
     <string name="assistant_create_account_part_1">Please confirm your country code and enter your phone number</string>
-    <string name="assistant_linphone_login_desc">Please enter your username and password of &appName; account</string>
+    <string name="assistant_linphone_login_desc">Please enter your &appName; account username and password</string>
     <string name="assistant_login_with_username">Use your username and password instead of your phone number</string>
     <string name="assistant_login_forgotten_password">Forgot your password?</string>
     <string name="assistant_forgotten_password_link" translatable="false">https://subscribe.linphone.org/</string>
@@ -445,6 +462,7 @@
     <string name="assistant_create_account_part_3">To complete your phone number verification, please enter the 4 digit code below:\n</string>
     <string name="assistant_link_phone_number">You will link with your phone number the following username:</string>
     <string name="assistant_link_phone_number_skip">Skip</string>
+    <string name="assistant_create_email_account_not_validated">Your account has not been activated yet, please click on the link you received by email</string>
 
     <!-- Assistant link -->
     <string name="assistant_link_account">Link account</string>
@@ -474,9 +492,13 @@
     <string name="settings_primary_account_title">Primary Account</string>
     <string name="settings_primary_account_display_name_title">Display Name</string>
     <string name="settings_primary_account_username_title">Username</string>
+    <string name="settings_password_protection_dialog_title">Please input your password below to access the settings</string>
+    <string name="settings_password_protection_dialog_input_hint">Password</string>
+    <string name="settings_password_protection_dialog_ok_label">Validate</string>
+    <string name="settings_password_protection_dialog_invalid_input">Invalid password!</string>
 
     <!-- Audio settings -->
-    <string name="audio_settings_echo_cancellation_title">Echo cancellation</string>
+    <string name="audio_settings_software_echo_cancellation_title">Software echo cancellation</string>
     <string name="audio_settings_echo_cancellation_summary">Removes the echo heard by other end</string>
     <string name="audio_settings_echo_canceller_calibration_title">Echo canceller calibration</string>
     <string name="audio_settings_echo_canceller_calibration_summary">Click to start echo canceller calibration</string>
@@ -568,7 +590,7 @@
     <string name="chat_settings_launcher_shortcuts_title">Create shortcuts to chat rooms in launcher</string>
     <string name="chat_settings_launcher_shortcuts_summary">Will be replaced by contacts shortcuts if enabled</string>
     <string name="chat_settings_hide_empty_rooms_title">Hide empty chat rooms</string>
-    <string name="chat_settings_hide_rooms_removed_proxies_title">Hide chat rooms from removed proxy configs</string>
+    <string name="chat_settings_hide_rooms_removed_proxies_title">Hide chat rooms from removed accounts</string>
     <string name="chat_settings_hide_rooms_removed_proxies_summary">If you are missing chat rooms, try to uncheck this setting</string>
     <string name="chat_settings_go_to_android_notification_settings">Android notification settings</string>
     <string name="chat_settings_use_in_app_file_viewer_title">Always open files inside this app</string>
@@ -684,7 +706,7 @@
     <string name="account_settings_delete_title">Delete</string>
     <string name="account_settings_advanced_title">Advanced</string>
     <string name="account_settings_push_notification_title">Allow push notification</string>
-    <string name="account_settings_push_notification_summary">Proxy config won\'t unregister</string>
+    <string name="account_settings_push_notification_summary">Account won\'t unregister</string>
     <string name="account_settings_transport_title">Transport</string>
     <string name="account_settings_transport_udp">UDP</string>
     <string name="account_settings_transport_tcp">TCP</string>
@@ -708,6 +730,11 @@
     <string name="account_setting_conference_factory_address">Conference factory URI</string>
     <string name="account_setting_audio_video_conference_factory_address">Audio/video conference factory URI</string>
     <string name="account_setting_end_to_end_encryption_keys_server_url">E2E encryption keys server URL</string>
+    <string name="account_setting_publish_presence_title">Publish presence information</string>
+    <string name="account_setting_delete_dialog_title">Do you want to delete your account?</string>
+    <string name="account_setting_delete_generic_confirmation_dialog">Your account will only be deleted locally.\nTo delete it permanently, go on your SIP provider website.</string>
+    <string name="account_setting_delete_sip_linphone_org_confirmation_dialog">Your account will only be deleted locally.\nTo delete it permanently, go to our account management platform:</string>
+    <string name="account_setting_disable_bundle_mode_title">Disable bundle mode</string>
 
     <!-- Conferences settings -->
     <string name="conferences_settings_layout_title">Default layout</string>
@@ -756,6 +783,14 @@
     <string name="dialog_update_available">An update is available</string>
     <string name="dialog_try_open_file_as_text_title">No app found for this kind of file</string>
     <string name="dialog_try_open_file_as_text_body">Would you like to try opening it as a plain text file?</string>
+    <string name="dialog_apply_remote_provisioning_title">Do you want to download and apply configuration from this URL?</string>
+    <string name="dialog_apply_remote_provisioning_button">Apply</string>
+    <string name="dialog_authentication_required_title">Authentication needed</string>
+    <string name="dialog_authentication_required_message">Connection failed because authentication is missing or invalid for account \n%s.\n\nYou can provide password again, or check your account configuration in the settings.</string>
+    <string name="dialog_authentication_required_change_password_label">Confirm</string>
+
+    <string name="android_14_full_screen_intent_permission_not_granted">Permission required to show incoming calls not granted yet</string>
+    <string name="android_14_go_to_full_screen_intent_permission_setting">Show</string>
 
     <!-- Content description -->
     <string name="content_description_add_sip_address_field">Add a SIP address field</string>
@@ -897,4 +932,8 @@
     <string name="content_description_toggle_conference_info_details">Toggle meeting information details visibility</string>
     <string name="content_description_conference_participants">Group call participants</string>
     <string name="content_description_recording_export">Export recording</string>
+    <string name="content_description_presence_online">User is online</string>
+    <string name="content_description_presence_offline">User is offline</string>
+    <string name="content_description_presence_do_not_disturb">User is asking not to be disturbed</string>
+    <string name="content_description_emoji_picker">Toggle emoji picker visibility</string>
 </resources>

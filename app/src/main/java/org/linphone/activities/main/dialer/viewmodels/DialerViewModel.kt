@@ -49,6 +49,8 @@ class DialerViewModel : LogsUploadViewModel() {
 
     val scheduleConferenceAvailable = MutableLiveData<Boolean>()
 
+    val hideAddContactButton = MutableLiveData<Boolean>()
+
     val updateAvailableEvent: MutableLiveData<Event<String>> by lazy {
         MutableLiveData<Event<String>>()
     }
@@ -98,12 +100,21 @@ class DialerViewModel : LogsUploadViewModel() {
             atLeastOneCall.value = core.callsNb > 0
         }
 
+        override fun onTransferStateChanged(core: Core, transfered: Call, callState: Call.State) {
+            if (callState == Call.State.OutgoingProgress) {
+                // Will work for both blind & attended transfer
+                onMessageToNotifyEvent.value = Event(org.linphone.R.string.dialer_transfer_succeded)
+            }
+        }
+
         override fun onNetworkReachable(core: Core, reachable: Boolean) {
             val address = addressWaitingNetworkToBeCalled.orEmpty()
             if (reachable && address.isNotEmpty()) {
                 val now = System.currentTimeMillis()
                 if (now - timeAtWitchWeTriedToCall > 1000) {
-                    Log.e("[Dialer] More than 1 second has passed waiting for network, abort auto call to $address")
+                    Log.e(
+                        "[Dialer] More than 1 second has passed waiting for network, abort auto call to $address"
+                    )
                     enteredUri.value = address
                 } else {
                     Log.i("[Dialer] Network is available, continue auto call to $address")
@@ -123,7 +134,7 @@ class DialerViewModel : LogsUploadViewModel() {
         ) {
             if (result == VersionUpdateCheckResult.NewVersionAvailable) {
                 Log.i("[Dialer] Update available, version [$version], url [$url]")
-                if (url != null && url.isNotEmpty()) {
+                if (!url.isNullOrEmpty()) {
                     updateAvailableEvent.value = Event(url)
                 }
             }
@@ -145,6 +156,7 @@ class DialerViewModel : LogsUploadViewModel() {
         enteredUri.value = ""
         atLeastOneCall.value = coreContext.core.callsNb > 0
         transferVisibility.value = false
+        hideAddContactButton.value = corePreferences.readOnlyNativeContacts
 
         showSwitchCamera.value = coreContext.showSwitchCameraButton()
         scheduleConferenceAvailable.value = LinphoneUtils.isRemoteConferencingAvailable()
@@ -188,7 +200,9 @@ class DialerViewModel : LogsUploadViewModel() {
         if (coreContext.core.isNetworkReachable) {
             coreContext.startCall(to)
         } else {
-            Log.w("[Dialer] Network isnt't reachable at the time, wait for network to start call (happens mainly when app is cold started)")
+            Log.w(
+                "[Dialer] Network isnt't reachable at the time, wait for network to start call (happens mainly when app is cold started)"
+            )
             timeAtWitchWeTriedToCall = System.currentTimeMillis()
             addressWaitingNetworkToBeCalled = to
         }
@@ -207,18 +221,18 @@ class DialerViewModel : LogsUploadViewModel() {
     fun transferCall(): Boolean {
         val addressToCall = enteredUri.value.orEmpty()
         return if (addressToCall.isNotEmpty()) {
-            onMessageToNotifyEvent.value = Event(
-                if (coreContext.transferCallTo(addressToCall)) {
-                    org.linphone.R.string.dialer_transfer_succeded
-                } else {
-                    org.linphone.R.string.dialer_transfer_failed
-                }
-            )
+            transferCallTo(addressToCall)
             eraseAll()
             true
         } else {
             setLastOutgoingCallAddress()
             false
+        }
+    }
+
+    fun transferCallTo(addressToCall: String) {
+        if (!coreContext.transferCallTo(addressToCall)) {
+            onMessageToNotifyEvent.value = Event(org.linphone.R.string.dialer_transfer_failed)
         }
     }
 

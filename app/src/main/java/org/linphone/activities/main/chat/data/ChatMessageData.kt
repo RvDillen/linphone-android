@@ -24,12 +24,15 @@ import android.text.Spannable
 import android.util.Patterns
 import androidx.lifecycle.MutableLiveData
 import java.util.regex.Pattern
+import org.linphone.LinphoneApplication.Companion.coreContext
 import org.linphone.R
+import org.linphone.contact.ContactsUpdatedListenerStub
 import org.linphone.contact.GenericContactData
 import org.linphone.core.ChatMessage
 import org.linphone.core.ChatMessageListenerStub
 import org.linphone.core.tools.Log
 import org.linphone.utils.AppUtils
+import org.linphone.utils.Event
 import org.linphone.utils.PatternClickableSpan
 import org.linphone.utils.TimestampUtils
 
@@ -56,11 +59,17 @@ class ChatMessageData(val chatMessage: ChatMessage) : GenericContactData(chatMes
 
     val text = MutableLiveData<Spannable>()
 
+    val isTextEmoji = MutableLiveData<Boolean>()
+
     val replyData = MutableLiveData<ChatMessageData>()
 
     val isDisplayed = MutableLiveData<Boolean>()
 
     val isOutgoing = chatMessage.isOutgoing
+
+    val contactNewlyFoundEvent: MutableLiveData<Event<Boolean>> by lazy {
+        MutableLiveData<Event<Boolean>>()
+    }
 
     var hasPreviousMessage = false
     var hasNextMessage = false
@@ -78,6 +87,16 @@ class ChatMessageData(val chatMessage: ChatMessage) : GenericContactData(chatMes
         }
     }
 
+    private val contactsListener = object : ContactsUpdatedListenerStub() {
+        override fun onContactsUpdated() {
+            contactLookup()
+            if (contact.value != null) {
+                coreContext.contactsManager.removeListener(this)
+                contactNewlyFoundEvent.value = Event(true)
+            }
+        }
+    }
+
     init {
         chatMessage.addListener(listener)
 
@@ -87,7 +106,9 @@ class ChatMessageData(val chatMessage: ChatMessage) : GenericContactData(chatMes
         if (chatMessage.isReply) {
             val reply = chatMessage.replyMessage
             if (reply != null) {
-                Log.i("[Chat Message Data] Message is a reply of message id [${chatMessage.replyMessageId}] sent by [${chatMessage.replyMessageSenderAddress?.asStringUriOnly()}]")
+                Log.i(
+                    "[Chat Message Data] Message is a reply of message id [${chatMessage.replyMessageId}] sent by [${chatMessage.replyMessageSenderAddress?.asStringUriOnly()}]"
+                )
                 replyData.value = ChatMessageData(reply)
             }
         }
@@ -97,6 +118,10 @@ class ChatMessageData(val chatMessage: ChatMessage) : GenericContactData(chatMes
 
         updateChatMessageState(chatMessage.state)
         updateContentsList()
+
+        if (contact.value == null) {
+            coreContext.contactsManager.addListener(contactsListener)
+        }
     }
 
     override fun destroy() {
@@ -188,13 +213,34 @@ class ChatMessageData(val chatMessage: ChatMessage) : GenericContactData(chatMes
                 data.listener = contentListener
                 list.add(data)
             } else if (content.isText) {
-                val spannable = Spannable.Factory.getInstance().newSpannable(content.utf8Text?.trim())
+                val textContent = content.utf8Text.orEmpty().trim()
+                val spannable = Spannable.Factory.getInstance().newSpannable(textContent)
                 text.value = PatternClickableSpan()
                     .add(
-                        Pattern.compile("(?:<?sips?:)?[a-zA-Z0-9+_.\\-]+(?:@([a-zA-Z0-9+_.\\-;=~]+))+(>)?"),
+                        Pattern.compile(
+                            "(?:<?sips?:)[a-zA-Z0-9+_.\\-]+(?:@([a-zA-Z0-9+_.\\-;=~]+))+(>)?"
+                        ),
                         object : PatternClickableSpan.SpannableClickedListener {
                             override fun onSpanClicked(text: String) {
                                 Log.i("[Chat Message Data] Clicked on SIP URI: $text")
+                                contentListener?.onSipAddressClicked(text)
+                            }
+                        }
+                    )
+                    .add(
+                        Patterns.EMAIL_ADDRESS,
+                        object : PatternClickableSpan.SpannableClickedListener {
+                            override fun onSpanClicked(text: String) {
+                                Log.i("[Chat Message Data] Clicked on email address: $text")
+                                contentListener?.onEmailAddressClicked(text)
+                            }
+                        }
+                    )
+                    .add(
+                        Patterns.PHONE,
+                        object : PatternClickableSpan.SpannableClickedListener {
+                            override fun onSpanClicked(text: String) {
+                                Log.i("[Chat Message Data] Clicked on phone number: $text")
                                 contentListener?.onSipAddressClicked(text)
                             }
                         }
@@ -207,18 +253,12 @@ class ChatMessageData(val chatMessage: ChatMessage) : GenericContactData(chatMes
                                 contentListener?.onWebUrlClicked(text)
                             }
                         }
-                    )
-                    .add(
-                        Patterns.PHONE,
-                        object : PatternClickableSpan.SpannableClickedListener {
-                            override fun onSpanClicked(text: String) {
-                                Log.i("[Chat Message Data] Clicked on phone number: $text")
-                                contentListener?.onSipAddressClicked(text)
-                            }
-                        }
                     ).build(spannable)
+                isTextEmoji.value = AppUtils.isTextOnlyContainingEmoji(textContent)
             } else {
-                Log.e("[Chat Message Data] Unexpected content with type: ${content.type}/${content.subtype}")
+                Log.e(
+                    "[Chat Message Data] Unexpected content with type: ${content.type}/${content.subtype}"
+                )
             }
         }
 
@@ -253,7 +293,12 @@ class ChatMessageData(val chatMessage: ChatMessage) : GenericContactData(chatMes
         val days = seconds / 86400
         return when {
             days >= 1L -> AppUtils.getStringWithPlural(R.plurals.days, days.toInt())
-            else -> String.format("%02d:%02d:%02d", seconds / 3600, (seconds % 3600) / 60, (seconds % 60))
+            else -> String.format(
+                "%02d:%02d:%02d",
+                seconds / 3600,
+                (seconds % 3600) / 60,
+                (seconds % 60)
+            )
         }
     }
 }

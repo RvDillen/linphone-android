@@ -131,6 +131,7 @@
                     layout="@layout/settings_widget_basic"
                     linphone:title="@{@string/account_settings_link_phone_number_title}"
                     linphone:listener="@{viewModel.linkPhoneNumberListener}"
+                    linphone:enabled="@{viewModel.pushNotificationsAvailable}"
                     android:visibility="@{viewModel.hideLinkPhoneNumber ? View.GONE : View.VISIBLE}"/>
 
                 <include
@@ -257,6 +258,12 @@
                     linphone:defaultValue="@{viewModel.limeServerUrl}"
                     android:visibility="gone"
                     linphone:inputType="@{InputType.TYPE_CLASS_TEXT}"/>
+
+                <include
+                    layout="@layout/settings_widget_switch"
+                    linphone:title="@{@string/account_setting_disable_bundle_mode_title}"
+                    linphone:listener="@{viewModel.disableBundleModeListener}"
+                    linphone:checked="@={viewModel.disableBundleMode}"/>
 
             </LinearLayout>
 

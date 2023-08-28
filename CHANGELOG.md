@@ -10,7 +10,62 @@ Group changes to describe their impact on the project, as follows:
     Fixed for any bug fixes.
     Security to invite users to upgrade in case of vulnerabilities.
 
-## [5.0.10] - 2023-01-04
+## [5.1.0] - 2023-08-21
+
+### Added
+- Showing short term presence for contacts whom publish it + added setting to disable it (enabled by default for sip.linphone.org accounts)
+- Confirmation dialog before removing account
+- Attended transfer instead of blind transfer if there is more than 1 call
+- Last sent message delivery status (IMDN) icon in chat rooms list
+- Emoji picker in chat room, and increase size of text if it only contains emojis
+- Hidden setting to disable video completely
+- Hidden setting to prevent adding / editing / removing native contacts
+- Hidden setting to protect settings access using account password
+- SIP URI in call can be selected using long press
+- Dialog showing up asking for correct account password in case of failed authentication
+
+### Changed
+- Switched Account Creator backend from XMLRPC to FlexiAPI, it now requires to be able to receive a push notification
+- Email account creation form is now only available if TELEPHONY feature is not available, not related to screen size anymore
+- Replaced voice recordings file name by localized placeholder text, like for video conferences invitations
+- Decline incoming calls with Busy reason if there is at least another active call
+- Open keyboard when replying to a message if no text / file / voice record is pending
+- Removed jetifier as it is not needed
+- Switched from gradle 7.5 to 8.0, requires JDK 17 (instead of 11)
+
+### Fixed
+- Messages not marked as reply in basic chat room if sending more than 1 content
+- Chat message video attachment display when failing to get a preview picture
+
+## [5.0.14] - 2023-06-20
+
+### Changed
+- SDK update only
+
+## [5.0.13] - 2023-06-15
+
+### Changed
+- SDK update only
+
+## [5.0.12] - 2023-05-23
+
+### Fixed
+- Crash if notification manager throws an exception
+- Video preview not moving if call was started in audio only
+
+## [5.0.11] - 2023-05-09
+
+### Fixed
+- Wrong call displayed when hanging up a call while an incoming one is ringing
+- Crash related to call history
+- Crash due to wrongly format string
+- Add/remove missing listener on FriendLists created after Core has been created
+
+### Changed
+- Improved GSM call interruption
+- Updated translations
+
+## [5.0.10] - 2023-04-04
 
 ### Fixed
 - Plain copy of encrypted files (when VFS is enabled) not cleaned
@@ -27,9 +82,6 @@ Group changes to describe their impact on the project, as follows:
 - Now SDK automatically handles TextureView's listener, removed it from app
 - Bumped license year to 2023
 - Force remove LIME X3DH server URL for third party accounts
-
-### Fixed
-- Plain copy of encrypted files (when VFS is enabled) not cleaned
 
 ## [5.0.8] - 2023-03-20
 
@@ -62,7 +114,6 @@ Group changes to describe their impact on the project, as follows:
 
 ### Changed
 - Improved incoming call layout when receiving early-media video
-- Disable some actions in left chat rooms
 - Hidden "Echo Tester" setting unless in debug mode as it can mislead user and isn't useful for end user
 
 ## [5.0.5] - 2023-01-19

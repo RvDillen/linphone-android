@@ -31,6 +31,7 @@ import org.linphone.activities.main.settings.SettingListenerStub
 import org.linphone.core.*
 import org.linphone.core.tools.Log
 import org.linphone.utils.Event
+import org.linphone.utils.LinphoneUtils
 
 class AccountSettingsViewModelFactory(private val identity: String) :
     ViewModelProvider.NewInstanceFactory() {
@@ -85,7 +86,9 @@ class AccountSettingsViewModel(val account: Account) : GenericSettingsViewModel(
             message: String
         ) {
             if (state == RegistrationState.Cleared && account == accountToDelete) {
-                Log.i("[Account Settings] Account to remove registration is now cleared")
+                Log.i(
+                    "[Account Settings] Account to remove ([${account.params.identityAddress?.asStringUriOnly()}]) registration is now cleared, removing it"
+                )
                 waitForUnregister.value = false
                 deleteAccount(account)
             } else {
@@ -117,7 +120,9 @@ class AccountSettingsViewModel(val account: Account) : GenericSettingsViewModel(
                     params.identityAddress = newIdentityAddress
                     account.params = params
                 } else {
-                    Log.e("[Account Settings] Failed to create identity address sip:$newValue@$domain")
+                    Log.e(
+                        "[Account Settings] Failed to create identity address sip:$newValue@$domain"
+                    )
                 }
             }
         }
@@ -153,10 +158,19 @@ class AccountSettingsViewModel(val account: Account) : GenericSettingsViewModel(
                 val identity = params.identityAddress
                 if (identity != null && identity.username != null) {
                     val newAuthInfo = Factory.instance()
-                        .createAuthInfo(identity.username!!, userId.value, newValue, null, null, identity.domain)
+                        .createAuthInfo(
+                            identity.username!!,
+                            userId.value,
+                            newValue,
+                            null,
+                            null,
+                            identity.domain
+                        )
                     core.addAuthInfo(newAuthInfo)
                 } else {
-                    Log.e("[Account Settings] Failed to find the user's identity, can't create a new auth info")
+                    Log.e(
+                        "[Account Settings] Failed to find the user's identity, can't create a new auth info"
+                    )
                 }
             }
         }
@@ -232,35 +246,16 @@ class AccountSettingsViewModel(val account: Account) : GenericSettingsViewModel(
         }
 
         core.removeAccount(account)
+        accountToDelete = null
         accountRemovedEvent.value = Event(true)
     }
 
+    val deleteAccountRequiredEvent: MutableLiveData<Event<Boolean>> by lazy {
+        MutableLiveData<Event<Boolean>>()
+    }
     val deleteListener = object : SettingListenerStub() {
         override fun onClicked() {
-            accountToDelete = account
-
-            val registered = account.state == RegistrationState.Ok
-            waitForUnregister.value = registered
-
-            if (core.defaultAccount == account) {
-                Log.i("[Account Settings] Account was default, let's look for a replacement")
-                for (accountIterator in core.accountList) {
-                    if (account != accountIterator) {
-                        core.defaultAccount = accountIterator
-                        Log.i("[Account Settings] New default account is $accountIterator")
-                        break
-                    }
-                }
-            }
-
-            val params = account.params.clone()
-            params.isRegisterEnabled = false
-            account.params = params
-
-            if (!registered) {
-                Log.w("[Account Settings] Account isn't registered, don't unregister before removing it")
-                deleteAccount(account)
-            }
+            deleteAccountRequiredEvent.value = Event(true)
         }
     }
 
@@ -294,7 +289,7 @@ class AccountSettingsViewModel(val account: Account) : GenericSettingsViewModel(
                 account.params = params
                 transportIndex.value = account.params.transport.toInt()
             } else {
-                Log.e("[Account Settings] Couldn't parse address: $address")
+                Log.e("[Account Settings] Couldn't parse address: $newValue")
             }
         }
     }
@@ -409,7 +404,9 @@ class AccountSettingsViewModel(val account: Account) : GenericSettingsViewModel(
     val conferenceFactoryUriListener = object : SettingListenerStub() {
         override fun onTextValueChanged(newValue: String) {
             val params = account.params.clone()
-            Log.i("[Account Settings] Forcing conference factory on proxy config ${params.identityAddress?.asString()} to value: $newValue")
+            Log.i(
+                "[Account Settings] Forcing conference factory on account ${params.identityAddress?.asString()} to value: $newValue"
+            )
             params.conferenceFactoryUri = newValue
             account.params = params
         }
@@ -420,7 +417,9 @@ class AccountSettingsViewModel(val account: Account) : GenericSettingsViewModel(
         override fun onTextValueChanged(newValue: String) {
             val params = account.params.clone()
             val uri = coreContext.core.interpretUrl(newValue, false)
-            Log.i("[Account Settings] Forcing audio/video conference factory on proxy config ${params.identityAddress?.asString()} to value: $newValue")
+            Log.i(
+                "[Account Settings] Forcing audio/video conference factory on account ${params.identityAddress?.asString()} to value: $newValue"
+            )
             params.audioVideoConferenceFactoryAddress = uri
             account.params = params
         }
@@ -435,6 +434,15 @@ class AccountSettingsViewModel(val account: Account) : GenericSettingsViewModel(
         }
     }
     val limeServerUrl = MutableLiveData<String>()
+
+    val disableBundleModeListener = object : SettingListenerStub() {
+        override fun onBoolValueChanged(newValue: Boolean) {
+            val params = account.params.clone()
+            params.isRtpBundleEnabled = !newValue
+            account.params = params
+        }
+    }
+    val disableBundleMode = MutableLiveData<Boolean>()
 
     init {
         update()
@@ -479,7 +487,7 @@ class AccountSettingsViewModel(val account: Account) : GenericSettingsViewModel(
         domain.value = params.identityAddress?.domain
         disable.value = !params.isRegisterEnabled
         pushNotification.value = params.pushNotificationAllowed
-        pushNotificationsAvailable.value = core.isPushNotificationAvailable
+        pushNotificationsAvailable.value = LinphoneUtils.isPushNotificationAvailable()
         proxy.value = params.serverAddress?.asStringUriOnly()
         outboundProxy.value = params.isOutboundProxyEnabled
         stunServer.value = params.natPolicy?.stunServer
@@ -496,6 +504,7 @@ class AccountSettingsViewModel(val account: Account) : GenericSettingsViewModel(
         limeServerUrl.value = params.limeServerUrl
 
         hideLinkPhoneNumber.value = corePreferences.hideLinkPhoneNumber || params.identityAddress?.domain != corePreferences.defaultDomain
+        disableBundleMode.value = !params.isRtpBundleEnabled
     }
 
     private fun initTransportList() {
@@ -511,5 +520,43 @@ class AccountSettingsViewModel(val account: Account) : GenericSettingsViewModel(
 
         transportLabels.value = labels
         transportIndex.value = account.params.transport.toInt()
+    }
+
+    fun startDeleteAccount() {
+        Log.i(
+            "[Account Settings] Starting to delete account [${account.params.identityAddress?.asStringUriOnly()}]"
+        )
+        accountToDelete = account
+
+        val registered = account.state == RegistrationState.Ok
+        waitForUnregister.value = registered
+
+        if (core.defaultAccount == account) {
+            Log.i("[Account Settings] Account was default, let's look for a replacement")
+            for (accountIterator in core.accountList) {
+                if (account != accountIterator) {
+                    core.defaultAccount = accountIterator
+                    Log.i(
+                        "[Account Settings] New default account is [${accountIterator.params.identityAddress?.asStringUriOnly()}]"
+                    )
+                    break
+                }
+            }
+        }
+
+        val params = account.params.clone()
+        params.isRegisterEnabled = false
+        account.params = params
+
+        if (!registered) {
+            Log.w(
+                "[Account Settings] Account isn't registered, don't unregister before removing it"
+            )
+            deleteAccount(account)
+        } else {
+            Log.i(
+                "[Account Settings] Waiting for account registration to be cleared before removing it"
+            )
+        }
     }
 }

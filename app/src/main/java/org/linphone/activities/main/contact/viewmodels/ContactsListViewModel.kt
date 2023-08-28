@@ -40,6 +40,12 @@ class ContactsListViewModel : ViewModel() {
 
     val nativeAddressBookEnabled = MutableLiveData<Boolean>()
 
+    val readOnlyNativeAddressBook = MutableLiveData<Boolean>()
+
+    val hideSipContactsList = MutableLiveData<Boolean>()
+
+    val onlyShowSipContactsList = MutableLiveData<Boolean>()
+
     val fetchInProgress = MutableLiveData<Boolean>()
     private var searchResultsPending: Boolean = false
     private var fastFetchJob: Job? = null
@@ -75,6 +81,16 @@ class ContactsListViewModel : ViewModel() {
     init {
         sipContactsSelected.value = coreContext.contactsManager.shouldDisplaySipContactsList()
         nativeAddressBookEnabled.value = corePreferences.enableNativeAddressBookIntegration
+        readOnlyNativeAddressBook.value = corePreferences.readOnlyNativeContacts
+
+        onlyShowSipContactsList.value = corePreferences.onlyShowSipContactsList
+        hideSipContactsList.value = corePreferences.hideSipContactsList
+        if (onlyShowSipContactsList.value == true) {
+            sipContactsSelected.value = true
+        }
+        if (hideSipContactsList.value == true) {
+            sipContactsSelected.value = false
+        }
 
         coreContext.contactsManager.addListener(contactsUpdatedListener)
         coreContext.contactsManager.magicSearch.addListener(magicSearchListener)
@@ -103,12 +119,19 @@ class ContactsListViewModel : ViewModel() {
         previousFilter = filterValue
 
         val domain = if (sipContactsSelected.value == true) coreContext.core.defaultAccount?.params?.domain ?: "" else ""
-        val filter = MagicSearchSource.Friends.toInt() or MagicSearchSource.LdapServers.toInt()
+        val sources = MagicSearchSource.Friends.toInt() or MagicSearchSource.LdapServers.toInt()
         val aggregation = MagicSearchAggregation.Friend
         searchResultsPending = true
         fastFetchJob?.cancel()
-        Log.i("[Contacts] Asking Magic search for contacts matching filter [$filterValue], domain [$domain] and in sources [$filter]")
-        coreContext.contactsManager.magicSearch.getContactsListAsync(filterValue, domain, filter, aggregation)
+        Log.i(
+            "[Contacts] Asking Magic search for contacts matching filter [$filterValue], domain [$domain] and in sources [$sources]"
+        )
+        coreContext.contactsManager.magicSearch.getContactsListAsync(
+            filterValue,
+            domain,
+            sources,
+            aggregation
+        )
 
         val spinnerDelay = corePreferences.delayBeforeShowingContactsSearchSpinner.toLong()
         fastFetchJob = viewModelScope.launch {
@@ -138,7 +161,9 @@ class ContactsListViewModel : ViewModel() {
                         ContactViewModel(friend, true)
                     } else {
                         Log.w("[Contacts] SearchResult [$result] has no Friend!")
-                        val fakeFriend = coreContext.contactsManager.createFriendFromSearchResult(result)
+                        val fakeFriend = coreContext.contactsManager.createFriendFromSearchResult(
+                            result
+                        )
                         ContactViewModel(fakeFriend, true)
                     }
 

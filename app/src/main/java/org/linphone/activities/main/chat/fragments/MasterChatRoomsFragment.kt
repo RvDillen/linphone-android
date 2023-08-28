@@ -133,7 +133,9 @@ class MasterChatRoomsFragment : MasterFragment<ChatRoomMasterFragmentBinding, Ch
                     val navHostFragment =
                         childFragmentManager.findFragmentById(R.id.chat_nav_container) as NavHostFragment
                     if (navHostFragment.navController.currentDestination?.id == R.id.emptyChatFragment) {
-                        Log.i("[Chat] Foldable device has been folded, closing side pane with empty fragment")
+                        Log.i(
+                            "[Chat] Foldable device has been folded, closing side pane with empty fragment"
+                        )
                         binding.slidingPane.closePane()
                     }
                 }
@@ -157,6 +159,7 @@ class MasterChatRoomsFragment : MasterFragment<ChatRoomMasterFragmentBinding, Ch
         // SubmitList is done on a background thread
         // We need this adapter data observer to know when to scroll
         adapter.registerAdapterDataObserver(observer)
+
         binding.chatList.setHasFixedSize(true)
         binding.chatList.adapter = adapter
 
@@ -183,14 +186,15 @@ class MasterChatRoomsFragment : MasterFragment<ChatRoomMasterFragmentBinding, Ch
                 if (index < 0 || index >= adapter.currentList.size) {
                     Log.e("[Chat] Index is out of bound, can't mark chat room as read")
                 } else {
-                    val chatRoom = adapter.currentList[viewHolder.bindingAdapterPosition]
-                    chatRoom.markAsRead()
-                    adapter.notifyItemChanged(viewHolder.bindingAdapterPosition)
+                    val data = adapter.currentList[viewHolder.bindingAdapterPosition]
+                    data.markAsRead()
                 }
             }
 
             override fun onRightToLeftSwipe(viewHolder: RecyclerView.ViewHolder) {
                 val viewModel = DialogViewModel(getString(R.string.chat_room_delete_one_dialog))
+                viewModel.showIcon = true
+                viewModel.iconResource = R.drawable.dialog_delete_icon
                 val dialog: Dialog = DialogUtils.getDialog(requireContext(), viewModel)
 
                 val index = viewHolder.bindingAdapterPosition
@@ -205,12 +209,14 @@ class MasterChatRoomsFragment : MasterFragment<ChatRoomMasterFragmentBinding, Ch
                     viewModel.showDeleteButton(
                         {
                             val deletedChatRoom =
-                                adapter.currentList[index]
+                                adapter.currentList[index].chatRoom
                             listViewModel.deleteChatRoom(deletedChatRoom)
                             if (!binding.slidingPane.isSlideable &&
                                 deletedChatRoom == sharedViewModel.selectedChatRoom.value
                             ) {
-                                Log.i("[Chat] Currently displayed chat room has been deleted, removing detail fragment")
+                                Log.i(
+                                    "[Chat] Currently displayed chat room has been deleted, removing detail fragment"
+                                )
                                 clearDisplayedChatRoom()
                             }
                             dialog.dismiss()
@@ -222,11 +228,17 @@ class MasterChatRoomsFragment : MasterFragment<ChatRoomMasterFragmentBinding, Ch
                 }
             }
         }
-        RecyclerViewSwipeUtils(ItemTouchHelper.LEFT or ItemTouchHelper.RIGHT, swipeConfiguration, swipeListener)
+        RecyclerViewSwipeUtils(
+            ItemTouchHelper.LEFT or ItemTouchHelper.RIGHT,
+            swipeConfiguration,
+            swipeListener
+        )
             .attachToRecyclerView(binding.chatList)
 
         // Divider between items
-        binding.chatList.addItemDecoration(AppUtils.getDividerDecoration(requireContext(), layoutManager))
+        binding.chatList.addItemDecoration(
+            AppUtils.getDividerDecoration(requireContext(), layoutManager)
+        )
 
         listViewModel.chatRooms.observe(
             viewLifecycleOwner
@@ -254,7 +266,9 @@ class MasterChatRoomsFragment : MasterFragment<ChatRoomMasterFragmentBinding, Ch
                         if (!binding.slidingPane.isOpen) {
                             Log.w("[Chat] Chat room is displayed but sliding pane is closed...")
                             if (!binding.slidingPane.openPane()) {
-                                Log.e("[Chat] Tried to open pane to workaround already displayed chat room issue, failed!")
+                                Log.e(
+                                    "[Chat] Tried to open pane to workaround already displayed chat room issue, failed!"
+                                )
                             }
                         } else {
                             Log.w("[Chat] This chat room is already displayed!")
@@ -312,11 +326,18 @@ class MasterChatRoomsFragment : MasterFragment<ChatRoomMasterFragmentBinding, Ch
         val localSipUri = arguments?.getString("LocalSipUri")
         val remoteSipUri = arguments?.getString("RemoteSipUri")
         if (localSipUri != null && remoteSipUri != null) {
-            Log.i("[Chat] Found local [$localSipUri] & remote [$remoteSipUri] addresses in arguments")
+            Log.i(
+                "[Chat] Found local [$localSipUri] & remote [$remoteSipUri] addresses in arguments"
+            )
             arguments?.clear()
             val localAddress = Factory.instance().createAddress(localSipUri)
             val remoteSipAddress = Factory.instance().createAddress(remoteSipUri)
-            val chatRoom = coreContext.core.searchChatRoom(null, localAddress, remoteSipAddress, arrayOfNulls(0))
+            val chatRoom = coreContext.core.searchChatRoom(
+                null,
+                localAddress,
+                remoteSipAddress,
+                arrayOfNulls(0)
+            )
             if (chatRoom != null) {
                 Log.i("[Chat] Found matching chat room $chatRoom")
                 adapter.selectedChatRoomEvent.value = Event(chatRoom)
@@ -378,7 +399,7 @@ class MasterChatRoomsFragment : MasterFragment<ChatRoomMasterFragmentBinding, Ch
         val list = ArrayList<ChatRoom>()
         var closeSlidingPane = false
         for (index in indexesOfItemToDelete) {
-            val chatRoom = adapter.currentList[index]
+            val chatRoom = adapter.currentList[index].chatRoom
             list.add(chatRoom)
 
             if (chatRoom == sharedViewModel.selectedChatRoom.value) {

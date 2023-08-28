@@ -31,19 +31,24 @@ import org.linphone.LinphoneApplication.Companion.coreContext
 import org.linphone.LinphoneApplication.Companion.corePreferences
 import org.linphone.R
 import org.linphone.contact.ContactDataInterface
+import org.linphone.contact.ContactsUpdatedListenerStub
 import org.linphone.core.*
 import org.linphone.core.tools.Log
 import org.linphone.utils.AppUtils
+import org.linphone.utils.Event
 import org.linphone.utils.LinphoneUtils
 import org.linphone.utils.TimestampUtils
 
-class ChatRoomData(private val chatRoom: ChatRoom) : ContactDataInterface {
+class ChatRoomData(val chatRoom: ChatRoom) : ContactDataInterface {
     override val contact: MutableLiveData<Friend> = MutableLiveData<Friend>()
     override val displayName: MutableLiveData<String> = MutableLiveData<String>()
     override val securityLevel: MutableLiveData<ChatRoomSecurityLevel> = MutableLiveData<ChatRoomSecurityLevel>()
     override val showGroupChatAvatar: Boolean
-        get() = conferenceChatRoom && !oneToOneChatRoom
+        get() = !oneToOneChatRoom
+    override val presenceStatus: MutableLiveData<ConsolidatedPresence> = MutableLiveData<ConsolidatedPresence>()
     override val coroutineScope: CoroutineScope = coreContext.coroutineScope
+
+    val id = LinphoneUtils.getChatRoomId(chatRoom)
 
     val unreadMessagesCount = MutableLiveData<Int>()
 
@@ -59,6 +64,10 @@ class ChatRoomData(private val chatRoom: ChatRoom) : ContactDataInterface {
 
     val lastMessageText = MutableLiveData<SpannableStringBuilder>()
 
+    val showLastMessageImdnIcon = MutableLiveData<Boolean>()
+
+    val lastMessageImdnIcon = MutableLiveData<Int>()
+
     val notificationsMuted = MutableLiveData<Boolean>()
 
     private val basicChatRoom: Boolean by lazy {
@@ -69,15 +78,37 @@ class ChatRoomData(private val chatRoom: ChatRoom) : ContactDataInterface {
         chatRoom.hasCapability(ChatRoomCapabilities.OneToOne.toInt())
     }
 
-    private val conferenceChatRoom: Boolean by lazy {
-        chatRoom.hasCapability(ChatRoomCapabilities.Conference.toInt())
-    }
-
     val encryptedChatRoom: Boolean by lazy {
         chatRoom.hasCapability(ChatRoomCapabilities.Encrypted.toInt())
     }
 
+    val contactNewlyFoundEvent: MutableLiveData<Event<Boolean>> by lazy {
+        MutableLiveData<Event<Boolean>>()
+    }
+
+    private val contactsListener = object : ContactsUpdatedListenerStub() {
+        override fun onContactsUpdated() {
+            if (contact.value == null && oneToOneChatRoom) {
+                searchMatchingContact()
+            }
+            if (!oneToOneChatRoom) {
+                formatLastMessage(chatRoom.lastMessageInHistory)
+            }
+        }
+    }
+
     init {
+        coreContext.contactsManager.addListener(contactsListener)
+
+        lastUpdate.value = "00:00"
+        presenceStatus.value = ConsolidatedPresence.Offline
+    }
+
+    fun destroy() {
+        coreContext.contactsManager.removeListener(contactsListener)
+    }
+
+    fun update() {
         unreadMessagesCount.value = chatRoom.unreadMessagesCount
 
         subject.value = chatRoom.subject
@@ -88,6 +119,11 @@ class ChatRoomData(private val chatRoom: ChatRoom) : ContactDataInterface {
         formatLastMessage(chatRoom.lastMessageInHistory)
 
         notificationsMuted.value = areNotificationsMuted()
+    }
+
+    fun markAsRead() {
+        chatRoom.markAsRead()
+        unreadMessagesCount.value = 0
     }
 
     private fun updateSecurityIcon() {
@@ -107,19 +143,10 @@ class ChatRoomData(private val chatRoom: ChatRoom) : ContactDataInterface {
     }
 
     private fun contactLookup() {
-        displayName.value = when {
-            basicChatRoom -> LinphoneUtils.getDisplayName(
-                chatRoom.peerAddress
-            )
-            oneToOneChatRoom -> LinphoneUtils.getDisplayName(
-                chatRoom.participants.firstOrNull()?.address ?: chatRoom.peerAddress
-            )
-            conferenceChatRoom -> chatRoom.subject.orEmpty()
-            else -> chatRoom.peerAddress.asStringUriOnly()
-        }
-
         if (oneToOneChatRoom) {
             searchMatchingContact()
+        } else {
+            displayName.value = chatRoom.subject ?: chatRoom.peerAddress.asStringUriOnly()
         }
     }
 
@@ -127,21 +154,41 @@ class ChatRoomData(private val chatRoom: ChatRoom) : ContactDataInterface {
         val remoteAddress = if (basicChatRoom) {
             chatRoom.peerAddress
         } else {
-            if (chatRoom.participants.isNotEmpty()) {
-                chatRoom.participants[0].address
+            val participants = chatRoom.participants
+            if (participants.isNotEmpty()) {
+                participants.first().address
             } else {
-                Log.e("[Chat Room] ${chatRoom.peerAddress} doesn't have any participant (state ${chatRoom.state})!")
+                Log.e(
+                    "[Chat Room] ${chatRoom.peerAddress} doesn't have any participant (state ${chatRoom.state})!"
+                )
                 null
             }
         }
+
         if (remoteAddress != null) {
-            contact.value = coreContext.contactsManager.findContactByAddress(remoteAddress)
+            val friend = coreContext.contactsManager.findContactByAddress(remoteAddress)
+            if (friend != null) {
+                val newlyFound = contact.value == null
+
+                contact.value = friend!!
+                presenceStatus.value = friend.consolidatedPresence
+                friend.addListener {
+                    presenceStatus.value = it.consolidatedPresence
+                }
+
+                if (newlyFound) {
+                    contactNewlyFoundEvent.value = Event(true)
+                }
+            } else {
+                displayName.value = LinphoneUtils.getDisplayName(remoteAddress)
+            }
+        } else {
+            displayName.value = chatRoom.peerAddress.asStringUriOnly()
         }
     }
 
     private fun formatLastMessage(msg: ChatMessage?) {
         val lastUpdateTime = chatRoom.lastUpdateTime
-        lastUpdate.value = "00:00"
         coroutineScope.launch {
             withContext(Dispatchers.IO) {
                 lastUpdate.postValue(TimestampUtils.toString(lastUpdateTime, true))
@@ -151,20 +198,50 @@ class ChatRoomData(private val chatRoom: ChatRoom) : ContactDataInterface {
         val builder = SpannableStringBuilder()
         if (msg == null) {
             lastMessageText.value = builder
+            showLastMessageImdnIcon.value = false
             return
         }
 
-        val sender: String =
-            coreContext.contactsManager.findContactByAddress(msg.fromAddress)?.name
-                ?: LinphoneUtils.getDisplayName(msg.fromAddress)
-        builder.append(sender)
-        builder.append(": ")
+        if (msg.isOutgoing && msg.state != ChatMessage.State.Displayed) {
+            msg.addListener(object : ChatMessageListenerStub() {
+                override fun onMsgStateChanged(message: ChatMessage, state: ChatMessage.State) {
+                    computeLastMessageImdnIcon(message)
+                }
+            })
+        }
+        computeLastMessageImdnIcon(msg)
+
+        if (!oneToOneChatRoom) {
+            val sender: String =
+                coreContext.contactsManager.findContactByAddress(msg.fromAddress)?.name
+                    ?: LinphoneUtils.getDisplayName(msg.fromAddress)
+            builder.append(
+                coreContext.context.getString(R.string.chat_room_last_message_sender_format, sender)
+            )
+            builder.append(" ")
+        }
 
         for (content in msg.contents) {
             if (content.isIcalendar) {
                 val body = AppUtils.getString(R.string.conference_invitation)
                 builder.append(body)
-                builder.setSpan(StyleSpan(Typeface.ITALIC), builder.length - body.length, builder.length, 0)
+                builder.setSpan(
+                    StyleSpan(Typeface.ITALIC),
+                    builder.length - body.length,
+                    builder.length,
+                    0
+                )
+                break
+            } else if (content.isVoiceRecording) {
+                val body = AppUtils.getString(R.string.chat_message_voice_recording)
+                builder.append(body)
+                builder.setSpan(
+                    StyleSpan(Typeface.ITALIC),
+                    builder.length - body.length,
+                    builder.length,
+                    0
+                )
+                break
             } else if (content.isFile || content.isFileTransfer) {
                 builder.append(content.name + " ")
             } else if (content.isText) {
@@ -176,8 +253,26 @@ class ChatRoomData(private val chatRoom: ChatRoom) : ContactDataInterface {
         lastMessageText.value = builder
     }
 
+    private fun computeLastMessageImdnIcon(msg: ChatMessage) {
+        val state = msg.state
+        showLastMessageImdnIcon.value = if (msg.isOutgoing) {
+            when (state) {
+                ChatMessage.State.DeliveredToUser, ChatMessage.State.Displayed,
+                ChatMessage.State.NotDelivered, ChatMessage.State.FileTransferError -> true
+                else -> false
+            }
+        } else {
+            false
+        }
+        lastMessageImdnIcon.value = when (state) {
+            ChatMessage.State.DeliveredToUser -> R.drawable.chat_delivered
+            ChatMessage.State.Displayed -> R.drawable.chat_read
+            ChatMessage.State.FileTransferError, ChatMessage.State.NotDelivered -> R.drawable.chat_error
+            else -> R.drawable.chat_error
+        }
+    }
+
     private fun areNotificationsMuted(): Boolean {
-        val id = LinphoneUtils.getChatRoomId(chatRoom.localAddress, chatRoom.peerAddress)
         return corePreferences.chatRoomMuted(id)
     }
 }

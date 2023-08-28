@@ -35,6 +35,8 @@ dependencyResolutionManagement {
         // Open the local Gradle cache (default location: %userprofile%\.gradle\caches\modules-2\files-2.1 )
         // Check if the desired version is present.
         // If it does exist, upload the version from cache into CLB Maven
+        // For "org.jlleitschuh.gradle:ktlint-gradle"
+        mavenCentral()
     }
 }
 include ':app'

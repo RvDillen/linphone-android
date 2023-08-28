@@ -103,6 +103,8 @@ class ConferenceWaitingRoomViewModel : MessageNotifierViewModel() {
         }
     }
 
+    val hideVideo = corePreferences.disableVideo
+
     private val callParams: CallParams = coreContext.core.createCallParams(null)!!
 
     private val listener: CoreListenerStub = object : CoreListenerStub() {
@@ -123,7 +125,9 @@ class ConferenceWaitingRoomViewModel : MessageNotifierViewModel() {
                     leaveWaitingRoomEvent.value = Event(true)
                 }
                 Call.State.Error -> {
-                    Log.w("[Conference Waiting Room] Call has failed, leaving waiting room fragment")
+                    Log.w(
+                        "[Conference Waiting Room] Call has failed, leaving waiting room fragment"
+                    )
                     leaveWaitingRoomEvent.value = Event(true)
                 }
                 else -> {}
@@ -136,7 +140,9 @@ class ConferenceWaitingRoomViewModel : MessageNotifierViewModel() {
             state: Conference.State?
         ) {
             if (state == Conference.State.Created) {
-                Log.i("[Conference Waiting Room] Conference has been created, leaving waiting room fragment")
+                Log.i(
+                    "[Conference Waiting Room] Conference has been created, leaving waiting room fragment"
+                )
                 leaveWaitingRoomEvent.value = Event(true)
             }
         }
@@ -154,8 +160,12 @@ class ConferenceWaitingRoomViewModel : MessageNotifierViewModel() {
         val core = coreContext.core
         core.addListener(listener)
 
-        audioRoutesMenuTranslateY.value = AppUtils.getDimension(R.dimen.voip_audio_routes_menu_translate_y)
-        conferenceLayoutMenuTranslateY.value = AppUtils.getDimension(R.dimen.voip_audio_routes_menu_translate_y)
+        audioRoutesMenuTranslateY.value = AppUtils.getDimension(
+            R.dimen.voip_audio_routes_menu_translate_y
+        )
+        conferenceLayoutMenuTranslateY.value = AppUtils.getDimension(
+            R.dimen.voip_audio_routes_menu_translate_y
+        )
 
         val reachable = core.isNetworkReachable
         networkReachable.value = reachable
@@ -164,7 +174,9 @@ class ConferenceWaitingRoomViewModel : MessageNotifierViewModel() {
         }
 
         callParams.isMicEnabled = PermissionHelper.get().hasRecordAudioPermission() && coreContext.core.isMicEnabled
-        Log.i("[Conference Waiting Room] Microphone will be ${if (callParams.isMicEnabled) "enabled" else "muted"}")
+        Log.i(
+            "[Conference Waiting Room] Microphone will be ${if (callParams.isMicEnabled) "enabled" else "muted"}"
+        )
         updateMicState()
 
         callParams.isVideoEnabled = isVideoAvailableInCore()
@@ -173,7 +185,9 @@ class ConferenceWaitingRoomViewModel : MessageNotifierViewModel() {
 
         isLowBandwidth.value = false
         if (LinphoneUtils.checkIfNetworkHasLowBandwidth(coreContext.context)) {
-            Log.w("[Conference Waiting Room] Enabling low bandwidth mode, forcing audio only layout!")
+            Log.w(
+                "[Conference Waiting Room] Enabling low bandwidth mode, forcing audio only layout!"
+            )
             callParams.isLowBandwidthEnabled = true
             callParams.isVideoEnabled = false
             callParams.videoDirection = MediaDirection.Inactive
@@ -222,7 +236,9 @@ class ConferenceWaitingRoomViewModel : MessageNotifierViewModel() {
         }
 
         callParams.isMicEnabled = !callParams.isMicEnabled
-        Log.i("[Conference Waiting Room] Microphone will be ${if (callParams.isMicEnabled) "enabled" else "muted"}")
+        Log.i(
+            "[Conference Waiting Room] Microphone will be ${if (callParams.isMicEnabled) "enabled" else "muted"}"
+        )
         updateMicState()
     }
 
@@ -252,10 +268,14 @@ class ConferenceWaitingRoomViewModel : MessageNotifierViewModel() {
     fun setBluetoothAudioRoute() {
         Log.i("[Conference Waiting Room] Set default output audio device to Bluetooth")
         callParams.outputAudioDevice = coreContext.core.audioDevices.find {
-            it.type == AudioDevice.Type.Bluetooth && it.hasCapability(AudioDevice.Capabilities.CapabilityPlay)
+            it.type == AudioDevice.Type.Bluetooth && it.hasCapability(
+                AudioDevice.Capabilities.CapabilityPlay
+            )
         }
         callParams.inputAudioDevice = coreContext.core.audioDevices.find {
-            it.type == AudioDevice.Type.Bluetooth && it.hasCapability(AudioDevice.Capabilities.CapabilityRecord)
+            it.type == AudioDevice.Type.Bluetooth && it.hasCapability(
+                AudioDevice.Capabilities.CapabilityRecord
+            )
         }
         updateAudioRouteState()
 
@@ -268,10 +288,14 @@ class ConferenceWaitingRoomViewModel : MessageNotifierViewModel() {
     fun setSpeakerAudioRoute() {
         Log.i("[Conference Waiting Room] Set default output audio device to Speaker")
         callParams.outputAudioDevice = coreContext.core.audioDevices.find {
-            it.type == AudioDevice.Type.Speaker && it.hasCapability(AudioDevice.Capabilities.CapabilityPlay)
+            it.type == AudioDevice.Type.Speaker && it.hasCapability(
+                AudioDevice.Capabilities.CapabilityPlay
+            )
         }
         callParams.inputAudioDevice = coreContext.core.audioDevices.find {
-            it.type == AudioDevice.Type.Microphone && it.hasCapability(AudioDevice.Capabilities.CapabilityRecord)
+            it.type == AudioDevice.Type.Microphone && it.hasCapability(
+                AudioDevice.Capabilities.CapabilityRecord
+            )
         }
         updateAudioRouteState()
 
@@ -284,10 +308,14 @@ class ConferenceWaitingRoomViewModel : MessageNotifierViewModel() {
     fun setEarpieceAudioRoute() {
         Log.i("[Conference Waiting Room] Set default output audio device to Earpiece")
         callParams.outputAudioDevice = coreContext.core.audioDevices.find {
-            it.type == AudioDevice.Type.Earpiece && it.hasCapability(AudioDevice.Capabilities.CapabilityPlay)
+            it.type == AudioDevice.Type.Earpiece && it.hasCapability(
+                AudioDevice.Capabilities.CapabilityPlay
+            )
         }
         callParams.inputAudioDevice = coreContext.core.audioDevices.find {
-            it.type == AudioDevice.Type.Microphone && it.hasCapability(AudioDevice.Capabilities.CapabilityRecord)
+            it.type == AudioDevice.Type.Microphone && it.hasCapability(
+                AudioDevice.Capabilities.CapabilityRecord
+            )
         }
         updateAudioRouteState()
 
@@ -370,11 +398,15 @@ class ConferenceWaitingRoomViewModel : MessageNotifierViewModel() {
 
     private fun onAudioDevicesListUpdated() {
         val bluetoothDeviceAvailable = AudioRouteUtils.isBluetoothAudioRouteAvailable()
+        if (!bluetoothDeviceAvailable && audioRoutesEnabled.value == true) {
+            Log.w(
+                "[Conference Waiting Room] Bluetooth device no longer available, switching back to default microphone & earpiece/speaker"
+            )
+        }
         audioRoutesEnabled.value = bluetoothDeviceAvailable
 
         if (!bluetoothDeviceAvailable) {
             audioRoutesSelected.value = false
-            Log.w("[Conference Waiting Room] Bluetooth device no longer available, switching back to default microphone & earpiece/speaker")
             if (isBluetoothHeadsetSelected.value == true) {
                 for (audioDevice in coreContext.core.audioDevices) {
                     if (isVideoEnabled.value == true) {
@@ -416,7 +448,9 @@ class ConferenceWaitingRoomViewModel : MessageNotifierViewModel() {
     private fun updateVideoState() {
         isVideoAvailable.value = callParams.isVideoEnabled
         isVideoEnabled.value = callParams.isVideoEnabled && callParams.videoDirection == MediaDirection.SendRecv
-        Log.i("[Conference Waiting Room] Video will be ${if (callParams.isVideoEnabled) "enabled" else "disabled"} with direction ${callParams.videoDirection}")
+        Log.i(
+            "[Conference Waiting Room] Video will be ${if (callParams.isVideoEnabled) "enabled" else "disabled"} with direction ${callParams.videoDirection}"
+        )
 
         isSwitchCameraAvailable.value = callParams.isVideoEnabled && coreContext.showSwitchCameraButton()
         coreContext.core.isVideoPreviewEnabled = isVideoEnabled.value == true

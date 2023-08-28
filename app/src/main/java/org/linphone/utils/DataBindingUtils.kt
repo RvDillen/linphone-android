@@ -33,7 +33,12 @@ import android.widget.SeekBar.OnSeekBarChangeListener
 import androidx.appcompat.content.res.AppCompatResources
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.constraintlayout.widget.Guideline
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.doOnLayout
 import androidx.databinding.*
+import androidx.emoji2.emojipicker.EmojiPickerView
+import androidx.emoji2.emojipicker.EmojiViewItem
 import coil.dispose
 import coil.load
 import coil.request.CachePolicy
@@ -52,6 +57,7 @@ import org.linphone.activities.voip.views.ScrollDotsView
 import org.linphone.contact.ContactAvatarGenerator
 import org.linphone.contact.ContactDataInterface
 import org.linphone.contact.getPictureUri
+import org.linphone.core.ConsolidatedPresence
 import org.linphone.core.tools.Log
 import org.linphone.views.VoiceRecordProgressBar
 
@@ -64,7 +70,30 @@ fun View.hideKeyboard() {
         val imm =
             context.getSystemService(Activity.INPUT_METHOD_SERVICE) as InputMethodManager
         imm.hideSoftInputFromWindow(windowToken, 0)
-    } catch (e: Exception) {}
+    } catch (_: Exception) {}
+}
+
+fun View.setKeyboardInsetListener(lambda: (visible: Boolean) -> Unit) {
+    doOnLayout {
+        var isKeyboardVisible = ViewCompat.getRootWindowInsets(this)?.isVisible(
+            WindowInsetsCompat.Type.ime()
+        ) == true
+
+        lambda(isKeyboardVisible)
+
+        // See https://issuetracker.google.com/issues/281942480
+        ViewCompat.setOnApplyWindowInsetsListener(
+            rootView
+        ) { view, insets ->
+            val keyboardVisibilityChanged = ViewCompat.getRootWindowInsets(view)
+                ?.isVisible(WindowInsetsCompat.Type.ime()) == true
+            if (keyboardVisibilityChanged != isKeyboardVisible) {
+                isKeyboardVisible = keyboardVisibilityChanged
+                lambda(isKeyboardVisible)
+            }
+            ViewCompat.onApplyWindowInsets(view, insets)
+        }
+    }
 }
 
 @BindingAdapter("android:src")
@@ -311,7 +340,7 @@ fun setImageViewScaleType(imageView: ImageView, scaleType: ImageView.ScaleType) 
 
 @BindingAdapter("coilRounded")
 fun loadRoundImageWithCoil(imageView: ImageView, path: String?) {
-    if (path != null && path.isNotEmpty() && FileUtils.isExtensionImage(path)) {
+    if (!path.isNullOrEmpty() && FileUtils.isExtensionImage(path)) {
         imageView.load(path) {
             transformations(CircleCropTransformation())
         }
@@ -322,13 +351,15 @@ fun loadRoundImageWithCoil(imageView: ImageView, path: String?) {
 
 @BindingAdapter("coil")
 fun loadImageWithCoil(imageView: ImageView, path: String?) {
-    if (path != null && path.isNotEmpty() && FileUtils.isExtensionImage(path)) {
+    if (!path.isNullOrEmpty() && FileUtils.isExtensionImage(path)) {
         if (corePreferences.vfsEnabled && path.startsWith(corePreferences.vfsCachePath)) {
             imageView.load(path) {
                 diskCachePolicy(CachePolicy.DISABLED)
                 listener(
                     onError = { _, result ->
-                        Log.e("[Data Binding] [VFS] [Coil] Error loading [$path]: ${result.throwable}")
+                        Log.e(
+                            "[Data Binding] [VFS] [Coil] Error loading [$path]: ${result.throwable}"
+                        )
                     }
                 )
             }
@@ -368,12 +399,21 @@ private suspend fun loadContactPictureWithCoil(
             imageView.load(R.drawable.icon_single_contact_avatar)
         }
     } else if (contact.showGroupChatAvatar) {
-        imageView.load(AppCompatResources.getDrawable(context, R.drawable.icon_multiple_contacts_avatar))
+        imageView.load(
+            AppCompatResources.getDrawable(context, R.drawable.icon_multiple_contacts_avatar)
+        )
     } else {
         val displayName = contact.contact.value?.name ?: contact.displayName.value.orEmpty()
         val source = contact.contact.value?.getPictureUri(useThumbnail)
+        val sourceStr = source.toString()
+        val base64 = if (ImageUtils.isBase64(sourceStr)) {
+            Log.d("[Coil] Picture URI is base64 encoded")
+            ImageUtils.getBase64ImageFromString(sourceStr)
+        } else {
+            null
+        }
 
-        imageView.load(source) {
+        imageView.load(base64 ?: source) {
             transformations(CircleCropTransformation())
             error(
                 if (displayName.isEmpty() || AppUtils.getInitials(displayName) == "+") {
@@ -420,8 +460,11 @@ fun loadBigContactPictureWithCoil(imageView: ImageView, contact: ContactDataInte
     coroutineScope.launch {
         withContext(Dispatchers.Main) {
             loadContactPictureWithCoil(
-                imageView, contact, false,
-                R.dimen.contact_avatar_big_size, R.dimen.contact_avatar_text_big_size
+                imageView,
+                contact,
+                false,
+                R.dimen.contact_avatar_big_size,
+                R.dimen.contact_avatar_text_big_size
             )
         }
     }
@@ -433,9 +476,13 @@ fun loadVoipContactPictureWithCoilAlt(imageView: ImageView, contact: ContactData
     coroutineScope.launch {
         withContext(Dispatchers.Main) {
             loadContactPictureWithCoil(
-                imageView, contact, false,
-                R.dimen.voip_contact_avatar_max_size, R.dimen.voip_contact_avatar_text_size,
-                R.attr.voipParticipantBackgroundColor, R.color.white_color
+                imageView,
+                contact,
+                false,
+                R.dimen.voip_contact_avatar_max_size,
+                R.dimen.voip_contact_avatar_text_size,
+                R.attr.voipParticipantBackgroundColor,
+                R.color.white_color
             )
         }
     }
@@ -447,9 +494,13 @@ fun loadVoipContactPictureWithCoil(imageView: ImageView, contact: ContactDataInt
     coroutineScope.launch {
         withContext(Dispatchers.Main) {
             loadContactPictureWithCoil(
-                imageView, contact, false,
-                R.dimen.voip_contact_avatar_max_size, R.dimen.voip_contact_avatar_text_size,
-                R.attr.voipBackgroundColor, R.color.white_color
+                imageView,
+                contact,
+                false,
+                R.dimen.voip_contact_avatar_max_size,
+                R.dimen.voip_contact_avatar_text_size,
+                R.attr.voipBackgroundColor,
+                R.color.white_color
             )
         }
     }
@@ -461,9 +512,13 @@ fun loadSelfAvatarWithCoil(imageView: ImageView, contact: ContactDataInterface?)
     coroutineScope.launch {
         withContext(Dispatchers.Main) {
             loadContactPictureWithCoil(
-                imageView, contact, false,
-                R.dimen.voip_contact_avatar_max_size, R.dimen.voip_contact_avatar_text_size,
-                R.attr.voipBackgroundColor, R.color.white_color,
+                imageView,
+                contact,
+                false,
+                R.dimen.voip_contact_avatar_max_size,
+                R.dimen.voip_contact_avatar_text_size,
+                R.attr.voipBackgroundColor,
+                R.color.white_color,
                 corePreferences.defaultAccountAvatarPath
             )
         }
@@ -493,9 +548,23 @@ fun loadAvatarWithCoil(imageView: ImageView, path: String?) {
 
 @BindingAdapter("coilVideoPreview")
 fun loadVideoPreview(imageView: ImageView, path: String?) {
-    if (path != null && path.isNotEmpty() && FileUtils.isExtensionVideo(path)) {
+    if (!path.isNullOrEmpty() && FileUtils.isExtensionVideo(path)) {
         imageView.load(path) {
             videoFrameMillis(0)
+            listener(
+                onError = { _, result ->
+                    Log.e(
+                        "[Data Binding] [Coil] Error getting preview picture from video? [$path]: ${result.throwable}"
+                    )
+                },
+                onSuccess = { _, _ ->
+                    // Display "play" button above video preview
+                    LayoutInflater.from(imageView.context).inflate(
+                        R.layout.video_play_button,
+                        imageView.parent as ViewGroup
+                    )
+                }
+            )
         }
     }
 }
@@ -508,7 +577,9 @@ fun addPhoneNumberEditTextValidation(editText: EditText, enabled: Boolean) {
             when {
                 s?.matches(Regex("\\d+")) == false ->
                     editText.error =
-                        editText.context.getString(R.string.assistant_error_phone_number_invalid_characters)
+                        editText.context.getString(
+                            R.string.assistant_error_phone_number_invalid_characters
+                        )
             }
         }
 
@@ -522,13 +593,23 @@ fun addPhoneNumberEditTextValidation(editText: EditText, enabled: Boolean) {
 fun addPrefixEditTextValidation(editText: EditText, enabled: Boolean) {
     if (!enabled) return
     editText.addTextChangedListener(object : TextWatcher {
-        override fun afterTextChanged(s: Editable?) {}
+        override fun afterTextChanged(s: Editable?) {
+            val dialPlan = PhoneNumberUtils.getDialPlanFromCountryCallingPrefix(
+                s.toString().substring(1)
+            )
+            if (dialPlan == null) {
+                editText.error =
+                    editText.context.getString(
+                        R.string.assistant_error_invalid_international_prefix
+                    )
+            }
+        }
 
         override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
 
         @SuppressLint("SetTextI18n")
         override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
-            if (s == null || s.isEmpty() || !s.startsWith("+")) {
+            if (s.isNullOrEmpty() || !s.startsWith("+")) {
                 editText.setText("+$s")
             }
         }
@@ -549,7 +630,9 @@ fun addUsernameEditTextValidation(editText: EditText, enabled: Boolean) {
             when {
                 s?.matches(Regex(usernameRegexp)) == false ->
                     editText.error =
-                        editText.context.getString(R.string.assistant_error_username_invalid_characters)
+                        editText.context.getString(
+                            R.string.assistant_error_username_invalid_characters
+                        )
                 (s?.length ?: 0) > usernameMaxLength -> {
                     editText.error =
                         editText.context.getString(R.string.assistant_error_username_too_long)
@@ -607,7 +690,9 @@ fun addPasswordConfirmationEditTextValidation(password: EditText, passwordConfir
         override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
             if (passwordConfirmation.text == null || s == null || passwordConfirmation.text.toString() != s.toString()) {
                 passwordConfirmation.error =
-                    passwordConfirmation.context.getString(R.string.assistant_error_passwords_dont_match)
+                    passwordConfirmation.context.getString(
+                        R.string.assistant_error_passwords_dont_match
+                    )
             } else {
                 passwordConfirmation.error = null // To clear other edit text field error
             }
@@ -622,7 +707,9 @@ fun addPasswordConfirmationEditTextValidation(password: EditText, passwordConfir
         override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
             if (password.text == null || s == null || password.text.toString() != s.toString()) {
                 passwordConfirmation.error =
-                    passwordConfirmation.context.getString(R.string.assistant_error_passwords_dont_match)
+                    passwordConfirmation.context.getString(
+                        R.string.assistant_error_passwords_dont_match
+                    )
             }
         }
     })
@@ -767,4 +854,37 @@ fun ScrollDotsView.setItems(count: Int) {
 @BindingAdapter("selectedDot")
 fun ScrollDotsView.setSelectedIndex(index: Int) {
     setSelectedDot(index)
+}
+
+@BindingAdapter("presenceIcon")
+fun ImageView.setPresenceIcon(presence: ConsolidatedPresence) {
+    val icon = when (presence) {
+        ConsolidatedPresence.Online -> R.drawable.led_online
+        ConsolidatedPresence.DoNotDisturb -> R.drawable.led_do_not_disturb
+        ConsolidatedPresence.Busy -> R.drawable.led_away
+        else -> R.drawable.led_not_registered
+    }
+    setImageResource(icon)
+
+    val contentDescription = when (presence) {
+        ConsolidatedPresence.Online -> AppUtils.getString(
+            R.string.content_description_presence_online
+        )
+        ConsolidatedPresence.DoNotDisturb -> AppUtils.getString(
+            R.string.content_description_presence_do_not_disturb
+        )
+        else -> AppUtils.getString(R.string.content_description_presence_offline)
+    }
+    setContentDescription(contentDescription)
+}
+
+interface EmojiPickedListener {
+    fun onEmojiPicked(item: EmojiViewItem)
+}
+
+@BindingAdapter("emojiPickedListener")
+fun EmojiPickerView.setEmojiPickedListener(listener: EmojiPickedListener) {
+    setOnEmojiPickedListener { emoji ->
+        listener.onEmojiPicked(emoji)
+    }
 }

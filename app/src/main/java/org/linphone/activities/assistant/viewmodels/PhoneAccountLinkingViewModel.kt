@@ -35,7 +35,9 @@ class PhoneAccountLinkingViewModelFactory(private val accountCreator: AccountCre
     }
 }
 
-class PhoneAccountLinkingViewModel(accountCreator: AccountCreator) : AbstractPhoneViewModel(accountCreator) {
+class PhoneAccountLinkingViewModel(accountCreator: AccountCreator) : AbstractPhoneViewModel(
+    accountCreator
+) {
     val username = MutableLiveData<String>()
 
     val allowSkip = MutableLiveData<Boolean>()
@@ -58,12 +60,12 @@ class PhoneAccountLinkingViewModel(accountCreator: AccountCreator) : AbstractPho
             status: AccountCreator.Status,
             response: String?
         ) {
-            Log.i("[Phone Account Linking] onIsAliasUsed status is $status")
+            Log.i("[Assistant] [Phone Account Linking] onIsAliasUsed status is $status")
 
             when (status) {
                 AccountCreator.Status.AliasNotExist -> {
                     if (creator.linkAccount() != AccountCreator.Status.RequestOk) {
-                        Log.e("[Phone Account Linking] linkAccount status is $status")
+                        Log.e("[Assistant] [Phone Account Linking] linkAccount status is $status")
                         waitForServerAnswer.value = false
                         onErrorEvent.value = Event("Error: ${status.name}")
                     }
@@ -84,7 +86,7 @@ class PhoneAccountLinkingViewModel(accountCreator: AccountCreator) : AbstractPho
             status: AccountCreator.Status,
             response: String?
         ) {
-            Log.i("[Phone Account Linking] onLinkAccount status is $status")
+            Log.i("[Assistant] [Phone Account Linking] onLinkAccount status is $status")
             waitForServerAnswer.value = false
 
             when (status) {
@@ -111,6 +113,9 @@ class PhoneAccountLinkingViewModel(accountCreator: AccountCreator) : AbstractPho
         linkEnabled.addSource(phoneNumberError) {
             linkEnabled.value = isLinkButtonEnabled()
         }
+        linkEnabled.addSource(prefixError) {
+            linkEnabled.value = isLinkButtonEnabled()
+        }
     }
 
     override fun onCleared() {
@@ -118,18 +123,28 @@ class PhoneAccountLinkingViewModel(accountCreator: AccountCreator) : AbstractPho
         super.onCleared()
     }
 
-    fun link() {
+    override fun onFlexiApiTokenReceived() {
         accountCreator.setPhoneNumber(phoneNumber.value, prefix.value)
         accountCreator.username = username.value
         Log.i("[Assistant] [Phone Account Linking] Phone number is ${accountCreator.phoneNumber}")
 
-        waitForServerAnswer.value = true
         val status: AccountCreator.Status = accountCreator.isAliasUsed
-        Log.i("[Phone Account Linking] isAliasUsed returned $status")
+        Log.i("[Assistant] [Phone Account Linking] isAliasUsed returned $status")
         if (status != AccountCreator.Status.RequestOk) {
             waitForServerAnswer.value = false
             onErrorEvent.value = Event("Error: ${status.name}")
         }
+    }
+
+    override fun onFlexiApiTokenRequestError() {
+        Log.e("[Assistant] [Phone Account Linking] Failed to get an auth token from FlexiAPI")
+        waitForServerAnswer.value = false
+    }
+
+    fun link() {
+        Log.i("[Assistant] [Phone Account Linking] Requesting an auth token from FlexiAPI")
+        waitForServerAnswer.value = true
+        requestFlexiApiToken()
     }
 
     fun skip() {

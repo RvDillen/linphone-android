@@ -40,9 +40,19 @@ class DialogViewModel(val message: String, val title: String = "") : ViewModel()
 
     var iconResource: Int = 0
 
+    var showSubscribeLinphoneOrgLink: Boolean = false
+
     val doNotAskAgain = MutableLiveData<Boolean>()
 
     val dismissEvent = MutableLiveData<Event<Boolean>>()
+
+    var password: String = ""
+
+    var passwordTitle: String = ""
+
+    var passwordSubtitle: String = ""
+
+    var showPassword: Boolean = false
 
     init {
         doNotAskAgain.value = false

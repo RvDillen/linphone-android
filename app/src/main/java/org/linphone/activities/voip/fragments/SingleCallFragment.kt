@@ -67,8 +67,6 @@ class SingleCallFragment : GenericVideoPreviewFragment<VoipSingleCallFragmentBin
 
         binding.lifecycleOwner = viewLifecycleOwner
 
-        setupLocalViewPreview(binding.localPreviewVideoSurface, binding.switchCamera)
-
         binding.controlsViewModel = controlsViewModel
 
         binding.callsViewModel = callsViewModel
@@ -84,15 +82,21 @@ class SingleCallFragment : GenericVideoPreviewFragment<VoipSingleCallFragmentBin
                 val call = callData.call
                 when (val callState = call.state) {
                     Call.State.IncomingReceived, Call.State.IncomingEarlyMedia -> {
-                        Log.i("[Single Call] New current call is in [$callState] state, switching to IncomingCall fragment")
+                        Log.i(
+                            "[Single Call] New current call is in [$callState] state, switching to IncomingCall fragment"
+                        )
                         navigateToIncomingCall()
                     }
-                    Call.State.OutgoingInit, Call.State.OutgoingProgress, Call.State.OutgoingRinging, Call.State.OutgoingEarlyMedia -> {
-                        Log.i("[Single Call] New current call is in [$callState] state, switching to OutgoingCall fragment")
+                    Call.State.OutgoingRinging, Call.State.OutgoingEarlyMedia -> {
+                        Log.i(
+                            "[Single Call] New current call is in [$callState] state, switching to OutgoingCall fragment"
+                        )
                         navigateToOutgoingCall()
                     }
                     else -> {
-                        Log.i("[Single Call] New current call is in [$callState] state, updating call UI")
+                        Log.i(
+                            "[Single Call] New current call is in [$callState] state, updating call UI"
+                        )
                         val timer = binding.root.findViewById<Chronometer>(R.id.active_call_timer)
                         timer.base =
                             SystemClock.elapsedRealtime() - (1000 * call.duration) // Linphone timestamps are in seconds
@@ -100,7 +104,9 @@ class SingleCallFragment : GenericVideoPreviewFragment<VoipSingleCallFragmentBin
 
                         if (corePreferences.enableFullScreenWhenJoiningVideoCall) {
                             if (call.currentParams.isVideoEnabled) {
-                                Log.i("[Single Call] Call params have video enabled, enabling full screen mode")
+                                Log.i(
+                                    "[Single Call] Call params have video enabled, enabling full screen mode"
+                                )
                                 controlsViewModel.fullScreenMode.value = true
                             }
                         }
@@ -161,7 +167,9 @@ class SingleCallFragment : GenericVideoPreviewFragment<VoipSingleCallFragmentBin
                             showCallVideoUpdateDialog(call)
                         }
                     } else {
-                        Log.w("[Single Call] Video display & capture are disabled, don't show video dialog")
+                        Log.w(
+                            "[Single Call] Video display & capture are disabled, don't show video dialog"
+                        )
                     }
                 }
             }
@@ -173,15 +181,23 @@ class SingleCallFragment : GenericVideoPreviewFragment<VoipSingleCallFragmentBin
             it.consume { isCallTransfer ->
                 val intent = Intent()
                 intent.setClass(requireContext(), MainActivity::class.java)
-                intent.putExtra("Dialer", true)
+                if (corePreferences.skipDialerForNewCallAndTransfer) {
+                    intent.putExtra("Contacts", true)
+                } else {
+                    intent.putExtra("Dialer", true)
+                }
                 intent.putExtra("Transfer", isCallTransfer)
                 intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 startActivity(intent)
             }
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
 
         coreContext.core.nativeVideoWindowId = binding.remoteVideoSurface
-        coreContext.core.nativePreviewWindowId = binding.localPreviewVideoSurface
+        setupLocalVideoPreview(binding.localPreviewVideoSurface, binding.switchCamera)
     }
 
     override fun onPause() {
@@ -189,6 +205,7 @@ class SingleCallFragment : GenericVideoPreviewFragment<VoipSingleCallFragmentBin
 
         Log.d("onPause -> controlsViewModel.hideExtraButtons()")
         controlsViewModel.hideExtraButtons(true)
+        cleanUpLocalVideoPreview(binding.localPreviewVideoSurface)
     }
 
     override fun onResume() {
@@ -203,7 +220,9 @@ class SingleCallFragment : GenericVideoPreviewFragment<VoipSingleCallFragmentBin
     }
 
     private fun showCallVideoUpdateDialog(call: Call) {
-        val viewModel = DialogViewModel(AppUtils.getString(R.string.call_video_update_requested_dialog))
+        val viewModel = DialogViewModel(
+            AppUtils.getString(R.string.call_video_update_requested_dialog)
+        )
         dialog = DialogUtils.getVoipDialog(requireContext(), viewModel)
 
         viewModel.showCancelButton(

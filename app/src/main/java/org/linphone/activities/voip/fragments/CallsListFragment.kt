@@ -62,8 +62,6 @@ class CallsListFragment : GenericVideoPreviewFragment<VoipCallsListFragmentBindi
 
         binding.controlsViewModel = controlsViewModel
 
-        setupLocalViewPreview(binding.localPreviewVideoSurface, binding.switchCamera)
-
         binding.setCancelClickListener {
             goBack()
         }
@@ -96,10 +94,24 @@ class CallsListFragment : GenericVideoPreviewFragment<VoipCallsListFragmentBindi
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+
+        setupLocalVideoPreview(binding.localPreviewVideoSurface, binding.switchCamera)
+    }
+
+    override fun onPause() {
+        super.onPause()
+
+        cleanUpLocalVideoPreview(binding.localPreviewVideoSurface)
+    }
+
     private fun showCallMenu(anchor: View, callData: CallData) {
         val popupView: VoipCallContextMenuBindingImpl = DataBindingUtil.inflate(
             LayoutInflater.from(requireContext()),
-            R.layout.voip_call_context_menu, null, false
+            R.layout.voip_call_context_menu,
+            null,
+            false
         )
 
         val itemSize = AppUtils.getDimension(R.dimen.voip_call_context_menu_item_height).toInt()

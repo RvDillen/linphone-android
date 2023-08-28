@@ -41,7 +41,9 @@ class PhoneAccountCreationViewModelFactory(private val accountCreator: AccountCr
     }
 }
 
-class PhoneAccountCreationViewModel(accountCreator: AccountCreator) : AbstractPhoneViewModel(accountCreator) {
+class PhoneAccountCreationViewModel(accountCreator: AccountCreator) : AbstractPhoneViewModel(
+    accountCreator
+) {
     val username = MutableLiveData<String>()
     val useUsername = MutableLiveData<Boolean>()
     val usernameError = MutableLiveData<String>()
@@ -66,19 +68,55 @@ class PhoneAccountCreationViewModel(accountCreator: AccountCreator) : AbstractPh
             status: AccountCreator.Status,
             response: String?
         ) {
-            Log.i("[Phone Account Creation] onIsAccountExist status is $status")
+            Log.i("[Assistant] [Phone Account Creation] onIsAccountExist status is $status")
             when (status) {
                 AccountCreator.Status.AccountExist, AccountCreator.Status.AccountExistWithAlias -> {
                     waitForServerAnswer.value = false
-                    if (useUsername.value == true) {
-                        usernameError.value = AppUtils.getString(R.string.assistant_error_username_already_exists)
-                    } else {
-                        phoneNumberError.value = AppUtils.getString(R.string.assistant_error_phone_number_already_exists)
-                    }
+                    usernameError.value = AppUtils.getString(
+                        R.string.assistant_error_username_already_exists
+                    )
                 }
                 AccountCreator.Status.AccountNotExist -> {
+                    waitForServerAnswer.value = false
+                    checkPhoneNumber()
+                }
+                else -> {
+                    waitForServerAnswer.value = false
+                    onErrorEvent.value = Event("Error: ${status.name}")
+                }
+            }
+        }
+
+        override fun onIsAliasUsed(
+            creator: AccountCreator,
+            status: AccountCreator.Status,
+            response: String?
+        ) {
+            Log.i("[Assistant] [Phone Account Creation] onIsAliasUsed status is $status")
+            when (status) {
+                AccountCreator.Status.AliasExist -> {
+                    waitForServerAnswer.value = false
+                    phoneNumberError.value = AppUtils.getString(
+                        R.string.assistant_error_phone_number_already_exists
+                    )
+                }
+                AccountCreator.Status.AliasIsAccount -> {
+                    waitForServerAnswer.value = false
+                    if (useUsername.value == true) {
+                        usernameError.value = AppUtils.getString(
+                            R.string.assistant_error_username_already_exists
+                        )
+                    } else {
+                        phoneNumberError.value = AppUtils.getString(
+                            R.string.assistant_error_phone_number_already_exists
+                        )
+                    }
+                }
+                AccountCreator.Status.AliasNotExist -> {
                     val createAccountStatus = creator.createAccount()
-                    Log.i("[Phone Account Creation] createAccount returned $createAccountStatus")
+                    Log.i(
+                        "[Assistant] [Phone Account Creation] createAccount returned $createAccountStatus"
+                    )
                     if (createAccountStatus != AccountCreator.Status.RequestOk) {
                         waitForServerAnswer.value = false
                         onErrorEvent.value = Event("Error: ${status.name}")
@@ -96,14 +134,16 @@ class PhoneAccountCreationViewModel(accountCreator: AccountCreator) : AbstractPh
             status: AccountCreator.Status,
             response: String?
         ) {
-            Log.i("[Phone Account Creation] onCreateAccount status is $status")
+            Log.i("[Assistant] [Phone Account Creation] onCreateAccount status is $status")
             waitForServerAnswer.value = false
             when (status) {
                 AccountCreator.Status.AccountCreated -> {
                     goToSmsValidationEvent.value = Event(true)
                 }
                 AccountCreator.Status.AccountExistWithAlias -> {
-                    phoneNumberError.value = AppUtils.getString(R.string.assistant_error_phone_number_already_exists)
+                    phoneNumberError.value = AppUtils.getString(
+                        R.string.assistant_error_phone_number_already_exists
+                    )
                 }
                 else -> {
                     onErrorEvent.value = Event("Error: ${status.name}")
@@ -135,6 +175,9 @@ class PhoneAccountCreationViewModel(accountCreator: AccountCreator) : AbstractPh
         createEnabled.addSource(phoneNumberError) {
             createEnabled.value = isCreateButtonEnabled()
         }
+        createEnabled.addSource(prefixError) {
+            createEnabled.value = isCreateButtonEnabled()
+        }
     }
 
     override fun onCleared() {
@@ -142,26 +185,81 @@ class PhoneAccountCreationViewModel(accountCreator: AccountCreator) : AbstractPh
         super.onCleared()
     }
 
-    fun create() {
+    override fun onFlexiApiTokenReceived() {
+        Log.i(
+            "[Assistant] [Phone Account Creation] Using FlexiAPI auth token [${accountCreator.token}]"
+        )
         accountCreator.displayName = displayName.value
-        accountCreator.setPhoneNumber(phoneNumber.value, prefix.value)
+
+        val result = AccountCreator.PhoneNumberStatus.fromInt(
+            accountCreator.setPhoneNumber(phoneNumber.value, prefix.value)
+        )
+        if (result != AccountCreator.PhoneNumberStatus.Ok) {
+            Log.e(
+                "[Assistant] [Phone Account Creation] Error [$result] setting the phone number: ${phoneNumber.value} with prefix: ${prefix.value}"
+            )
+            phoneNumberError.value = result.name
+            return
+        }
+        Log.i("[Assistant] [Phone Account Creation] Phone number is ${accountCreator.phoneNumber}")
+
         if (useUsername.value == true) {
             accountCreator.username = username.value
         } else {
             accountCreator.username = accountCreator.phoneNumber
         }
 
-        waitForServerAnswer.value = true
+        if (useUsername.value == true) {
+            checkUsername()
+        } else {
+            checkPhoneNumber()
+        }
+    }
+
+    override fun onFlexiApiTokenRequestError() {
+        Log.e("[Assistant] [Phone Account Creation] Failed to get an auth token from FlexiAPI")
+        waitForServerAnswer.value = false
+        onErrorEvent.value = Event("Error: Failed to get an auth token from account manager server")
+    }
+
+    private fun checkUsername() {
         val status = accountCreator.isAccountExist
-        Log.i("[Phone Account Creation] isAccountExist returned $status")
+        Log.i("[Assistant] [Phone Account Creation] isAccountExist returned $status")
         if (status != AccountCreator.Status.RequestOk) {
             waitForServerAnswer.value = false
             onErrorEvent.value = Event("Error: ${status.name}")
         }
     }
 
+    private fun checkPhoneNumber() {
+        val status = accountCreator.isAliasUsed
+        Log.i("[Assistant] [Phone Account Creation] isAliasUsed returned $status")
+        if (status != AccountCreator.Status.RequestOk) {
+            waitForServerAnswer.value = false
+            onErrorEvent.value = Event("Error: ${status.name}")
+        }
+    }
+
+    fun create() {
+        val token = accountCreator.token.orEmpty()
+        if (token.isNotEmpty()) {
+            Log.i(
+                "[Assistant] [Phone Account Creation] We already have an auth token from FlexiAPI [$token], continue"
+            )
+            onFlexiApiTokenReceived()
+        } else {
+            Log.i("[Assistant] [Phone Account Creation] Requesting an auth token from FlexiAPI")
+            waitForServerAnswer.value = true
+            requestFlexiApiToken()
+        }
+    }
+
     private fun isCreateButtonEnabled(): Boolean {
-        val usernameRegexp = corePreferences.config.getString("assistant", "username_regex", "^[a-z0-9+_.\\-]*\$")
+        val usernameRegexp = corePreferences.config.getString(
+            "assistant",
+            "username_regex",
+            "^[a-z0-9+_.\\-]*\$"
+        )
         return isPhoneNumberOk() && usernameRegexp != null &&
             (
                 useUsername.value == false ||

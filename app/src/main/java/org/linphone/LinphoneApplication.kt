@@ -44,6 +44,7 @@ class LinphoneApplication : Application(), ImageLoaderFactory {
     companion object {
         @SuppressLint("StaticFieldLeak")
         lateinit var corePreferences: CorePreferences
+
         @SuppressLint("StaticFieldLeak")
         lateinit var coreContext: CoreContext
 
@@ -90,15 +91,23 @@ class LinphoneApplication : Application(), ImageLoaderFactory {
             context: Context,
             pushReceived: Boolean = false,
             service: CoreService? = null,
-            useAutoStartDescription: Boolean = false
+            useAutoStartDescription: Boolean = false,
+            skipCoreStart: Boolean = false
         ): Boolean {
             if (::coreContext.isInitialized && !coreContext.stopped) {
                 Log.d("[Application] Skipping Core creation (push received? $pushReceived)")
                 return false
             }
 
-            Log.i("[Application] Core context is being created ${if (pushReceived) "from push" else ""}")
-            coreContext = CoreContext(context, corePreferences.config, service, useAutoStartDescription)
+            Log.i(
+                "[Application] Core context is being created ${if (pushReceived) "from push" else ""}"
+            )
+            coreContext = CoreContext(
+                context,
+                corePreferences.config,
+                service,
+                useAutoStartDescription
+            )
 
             if (coreContext.core.provisioningUri == null) {
                 val configUrl = "http://config.clb.nl/linphonerc.xml"
@@ -109,7 +118,8 @@ class LinphoneApplication : Application(), ImageLoaderFactory {
                 Log.i("[Application] Provisioning URL already configured: $configUrl")
             }
 
-            coreContext.start()
+            if (!skipCoreStart) {
+                coreContext.start()
 
             // CLB Registration
             val registerCLB: RegisterCLB = org.linphone.clb.RegisterCLB(coreContext.context.applicationContext)

@@ -19,10 +19,11 @@
  */
 package org.linphone.activities.main.settings.viewmodels
 
+import android.os.Vibrator
 import androidx.lifecycle.MutableLiveData
 import java.io.File
 import java.util.*
-import kotlin.collections.ArrayList
+import org.linphone.LinphoneApplication.Companion.coreContext
 import org.linphone.R
 import org.linphone.activities.main.settings.SettingListenerStub
 import org.linphone.core.MediaEncryption
@@ -65,6 +66,7 @@ class CallSettingsViewModel : GenericSettingsViewModel() {
         }
     }
     val vibrateOnIncomingCall = MutableLiveData<Boolean>()
+    val canVibrate = MutableLiveData<Boolean>()
 
     val encryptionListener = object : SettingListenerStub() {
         override fun onListValueChanged(position: Int) {
@@ -100,7 +102,7 @@ class CallSettingsViewModel : GenericSettingsViewModel() {
                     Log.w("[Call Settings] Disabling Telecom Manager auto-enable")
                     prefs.manuallyDisabledTelecomManager = true
                 }
-                prefs.useTelecomManager = newValue
+                prefs.useTelecomManager = false
             }
         }
     }
@@ -172,7 +174,7 @@ class CallSettingsViewModel : GenericSettingsViewModel() {
         override fun onTextValueChanged(newValue: String) {
             try {
                 prefs.autoAnswerDelay = newValue.toInt()
-            } catch (nfe: NumberFormatException) {
+            } catch (_: NumberFormatException) {
             }
         }
     }
@@ -182,7 +184,7 @@ class CallSettingsViewModel : GenericSettingsViewModel() {
         override fun onTextValueChanged(newValue: String) {
             try {
                 core.incTimeout = newValue.toInt()
-            } catch (nfe: NumberFormatException) {
+            } catch (_: NumberFormatException) {
             }
         }
     }
@@ -238,6 +240,11 @@ class CallSettingsViewModel : GenericSettingsViewModel() {
         showRingtonesList.value = core.ring != null
 
         vibrateOnIncomingCall.value = core.isVibrationOnIncomingCallEnabled
+        val vibrator = coreContext.context.getSystemService(Vibrator::class.java)
+        canVibrate.value = vibrator.hasVibrator()
+        if (canVibrate.value == false) {
+            Log.w("[Call Settings] Device doesn't seem to have a vibrator, hiding related setting")
+        }
 
         initEncryptionList()
         encryptionMandatory.value = core.isMediaEncryptionMandatory
@@ -296,7 +303,9 @@ class CallSettingsViewModel : GenericSettingsViewModel() {
         }
         if (core.mediaEncryptionSupported(MediaEncryption.ZRTP)) {
             if (core.postQuantumAvailable) {
-                labels.add(prefs.getString(R.string.call_settings_media_encryption_zrtp_post_quantum))
+                labels.add(
+                    prefs.getString(R.string.call_settings_media_encryption_zrtp_post_quantum)
+                )
             } else {
                 labels.add(prefs.getString(R.string.call_settings_media_encryption_zrtp))
             }

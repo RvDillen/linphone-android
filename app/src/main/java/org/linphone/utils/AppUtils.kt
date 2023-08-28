@@ -44,7 +44,25 @@ import org.linphone.core.tools.Log
  * Various utility methods for application
  */
 class AppUtils {
+    interface KeyboardVisibilityListener {
+        fun onKeyboardVisibilityChanged(visible: Boolean)
+    }
+
     companion object {
+        private val emojiCompat: EmojiCompat?
+            get() = initEmojiCompat()
+
+        private fun initEmojiCompat(): EmojiCompat? {
+            return try {
+                EmojiCompat.get()
+            } catch (ise: IllegalStateException) {
+                Log.w(
+                    "[App Utils] EmojiCompat.get() triggered IllegalStateException [$ise], trying manual init"
+                )
+                EmojiCompat.init(coreContext.context)
+            }
+        }
+
         fun getString(id: Int): String {
             return coreContext.context.getString(id)
         }
@@ -67,20 +85,18 @@ class AppUtils {
             val split = displayName.uppercase(Locale.getDefault()).split(" ")
             var initials = ""
             var characters = 0
-
-            val emoji = try {
-                EmojiCompat.get()
-            } catch (ise: IllegalStateException) {
-                Log.e("[App Utils] Can't get EmojiCompat: $ise")
-                null
-            }
+            val emoji = emojiCompat
 
             for (i in split.indices) {
                 if (split[i].isNotEmpty()) {
                     try {
-                        if (emoji?.hasEmojiGlyph(split[i]) == true) {
+                        if (emoji?.loadState == EmojiCompat.LOAD_STATE_SUCCEEDED && emoji.hasEmojiGlyph(
+                                split[i]
+                            )
+                        ) {
                             val glyph = emoji.process(split[i])
                             if (characters > 0) { // Limit initial to 1 emoji only
+                                Log.d("[App Utils] We limit initials to one emoji only")
                                 initials = ""
                             }
                             initials += glyph
@@ -98,6 +114,39 @@ class AppUtils {
                 }
             }
             return initials
+        }
+
+        fun isTextOnlyContainingEmoji(text: String): Boolean {
+            val emoji = emojiCompat
+            emoji ?: return false
+
+            if (emoji.loadState != EmojiCompat.LOAD_STATE_SUCCEEDED) {
+                Log.w(
+                    "[App Utils] Can't check emoji presence in text due to EmojiCompat library not loaded yet [${emoji.loadState}]"
+                )
+                return false
+            }
+
+            try {
+                for (split in text.split(" ")) {
+                    // We only check the first and last chars of the split for commodity
+                    if (emoji.getEmojiStart(split, 0) == -1 ||
+                        emoji.getEmojiEnd(split, split.length - 1) == -1
+                    ) {
+                        Log.d("[App Utils] Found a non-emoji character in [$text]")
+                        return false
+                    }
+                }
+            } catch (npe: NullPointerException) {
+                Log.e(
+                    "[App Utils] Can't check emoji presence in text due to NPE in EmojiCompat library, assuming there is none"
+                )
+                // This can happen in EmojiCompat library, mProcessor can be null (https://issuetracker.google.com/issues/277182750)
+                return false
+            }
+
+            Log.d("[App Utils] It seems text [$text] only contains emoji(s)")
+            return true
         }
 
         fun pixelsToDp(pixels: Float): Float {
@@ -128,7 +177,12 @@ class AppUtils {
             intent.type = "text/plain"
 
             try {
-                activity.startActivity(Intent.createChooser(intent, activity.getString(R.string.share_uploaded_logs_link)))
+                activity.startActivity(
+                    Intent.createChooser(
+                        intent,
+                        activity.getString(R.string.share_uploaded_logs_link)
+                    )
+                )
             } catch (ex: ActivityNotFoundException) {
                 Log.e(ex)
             }
@@ -169,7 +223,9 @@ class AppUtils {
                 .build()
 
             val request =
-                AudioFocusRequestCompat.Builder(AudioManagerCompat.AUDIOFOCUS_GAIN_TRANSIENT_EXCLUSIVE)
+                AudioFocusRequestCompat.Builder(
+                    AudioManagerCompat.AUDIOFOCUS_GAIN_TRANSIENT_EXCLUSIVE
+                )
                     .setAudioAttributes(audioAttrs)
                     .setOnAudioFocusChangeListener { }
                     .build()

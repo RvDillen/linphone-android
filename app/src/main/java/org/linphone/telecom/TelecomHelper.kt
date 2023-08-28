@@ -201,7 +201,9 @@ class TelecomHelper private constructor(context: Context) {
     }
 
     private fun onIncomingCall(call: Call) {
-        Log.i("[Telecom Helper] Incoming call received from ${call.remoteAddress.asStringUriOnly()}, using account handle ${account.accountHandle}")
+        Log.i(
+            "[Telecom Helper] Incoming call received from ${call.remoteAddress.asStringUriOnly()}, using account handle ${account.accountHandle}"
+        )
 
         val extras = prepareBundle(call)
         telecomManager.addNewIncomingCall(
@@ -215,7 +217,9 @@ class TelecomHelper private constructor(context: Context) {
 
     @SuppressLint("MissingPermission")
     private fun onOutgoingCall(call: Call) {
-        Log.i("[Telecom Helper] Outgoing call started to ${call.remoteAddress.asStringUriOnly()}, using account handle ${account.accountHandle}")
+        Log.i(
+            "[Telecom Helper] Outgoing call started to ${call.remoteAddress.asStringUriOnly()}, using account handle ${account.accountHandle}"
+        )
 
         val extras = prepareBundle(call)
         telecomManager.placeCall(
