@@ -306,19 +306,15 @@ class TelecomConnectionService : ConnectionService() {
                         "[Telecom Connection Service] found connection for call id delayed: $callId"
                     )
 
-                    if (connection.state != Connection.STATE_HOLDING) {
-                        connection.setActive()
-                    }
+                    connection.setActive()
                 },
                 500
             )
             return
-        }
-
-        Log.i(
-            "[Telecom Connection Service] Setting connection as active, currently in ${connection.stateAsString()} for call id: $callId"
-        )
-        if (connection.state != Connection.STATE_HOLDING) {
+        } else {
+            Log.i(
+                "[Telecom Connection Service] Setting connection as active, currently in ${connection.stateAsString()} for call id: $callId"
+            )
             connection.setActive()
         }
     }
