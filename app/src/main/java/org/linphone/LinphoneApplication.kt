@@ -72,6 +72,7 @@ class LinphoneApplication : Application(), ImageLoaderFactory {
             // CLB CreateConfigCLB replaces: val config = Factory.instance().createConfigWithFactory()
             val config = CreateConfigCLB(context)
             corePreferences.config = config
+            corePreferences.firstStart = false
 
             val appName = context.getString(R.string.app_name)
             Factory.instance().setLoggerDomain(appName)
@@ -146,7 +147,7 @@ class LinphoneApplication : Application(), ImageLoaderFactory {
             // Handle changes in LinphoneRc
             if (ach.linphoneRcHasChanges()) {
                 android.util.Log.i("[CLB]", "Applying AppConfig linphoneRc changes")
-                corePreferences.firstStart = false
+
                 val linphonercData = ach.linphoneRc
 
                 // CLB LinphoneRC changes? => Update
@@ -173,7 +174,7 @@ class LinphoneApplication : Application(), ImageLoaderFactory {
             // Parse/execute RC XML (pass 'null' to use AppConfig bundle check)
             if (ach.linphoneRcXmlHasChanges(null)) {
                 LogConfig("Apply AppConfig Linphone Rc XML changes.")
-                corePreferences.firstStart = false
+
                 val linphonercXmlData = ach.linphoneRcXml
 
                 if (LinphonePreferencesCLB.instance().UpdateFromLinphoneXmlData(linphonercXmlData, config)) {
