@@ -301,7 +301,7 @@ dependencies {
         implementation 'com.google.firebase:firebase-messaging'
     }
 
-    implementation 'org.linphone:linphone-sdk-android:5.2.98'
+    implementation 'org.linphone:linphone-sdk-android:5.2.17-pre.1+18bb2b1'
 
     // Only enable leak canary prior to release
     // debugImplementation 'com.squareup.leakcanary:leakcanary-android:2.10'
