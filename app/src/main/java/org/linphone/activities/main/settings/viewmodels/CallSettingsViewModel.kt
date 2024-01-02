@@ -102,7 +102,7 @@ class CallSettingsViewModel : GenericSettingsViewModel() {
                     Log.w("[Call Settings] Disabling Telecom Manager auto-enable")
                     prefs.manuallyDisabledTelecomManager = true
                 }
-                prefs.useTelecomManager = newValue
+                prefs.useTelecomManager = false
             }
         }
     }
