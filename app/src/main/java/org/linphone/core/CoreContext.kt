@@ -864,10 +864,22 @@ class CoreContext(
             }
         }
 
-        val address: Address? = core.interpretUrl(
+        var address: Address? = core.interpretUrl(
             stringAddress,
             LinphoneUtils.applyInternationalPrefix()
         )
+
+        if (tos.size > 1) {
+            stringAddress = address!!.asString()
+            for (i in 1 until tos.size) {
+                stringAddress = stringAddress + ";" + tos[i]
+            }
+            address = core.interpretUrl(
+                stringAddress,
+                LinphoneUtils.applyInternationalPrefix()
+            )
+        }
+
         if (address == null) {
             Log.e("[Context] Failed to parse $stringAddress, abort outgoing call")
             callErrorMessageResourceId.value = Event(
