@@ -1,8 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
-<layout xmlns:android="http://schemas.android.com/apk/res/android">
+<layout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <data>
         <import type="android.view.View"/>
+        <import type="org.linphone.core.ConsolidatedPresence"/>
         <variable
             name="clickListener"
             type="android.view.View.OnClickListener"/>
@@ -43,6 +46,18 @@
             android:src="@drawable/voip_single_contact_avatar"
             android:contentDescription="@null" />
 
+        <ImageView
+            android:layout_width="@dimen/contact_presence_badge_size"
+            android:layout_height="@dimen/contact_presence_badge_size"
+            android:layout_alignBottom="@id/avatar"
+            android:layout_marginStart="25dp"
+            android:adjustViewBounds="true"
+            android:background="@drawable/led_background"
+            android:padding="@dimen/contact_presence_badge_padding"
+            app:presenceIcon="@{viewModel.presenceStatus}"
+            android:visibility="@{viewModel.presenceStatus == ConsolidatedPresence.Offline ? View.GONE : View.VISIBLE, default=gone}"
+            tools:ignore="ContentDescription" />
+
         <LinearLayout
             android:id="@+id/right"
             android:layout_width="wrap_content"
@@ -59,7 +74,7 @@
                 android:src="@drawable/linphone_logo_tinted"
                 android:layout_marginRight="10dp"
                 android:contentDescription="@string/content_description_linphone_user"
-                android:visibility="@{viewModel.hasPresence() ? View.VISIBLE : View.GONE}" />
+                android:visibility="@{viewModel.hasLongTermPresence ? View.VISIBLE : View.GONE, default=gone}" />
 
             <CheckBox
                 android:onClick="@{() -> selectionListViewModel.onToggleSelect(position)}"

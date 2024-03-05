@@ -1,8 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
-<layout xmlns:android="http://schemas.android.com/apk/res/android">
+<layout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <data>
         <import type="android.view.View"/>
+        <import type="org.linphone.core.ConsolidatedPresence"/>
         <variable
             name="clickListener"
             type="android.view.View.OnClickListener"/>
@@ -31,6 +34,7 @@
                 android:layout_centerVertical="true">
 
                 <ImageView
+                    android:id="@+id/avatar_icon"
                     coilContact="@{data}"
                     android:layout_width="@dimen/contact_avatar_size"
                     android:layout_height="@dimen/contact_avatar_size"
@@ -39,6 +43,18 @@
                     android:background="@drawable/generated_avatar_bg"
                     android:src="@drawable/voip_single_contact_avatar"
                     android:contentDescription="@null" />
+
+                <ImageView
+                    android:layout_width="@dimen/contact_presence_badge_size"
+                    android:layout_height="@dimen/contact_presence_badge_size"
+                    android:layout_alignBottom="@id/avatar_icon"
+                    android:layout_marginStart="25dp"
+                    android:adjustViewBounds="true"
+                    android:background="@drawable/led_background"
+                    android:padding="@dimen/contact_presence_badge_padding"
+                    app:presenceIcon="@{data.presenceStatus}"
+                    android:visibility="@{data.presenceStatus == ConsolidatedPresence.Offline ? View.GONE : View.VISIBLE, default=gone}"
+                    tools:ignore="ContentDescription" />
 
                 <ImageView
                     android:visibility="@{data.hasLimeX3DHCapability ? View.VISIBLE : View.GONE, default=gone}"

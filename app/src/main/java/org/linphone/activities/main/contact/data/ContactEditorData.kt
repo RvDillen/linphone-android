@@ -31,7 +31,8 @@ import org.linphone.LinphoneApplication.Companion.coreContext
 import org.linphone.LinphoneApplication.Companion.corePreferences
 import org.linphone.R
 import org.linphone.contact.*
-import org.linphone.core.ChatRoomSecurityLevel
+import org.linphone.core.ChatRoom.SecurityLevel
+import org.linphone.core.ConsolidatedPresence
 import org.linphone.core.Friend
 import org.linphone.core.tools.Log
 import org.linphone.utils.AppUtils
@@ -41,7 +42,8 @@ import org.linphone.utils.PermissionHelper
 class ContactEditorData(val friend: Friend?) : ContactDataInterface {
     override val contact: MutableLiveData<Friend> = MutableLiveData<Friend>()
     override val displayName: MutableLiveData<String> = MutableLiveData<String>()
-    override val securityLevel: MutableLiveData<ChatRoomSecurityLevel> = MutableLiveData<ChatRoomSecurityLevel>()
+    override val securityLevel: MutableLiveData<SecurityLevel> = MutableLiveData<SecurityLevel>()
+    override val presenceStatus: MutableLiveData<ConsolidatedPresence> = MutableLiveData<ConsolidatedPresence>()
     override val coroutineScope: CoroutineScope = coreContext.coroutineScope
 
     val firstName = MutableLiveData<String>()
@@ -66,8 +68,13 @@ class ContactEditorData(val friend: Friend?) : ContactDataInterface {
         if (friend != null) {
             contact.value = friend!!
             displayName.value = friend.name ?: ""
+            presenceStatus.value = friend.consolidatedPresence
+            friend.addListener {
+                presenceStatus.value = it.consolidatedPresence
+            }
         } else {
             displayName.value = ""
+            presenceStatus.value = ConsolidatedPresence.Offline
         }
 
         organization.value = friend?.organization ?: ""
@@ -81,7 +88,9 @@ class ContactEditorData(val friend: Friend?) : ContactDataInterface {
                 Log.w("[Contact Editor] vCard first & last name not filled-in yet, doing it now")
                 fetchFirstAndLastNames(refKey)
             } else {
-                Log.e("[Contact Editor] vCard first & last name not available as contact doesn't have a native ID")
+                Log.e(
+                    "[Contact Editor] vCard first & last name not available as contact doesn't have a native ID"
+                )
             }
         } else {
             firstName.value = vCard?.givenName
@@ -239,10 +248,16 @@ class ContactEditorData(val friend: Friend?) : ContactDataInterface {
                 while (cursor != null && cursor.moveToNext()) {
                     val linphoneMime = AppUtils.getString(R.string.linphone_address_mime_type)
                     val mime: String? =
-                        cursor.getString(cursor.getColumnIndexOrThrow(ContactsContract.Data.MIMETYPE))
+                        cursor.getString(
+                            cursor.getColumnIndexOrThrow(ContactsContract.Data.MIMETYPE)
+                        )
                     if (mime == ContactsContract.CommonDataKinds.Phone.CONTENT_ITEM_TYPE) {
                         val data1: String? =
-                            cursor.getString(cursor.getColumnIndexOrThrow(ContactsContract.CommonDataKinds.Phone.NUMBER))
+                            cursor.getString(
+                                cursor.getColumnIndexOrThrow(
+                                    ContactsContract.CommonDataKinds.Phone.NUMBER
+                                )
+                            )
                         if (data1 != null) {
                             phoneNumbers.add(NumberOrAddressEditorData(data1, false))
                         }
@@ -251,7 +266,11 @@ class ContactEditorData(val friend: Friend?) : ContactDataInterface {
                         mime == linphoneMime
                     ) {
                         val data1: String? =
-                            cursor.getString(cursor.getColumnIndexOrThrow(ContactsContract.CommonDataKinds.SipAddress.SIP_ADDRESS))
+                            cursor.getString(
+                                cursor.getColumnIndexOrThrow(
+                                    ContactsContract.CommonDataKinds.SipAddress.SIP_ADDRESS
+                                )
+                            )
                         if (data1 != null) {
                             sipAddresses.add(NumberOrAddressEditorData(data1, true))
                         }
@@ -267,7 +286,9 @@ class ContactEditorData(val friend: Friend?) : ContactDataInterface {
         }
 
         if (!fetched) {
-            Log.w("[Contact Editor] Fall-backing to friend info (might be inaccurate and thus edition/removal might fail)")
+            Log.w(
+                "[Contact Editor] Fall-backing to friend info (might be inaccurate and thus edition/removal might fail)"
+            )
             for (number in friend?.phoneNumbers.orEmpty()) {
                 phoneNumbers.add(NumberOrAddressEditorData(number, false))
             }
@@ -303,17 +324,27 @@ class ContactEditorData(val friend: Friend?) : ContactDataInterface {
             )
 
             while (cursor != null && cursor.moveToNext()) {
-                val mime: String? = cursor.getString(cursor.getColumnIndexOrThrow(ContactsContract.Data.MIMETYPE))
+                val mime: String? = cursor.getString(
+                    cursor.getColumnIndexOrThrow(ContactsContract.Data.MIMETYPE)
+                )
                 if (mime == ContactsContract.CommonDataKinds.StructuredName.CONTENT_ITEM_TYPE) {
                     val givenName: String? =
-                        cursor.getString(cursor.getColumnIndexOrThrow(ContactsContract.CommonDataKinds.StructuredName.GIVEN_NAME))
+                        cursor.getString(
+                            cursor.getColumnIndexOrThrow(
+                                ContactsContract.CommonDataKinds.StructuredName.GIVEN_NAME
+                            )
+                        )
                     if (!givenName.isNullOrEmpty()) {
                         friend?.vcard?.givenName = givenName
                         firstName.value = givenName!!
                     }
 
                     val familyName: String? =
-                        cursor.getString(cursor.getColumnIndexOrThrow(ContactsContract.CommonDataKinds.StructuredName.FAMILY_NAME))
+                        cursor.getString(
+                            cursor.getColumnIndexOrThrow(
+                                ContactsContract.CommonDataKinds.StructuredName.FAMILY_NAME
+                            )
+                        )
                     if (!familyName.isNullOrEmpty()) {
                         friend?.vcard?.familyName = familyName
                         lastName.value = familyName!!

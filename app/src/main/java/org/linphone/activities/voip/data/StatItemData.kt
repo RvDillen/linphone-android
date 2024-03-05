@@ -65,15 +65,27 @@ class StatItemData(val type: StatType) {
         val payloadType = if (stats.type == StreamType.Audio) call.currentParams.usedAudioPayloadType else call.currentParams.usedVideoPayloadType
         payloadType ?: return
         value.value = when (type) {
-            StatType.CAPTURE -> if (stats.type == StreamType.Audio) audioDeviceToString(call.inputAudioDevice) else call.core.videoDevice
-            StatType.PLAYBACK -> if (stats.type == StreamType.Audio) audioDeviceToString(call.outputAudioDevice) else call.core.videoDisplayFilter
+            StatType.CAPTURE -> if (stats.type == StreamType.Audio) {
+                audioDeviceToString(
+                    call.inputAudioDevice
+                )
+            } else {
+                call.core.videoDevice
+            }
+            StatType.PLAYBACK -> if (stats.type == StreamType.Audio) {
+                audioDeviceToString(
+                    call.outputAudioDevice
+                )
+            } else {
+                call.core.videoDisplayFilter
+            }
             StatType.PAYLOAD -> "${payloadType.mimeType}/${payloadType.clockRate / 1000} kHz"
             StatType.ENCODER -> call.core.mediastreamerFactory.getDecoderText(payloadType.mimeType)
             StatType.DECODER -> call.core.mediastreamerFactory.getEncoderText(payloadType.mimeType)
             StatType.DOWNLOAD_BW -> "${stats.downloadBandwidth} kbits/s"
             StatType.UPLOAD_BW -> "${stats.uploadBandwidth} kbits/s"
             StatType.ICE -> stats.iceState.toString()
-            StatType.IP_FAM -> if (stats.ipFamilyOfRemote == AddressFamily.Inet6) "IPv6" else "IPv4"
+            StatType.IP_FAM -> if (stats.ipFamilyOfRemote == Address.Family.Inet6) "IPv6" else "IPv4"
             StatType.SENDER_LOSS -> DecimalFormat("##.##%").format(stats.senderLossRate)
             StatType.RECEIVER_LOSS -> DecimalFormat("##.##%").format(stats.receiverLossRate)
             StatType.JITTER -> DecimalFormat("##.## ms").format(stats.jitterBufferSizeMs)
@@ -86,14 +98,22 @@ class StatItemData(val type: StatType) {
                 when (call.currentParams.mediaEncryption) {
                     MediaEncryption.ZRTP -> {
                         if (stats.isZrtpKeyAgreementAlgoPostQuantum) {
-                            AppUtils.getString(R.string.call_settings_media_encryption_zrtp_post_quantum)
+                            AppUtils.getString(
+                                R.string.call_settings_media_encryption_zrtp_post_quantum
+                            )
                         } else {
                             AppUtils.getString(R.string.call_settings_media_encryption_zrtp)
                         }
                     }
-                    MediaEncryption.DTLS -> AppUtils.getString(R.string.call_settings_media_encryption_dtls)
-                    MediaEncryption.SRTP -> AppUtils.getString(R.string.call_settings_media_encryption_srtp)
-                    MediaEncryption.None -> AppUtils.getString(R.string.call_settings_media_encryption_none)
+                    MediaEncryption.DTLS -> AppUtils.getString(
+                        R.string.call_settings_media_encryption_dtls
+                    )
+                    MediaEncryption.SRTP -> AppUtils.getString(
+                        R.string.call_settings_media_encryption_srtp
+                    )
+                    MediaEncryption.None -> AppUtils.getString(
+                        R.string.call_settings_media_encryption_none
+                    )
                     else -> "Unexpected!"
                 }
             }

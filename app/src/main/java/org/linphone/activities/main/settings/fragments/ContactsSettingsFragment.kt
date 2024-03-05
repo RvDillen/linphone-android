@@ -67,8 +67,18 @@ class ContactsSettingsFragment : GenericSettingFragment<SettingsContactsFragment
             viewLifecycleOwner
         ) {
             it.consume {
-                Log.i("[Contacts Settings] Asking for WRITE_CONTACTS permission to be able to store presence")
+                Log.i(
+                    "[Contacts Settings] Asking for WRITE_CONTACTS permission to be able to store presence"
+                )
                 requestPermissions(arrayOf(android.Manifest.permission.WRITE_CONTACTS), 1)
+            }
+        }
+
+        viewModel.publishPresenceToggledEvent.observe(
+            viewLifecycleOwner
+        ) {
+            it.consume {
+                sharedViewModel.publishPresenceToggled.value = true
             }
         }
 

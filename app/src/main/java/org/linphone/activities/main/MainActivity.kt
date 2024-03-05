@@ -21,8 +21,10 @@ package org.linphone.activities.main
 
 import android.annotation.SuppressLint
 import android.annotation.TargetApi
+import android.app.Dialog
 import android.app.role.RoleManager
 import android.content.ComponentCallbacks2
+import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
 import android.net.Uri
@@ -33,14 +35,14 @@ import android.telecom.TelecomManager
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
+import android.view.inputmethod.InputMethodManager
 import androidx.annotation.StringRes
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
-import androidx.core.view.ViewCompat
-import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.doOnAttach
 import androidx.databinding.DataBindingUtil
 import androidx.fragment.app.FragmentContainerView
+import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.NavController
@@ -59,10 +61,15 @@ import org.linphone.R
 import org.linphone.activities.*
 import org.linphone.activities.assistant.AssistantActivity
 import org.linphone.activities.main.viewmodels.CallOverlayViewModel
+import org.linphone.activities.main.viewmodels.DialogViewModel
 import org.linphone.activities.main.viewmodels.SharedMainViewModel
 import org.linphone.activities.navigateToDialer
 import org.linphone.compatibility.Compatibility
 import org.linphone.contact.ContactsUpdatedListenerStub
+import org.linphone.core.AuthInfo
+import org.linphone.core.AuthMethod
+import org.linphone.core.Core
+import org.linphone.core.CoreListenerStub
 import org.linphone.core.CorePreferences
 import org.linphone.core.tools.Log
 import org.linphone.databinding.MainActivityBinding
@@ -114,6 +121,26 @@ class MainActivity : GenericActivity(), SnackBarActivity, NavController.OnDestin
     private var shouldTabsBeVisibleDependingOnDestination = true
     private var shouldTabsBeVisibleDueToOrientationAndKeyboard = true
 
+    private val authenticationRequestedEvent: MutableLiveData<Event<AuthInfo>> by lazy {
+        MutableLiveData<Event<AuthInfo>>()
+    }
+    private var authenticationRequiredDialog: Dialog? = null
+
+    private val coreListener: CoreListenerStub = object : CoreListenerStub() {
+        override fun onAuthenticationRequested(core: Core, authInfo: AuthInfo, method: AuthMethod) {
+            if (authInfo.username == null || authInfo.domain == null || authInfo.realm == null) {
+                return
+            }
+
+            Log.w(
+                "[Main Activity] Authentication requested for account [${authInfo.username}@${authInfo.domain}] with realm [${authInfo.realm}] using method [$method]"
+            )
+            authenticationRequestedEvent.value = Event(authInfo)
+        }
+    }
+
+    private val keyboardVisibilityListeners = arrayListOf<AppUtils.KeyboardVisibilityListener>()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -146,6 +173,14 @@ class MainActivity : GenericActivity(), SnackBarActivity, NavController.OnDestin
         ) {
             it.consume { message ->
                 showSnackBar(message)
+            }
+        }
+
+        authenticationRequestedEvent.observe(
+            this
+        ) {
+            it.consume { authInfo ->
+                showAuthenticationRequestedDialog(authInfo)
             }
         }
 
@@ -196,9 +231,11 @@ class MainActivity : GenericActivity(), SnackBarActivity, NavController.OnDestin
     override fun onResume() {
         super.onResume()
         coreContext.contactsManager.addListener(listener)
+        coreContext.core.addListener(coreListener)
     }
 
     override fun onPause() {
+        coreContext.core.removeListener(coreListener)
         coreContext.contactsManager.removeListener(listener)
         super.onPause()
     }
@@ -260,13 +297,17 @@ class MainActivity : GenericActivity(), SnackBarActivity, NavController.OnDestin
         registerComponentCallbacks(componentCallbacks)
         findNavController(R.id.nav_host_fragment).addOnDestinationChangedListener(this)
 
-        binding.rootCoordinatorLayout.viewTreeObserver.addOnGlobalLayoutListener {
+        binding.rootCoordinatorLayout.setKeyboardInsetListener { keyboardVisible ->
             val portraitOrientation = resources.configuration.orientation != Configuration.ORIENTATION_LANDSCAPE
-            val keyboardVisible = ViewCompat.getRootWindowInsets(binding.rootCoordinatorLayout)
-                ?.isVisible(WindowInsetsCompat.Type.ime()) == true
-            Log.d("[Tabs Fragment] Keyboard is ${if (keyboardVisible) "visible" else "invisible"}")
+            Log.i(
+                "[Main Activity] Keyboard is ${if (keyboardVisible) "visible" else "invisible"}, orientation is ${if (portraitOrientation) "portrait" else "landscape"}"
+            )
             shouldTabsBeVisibleDueToOrientationAndKeyboard = !portraitOrientation || !keyboardVisible
             updateTabsFragmentVisibility()
+
+            for (listener in keyboardVisibilityListeners) {
+                listener.onKeyboardVisibilityChanged(keyboardVisible)
+            }
         }
 
         initOverlay()
@@ -301,8 +342,26 @@ class MainActivity : GenericActivity(), SnackBarActivity, NavController.OnDestin
         updateTabsFragmentVisibility()
     }
 
+    fun addKeyboardVisibilityListener(listener: AppUtils.KeyboardVisibilityListener) {
+        keyboardVisibilityListeners.add(listener)
+    }
+
+    fun removeKeyboardVisibilityListener(listener: AppUtils.KeyboardVisibilityListener) {
+        keyboardVisibilityListeners.remove(listener)
+    }
+
     fun hideKeyboard() {
         currentFocus?.hideKeyboard()
+    }
+
+    fun showKeyboard() {
+        // Requires a text field to have the focus
+        if (currentFocus != null) {
+            (getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager)
+                .showSoftInput(currentFocus, 0)
+        } else {
+            Log.w("[Main Activity] Can't show the keyboard, no focused view")
+        }
     }
 
     fun hideStatusFragment(hide: Boolean) {
@@ -314,7 +373,9 @@ class MainActivity : GenericActivity(), SnackBarActivity, NavController.OnDestin
     }
 
     private fun handleIntentParams(intent: Intent) {
-        Log.i("[Main Activity] Handling intent with action [${intent.action}], type [${intent.type}] and data [${intent.data}]")
+        Log.i(
+            "[Main Activity] Handling intent with action [${intent.action}], type [${intent.type}] and data [${intent.data}]"
+        )
 
         when (intent.action) {
             Intent.ACTION_MAIN -> handleMainIntent(intent)
@@ -346,7 +407,23 @@ class MainActivity : GenericActivity(), SnackBarActivity, NavController.OnDestin
                             navigateToContact(contactId)
                         }
                     } else {
-                        handleTelOrSipUri(uri)
+                        val stringUri = uri.toString()
+                        if (stringUri.startsWith("linphone-config:")) {
+                            val remoteConfigUri = stringUri.substring("linphone-config:".length)
+                            if (corePreferences.autoRemoteProvisioningOnConfigUriHandler) {
+                                Log.w(
+                                    "[Main Activity] Remote provisioning URL set to [$remoteConfigUri], restarting Core now"
+                                )
+                                applyRemoteProvisioning(remoteConfigUri)
+                            } else {
+                                Log.i(
+                                    "[Main Activity] Remote provisioning URL found [$remoteConfigUri], asking for user validation"
+                                )
+                                showAcceptRemoteConfigurationDialog(remoteConfigUri)
+                            }
+                        } else {
+                            handleTelOrSipUri(uri)
+                        }
                     }
                 }
             }
@@ -370,7 +447,12 @@ class MainActivity : GenericActivity(), SnackBarActivity, NavController.OnDestin
         // Prevent this intent to be processed again
         intent.action = null
         intent.data = null
-        intent.extras?.clear()
+        val extras = intent.extras
+        if (extras != null) {
+            for (key in extras.keySet()) {
+                intent.removeExtra(key)
+            }
+        }
     }
 
     private fun handleMainIntent(intent: Intent) {
@@ -386,7 +468,9 @@ class MainActivity : GenericActivity(), SnackBarActivity, NavController.OnDestin
                 if (intent.hasExtra("RemoteSipUri") && intent.hasExtra("LocalSipUri")) {
                     val peerAddress = intent.getStringExtra("RemoteSipUri")
                     val localAddress = intent.getStringExtra("LocalSipUri")
-                    Log.i("[Main Activity] Found chat room intent extra: local SIP URI=[$localAddress], peer SIP URI=[$peerAddress]")
+                    Log.i(
+                        "[Main Activity] Found chat room intent extra: local SIP URI=[$localAddress], peer SIP URI=[$peerAddress]"
+                    )
                     navigateToChatRoom(localAddress, peerAddress)
                 } else {
                     Log.i("[Main Activity] Found chat intent extra, go to chat rooms list")
@@ -395,17 +479,30 @@ class MainActivity : GenericActivity(), SnackBarActivity, NavController.OnDestin
             }
             intent.hasExtra("Dialer") -> {
                 Log.i("[Main Activity] Found dialer intent extra, go to dialer")
-                val args = Bundle()
-                args.putBoolean("Transfer", intent.getBooleanExtra("Transfer", false))
-                navigateToDialer(args)
+                val isTransfer = intent.getBooleanExtra("Transfer", false)
+                sharedViewModel.pendingCallTransfer = isTransfer
+                navigateToDialer()
+            }
+            intent.hasExtra("Contacts") -> {
+                Log.i("[Main Activity] Found contacts intent extra, go to contacts list")
+                val isTransfer = intent.getBooleanExtra("Transfer", false)
+                sharedViewModel.pendingCallTransfer = isTransfer
+                navigateToContacts()
             }
             else -> {
                 val core = coreContext.core
                 val call = core.currentCall ?: core.calls.firstOrNull()
                 if (call != null) {
-                    Log.i("[Main Activity] Launcher clicked while there is at least one active call, go to CallActivity")
-                    val callIntent = Intent(this, org.linphone.activities.voip.CallActivity::class.java)
-                    callIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
+                    Log.i(
+                        "[Main Activity] Launcher clicked while there is at least one active call, go to CallActivity"
+                    )
+                    val callIntent = Intent(
+                        this,
+                        org.linphone.activities.voip.CallActivity::class.java
+                    )
+                    callIntent.addFlags(
+                        Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
+                    )
                     startActivity(callIntent)
                 }
             }
@@ -437,7 +534,12 @@ class MainActivity : GenericActivity(), SnackBarActivity, NavController.OnDestin
             }
         }
 
-        val address = coreContext.core.interpretUrl(addressToCall, LinphoneUtils.applyInternationalPrefix())
+        addressToCall = addressToCall.replace("%40", "@")
+
+        val address = coreContext.core.interpretUrl(
+            addressToCall,
+            LinphoneUtils.applyInternationalPrefix()
+        )
         if (address != null) {
             addressToCall = address.asStringUriOnly()
         }
@@ -536,8 +638,13 @@ class MainActivity : GenericActivity(), SnackBarActivity, NavController.OnDestin
 
             val localAddress =
                 coreContext.core.defaultAccount?.params?.identityAddress?.asStringUriOnly()
-            val peerAddress = coreContext.core.interpretUrl(addressToIM, LinphoneUtils.applyInternationalPrefix())?.asStringUriOnly()
-            Log.i("[Main Activity] Navigating to chat room with local [$localAddress] and peer [$peerAddress] addresses")
+            val peerAddress = coreContext.core.interpretUrl(
+                addressToIM,
+                LinphoneUtils.applyInternationalPrefix()
+            )?.asStringUriOnly()
+            Log.i(
+                "[Main Activity] Navigating to chat room with local [$localAddress] and peer [$peerAddress] addresses"
+            )
             navigateToChatRoom(localAddress, peerAddress)
         } else {
             val shortcutId = intent.getStringExtra("android.intent.extra.shortcut.ID") // Intent.EXTRA_SHORTCUT_ID
@@ -556,10 +663,14 @@ class MainActivity : GenericActivity(), SnackBarActivity, NavController.OnDestin
         if (split.size == 2) {
             val localAddress = split[0]
             val peerAddress = split[1]
-            Log.i("[Main Activity] Navigating to chat room with local [$localAddress] and peer [$peerAddress] addresses, computed from shortcut/locus id")
+            Log.i(
+                "[Main Activity] Navigating to chat room with local [$localAddress] and peer [$peerAddress] addresses, computed from shortcut/locus id"
+            )
             navigateToChatRoom(localAddress, peerAddress)
         } else {
-            Log.e("[Main Activity] Failed to parse shortcut/locus id: $id, going to chat rooms list")
+            Log.e(
+                "[Main Activity] Failed to parse shortcut/locus id: $id, going to chat rooms list"
+            )
             navigateToChatRooms()
         }
     }
@@ -599,5 +710,92 @@ class MainActivity : GenericActivity(), SnackBarActivity, NavController.OnDestin
         callOverlay.setOnClickListener {
             coreContext.onCallOverlayClick()
         }
+    }
+
+    private fun applyRemoteProvisioning(remoteConfigUri: String) {
+        coreContext.core.provisioningUri = remoteConfigUri
+        coreContext.core.stop()
+        coreContext.core.start()
+    }
+
+    private fun showAcceptRemoteConfigurationDialog(remoteConfigUri: String) {
+        val dialogViewModel = DialogViewModel(
+            remoteConfigUri,
+            getString(R.string.dialog_apply_remote_provisioning_title)
+        )
+        val dialog = DialogUtils.getDialog(this, dialogViewModel)
+
+        dialogViewModel.showCancelButton {
+            Log.i("[Main Activity] User cancelled remote provisioning config")
+            dialog.dismiss()
+        }
+
+        val okLabel = getString(
+            R.string.dialog_apply_remote_provisioning_button
+        )
+        dialogViewModel.showOkButton(
+            {
+                Log.w(
+                    "[Main Activity] Remote provisioning URL set to [$remoteConfigUri], restarting Core now"
+                )
+                applyRemoteProvisioning(remoteConfigUri)
+                dialog.dismiss()
+            },
+            okLabel
+        )
+
+        dialog.show()
+    }
+
+    private fun showAuthenticationRequestedDialog(
+        authInfo: AuthInfo
+    ) {
+        authenticationRequiredDialog?.dismiss()
+
+        val accountFound = coreContext.core.accountList.find {
+            it.params.identityAddress?.username == authInfo.username && it.params.identityAddress?.domain == authInfo.domain
+        }
+        if (accountFound == null) {
+            Log.w("[Main Activity] Failed to find account matching auth info, aborting auth dialog")
+            return
+        }
+
+        val identity = "${authInfo.username}@${authInfo.domain}"
+        Log.i("[Main Activity] Showing authentication required dialog for account [$identity]")
+
+        val dialogViewModel = DialogViewModel(
+            getString(R.string.dialog_authentication_required_message, identity),
+            getString(R.string.dialog_authentication_required_title)
+        )
+        dialogViewModel.showPassword = true
+        dialogViewModel.passwordTitle = getString(
+            R.string.settings_password_protection_dialog_input_hint
+        )
+        val dialog = DialogUtils.getDialog(this, dialogViewModel)
+
+        dialogViewModel.showCancelButton {
+            dialog.dismiss()
+            authenticationRequiredDialog = null
+        }
+
+        dialogViewModel.showOkButton(
+            {
+                Log.i(
+                    "[Main Activity] Updating password for account [$identity] using auth info [$authInfo]"
+                )
+                val newPassword = dialogViewModel.password
+                authInfo.password = newPassword
+                coreContext.core.addAuthInfo(authInfo)
+
+                coreContext.core.refreshRegisters()
+
+                dialog.dismiss()
+                authenticationRequiredDialog = null
+            },
+            getString(R.string.dialog_authentication_required_change_password_label)
+        )
+
+        dialog.show()
+        authenticationRequiredDialog = dialog
     }
 }

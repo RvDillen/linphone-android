@@ -54,9 +54,9 @@ open class StatusViewModel : ViewModel() {
             core: Core,
             event: Event,
             notifiedEvent: String,
-            body: Content
+            body: Content?
         ) {
-            if (body.type == "application" && body.subtype == "simple-message-summary" && body.size > 0) {
+            if (body?.type == "application" && body.subtype == "simple-message-summary" && body.size > 0) {
                 val data = body.utf8Text?.lowercase(Locale.getDefault())
                 val voiceMail = data?.split("voice-message: ")
                 if ((voiceMail?.size ?: 0) >= 2) {
@@ -101,7 +101,7 @@ open class StatusViewModel : ViewModel() {
     private fun getStatusIconText(state: RegistrationState): Int {
         return when (state) {
             RegistrationState.Ok -> R.string.status_connected
-            RegistrationState.Progress -> R.string.status_in_progress
+            RegistrationState.Progress, RegistrationState.Refreshing -> R.string.status_in_progress
             RegistrationState.Failed -> R.string.status_error
             else -> R.string.status_not_connected
         }
@@ -110,7 +110,7 @@ open class StatusViewModel : ViewModel() {
     private fun getStatusIconResource(state: RegistrationState): Int {
         return when (state) {
             RegistrationState.Ok -> R.drawable.led_registered
-            RegistrationState.Progress -> R.drawable.led_registration_in_progress
+            RegistrationState.Progress, RegistrationState.Refreshing -> R.drawable.led_registration_in_progress
             RegistrationState.Failed -> R.drawable.led_error
             else -> R.drawable.led_not_registered
         }

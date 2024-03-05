@@ -50,7 +50,9 @@ class NativeCallWrapper(var callId: String) : Connection() {
     }
 
     override fun onStateChanged(state: Int) {
-        Log.i("[Connection] Telecom state changed [${intStateToString(state)}] for call with id: $callId")
+        Log.i(
+            "[Connection] Telecom state changed [${intStateToString(state)}] for call with id: $callId"
+        )
         super.onStateChanged(state)
     }
 
@@ -61,13 +63,25 @@ class NativeCallWrapper(var callId: String) : Connection() {
 
     override fun onHold() {
         Log.i("[Connection] Pausing telecom call with id: $callId")
-        getCall()?.pause() ?: selfDestroy()
+        getCall()?.let { call ->
+            if (call.conference != null) {
+                call.conference?.leave()
+            } else {
+                call.pause()
+            }
+        } ?: selfDestroy()
         setOnHold()
     }
 
     override fun onUnhold() {
         Log.i("[Connection] Resuming telecom call with id: $callId")
-        getCall()?.resume() ?: selfDestroy()
+        getCall()?.let { call ->
+            if (call.conference != null) {
+                call.conference?.enter()
+            } else {
+                call.resume()
+            }
+        } ?: selfDestroy()
         setActive()
     }
 
@@ -76,11 +90,31 @@ class NativeCallWrapper(var callId: String) : Connection() {
 
         val call = getCall()
         if (call != null) {
+            if (getState() != STATE_ACTIVE && getState() != STATE_DIALING) {
+                Log.w(
+                    "[Connection] Call state isn't STATE_ACTIVE or STATE_DIALING, ignoring mute mic & audio route directive from TelecomManager"
+                )
+                return
+            }
+
+            if (state.isMuted != call.microphoneMuted) {
+                Log.w(
+                    "[Connection] Connection audio state asks for changing in mute: ${state.isMuted}, currently is ${call.microphoneMuted}"
+                )
+                if (state.isMuted) {
+                    Log.w("[Connection] Muting microphone")
+                    call.microphoneMuted = true
+                }
+            }
+
             when (state.route) {
                 CallAudioState.ROUTE_EARPIECE -> AudioRouteUtils.routeAudioToEarpiece(call, true)
                 CallAudioState.ROUTE_SPEAKER -> AudioRouteUtils.routeAudioToSpeaker(call, true)
                 CallAudioState.ROUTE_BLUETOOTH -> AudioRouteUtils.routeAudioToBluetooth(call, true)
-                CallAudioState.ROUTE_WIRED_HEADSET -> AudioRouteUtils.routeAudioToHeadset(call, true)
+                CallAudioState.ROUTE_WIRED_HEADSET -> AudioRouteUtils.routeAudioToHeadset(
+                    call,
+                    true
+                )
             }
         } else {
             selfDestroy()

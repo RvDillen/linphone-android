@@ -1,9 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
-<layout xmlns:android="http://schemas.android.com/apk/res/android">
+<layout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <data>
 
         <import type="android.view.View" />
+        <import type="org.linphone.core.ConsolidatedPresence"/>
 
         <variable
             name="clickListener"
@@ -91,6 +94,18 @@
                 android:contentDescription="@null"
                 android:background="@drawable/generated_avatar_bg"
                 android:src="@drawable/voip_single_contact_avatar" />
+
+            <ImageView
+                android:layout_width="@dimen/contact_presence_badge_size"
+                android:layout_height="@dimen/contact_presence_badge_size"
+                android:layout_alignBottom="@id/avatar"
+                android:layout_marginStart="25dp"
+                android:adjustViewBounds="true"
+                android:background="@drawable/led_background"
+                android:padding="@dimen/contact_presence_badge_padding"
+                app:presenceIcon="@{viewModel.presenceStatus}"
+                android:visibility="@{viewModel.presenceStatus == ConsolidatedPresence.Offline ? View.GONE : View.VISIBLE, default=gone}"
+                tools:ignore="ContentDescription" />
 
             <ImageView
                 android:id="@+id/icon"

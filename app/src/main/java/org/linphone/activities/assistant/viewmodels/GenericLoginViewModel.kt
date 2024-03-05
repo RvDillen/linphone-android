@@ -62,17 +62,16 @@ class GenericLoginViewModel(private val accountCreator: AccountCreator) : ViewMo
         MutableLiveData<Event<String>>()
     }
 
-    private var proxyConfigToCheck: ProxyConfig? = null
+    private var accountToCheck: Account? = null
 
     private val coreListener = object : CoreListenerStub() {
-        @Deprecated("Deprecated in Java")
-        override fun onRegistrationStateChanged(
+        override fun onAccountRegistrationStateChanged(
             core: Core,
-            cfg: ProxyConfig,
-            state: RegistrationState,
+            account: Account,
+            state: RegistrationState?,
             message: String
         ) {
-            if (cfg == proxyConfigToCheck) {
+            if (account == accountToCheck) {
                 Log.i("[Assistant] [Generic Login] Registration state is $state: $message")
                 if (state == RegistrationState.Ok) {
                     waitForServerAnswer.value = false
@@ -107,19 +106,28 @@ class GenericLoginViewModel(private val accountCreator: AccountCreator) : ViewMo
     }
 
     fun removeInvalidProxyConfig() {
-        val cfg = proxyConfigToCheck
-        cfg ?: return
-        val authInfo = cfg.findAuthInfo()
-        if (authInfo != null) coreContext.core.removeAuthInfo(authInfo)
-        coreContext.core.removeProxyConfig(cfg)
-        proxyConfigToCheck = null
+        val account = accountToCheck
+        account ?: return
+
+        val core = coreContext.core
+        val authInfo = account.findAuthInfo()
+        if (authInfo != null) core.removeAuthInfo(authInfo)
+        core.removeAccount(account)
+        accountToCheck = null
+
+        // Make sure there is a valid default account
+        val accounts = core.accountList
+        if (accounts.isNotEmpty() && core.defaultAccount == null) {
+            core.defaultAccount = accounts.first()
+            core.refreshRegisters()
+        }
     }
 
     fun continueEvenIfInvalidCredentials() {
         leaveAssistantEvent.value = Event(true)
     }
 
-    fun createProxyConfig() {
+    fun createAccountAndAuthInfo() {
         waitForServerAnswer.value = true
         coreContext.core.addListener(coreListener)
 
@@ -129,21 +137,23 @@ class GenericLoginViewModel(private val accountCreator: AccountCreator) : ViewMo
         accountCreator.displayName = displayName.value
         accountCreator.transport = transport.value
 
-        val proxyConfig: ProxyConfig? = accountCreator.createProxyConfig()
-        proxyConfigToCheck = proxyConfig
+        val account = accountCreator.createAccountInCore()
+        accountToCheck = account
 
-        if (proxyConfig == null) {
-            Log.e("[Assistant] [Generic Login] Account creator couldn't create proxy config")
+        if (account == null) {
+            Log.e("[Assistant] [Generic Login] Account creator couldn't create account")
             coreContext.core.removeListener(coreListener)
             onErrorEvent.value = Event("Error: Failed to create account object")
             waitForServerAnswer.value = false
             return
         }
 
-        Log.i("[Assistant] [Generic Login] Proxy config created")
+        Log.i("[Assistant] [Generic Login] Account created")
     }
 
     private fun isLoginButtonEnabled(): Boolean {
-        return username.value.orEmpty().isNotEmpty() && domain.value.orEmpty().isNotEmpty() && password.value.orEmpty().isNotEmpty()
+        return username.value.orEmpty().isNotEmpty() &&
+            domain.value.orEmpty().isNotEmpty() &&
+            password.value.orEmpty().isNotEmpty()
     }
 }

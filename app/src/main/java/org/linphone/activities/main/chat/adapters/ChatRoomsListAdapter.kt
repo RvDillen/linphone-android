@@ -31,13 +31,14 @@ import org.linphone.activities.main.adapters.SelectionListAdapter
 import org.linphone.activities.main.chat.data.ChatRoomData
 import org.linphone.activities.main.viewmodels.ListTopBarViewModel
 import org.linphone.core.ChatRoom
+import org.linphone.core.tools.Log
 import org.linphone.databinding.ChatRoomListCellBinding
 import org.linphone.utils.Event
 
 class ChatRoomsListAdapter(
     selectionVM: ListTopBarViewModel,
     private val viewLifecycleOwner: LifecycleOwner
-) : SelectionListAdapter<ChatRoom, RecyclerView.ViewHolder>(selectionVM, ChatRoomDiffCallback()) {
+) : SelectionListAdapter<ChatRoomData, RecyclerView.ViewHolder>(selectionVM, ChatRoomDiffCallback()) {
     val selectedChatRoomEvent: MutableLiveData<Event<ChatRoom>> by lazy {
         MutableLiveData<Event<ChatRoom>>()
     }
@@ -47,7 +48,9 @@ class ChatRoomsListAdapter(
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
         val binding: ChatRoomListCellBinding = DataBindingUtil.inflate(
             LayoutInflater.from(parent.context),
-            R.layout.chat_room_list_cell, parent, false
+            R.layout.chat_room_list_cell,
+            parent,
+            false
         )
         return ViewHolder(binding)
     }
@@ -64,9 +67,25 @@ class ChatRoomsListAdapter(
     inner class ViewHolder(
         private val binding: ChatRoomListCellBinding
     ) : RecyclerView.ViewHolder(binding.root) {
-        fun bind(chatRoom: ChatRoom) {
+        fun bind(chatRoomData: ChatRoomData) {
             with(binding) {
-                data = ChatRoomData(chatRoom)
+                chatRoomData.update()
+                data = chatRoomData
+
+                chatRoomData.contactNewlyFoundEvent.observe(viewLifecycleOwner) {
+                    it.consume {
+                        // Post to prevent IllegalStateException: Cannot call this method while RecyclerView is computing a layout or scrolling
+                        binding.root.post {
+                            try {
+                                notifyItemChanged(bindingAdapterPosition)
+                            } catch (e: Exception) {
+                                Log.e(
+                                    "[Chat Rooms Adapter] Can't notify item [$bindingAdapterPosition] has changed: $e"
+                                )
+                            }
+                        }
+                    }
+                }
 
                 lifecycleOwner = viewLifecycleOwner
 
@@ -84,7 +103,7 @@ class ChatRoomsListAdapter(
                     if (selectionViewModel.isEditionEnabled.value == true) {
                         selectionViewModel.onToggleSelect(bindingAdapterPosition)
                     } else {
-                        selectedChatRoomEvent.value = Event(chatRoom)
+                        selectedChatRoomEvent.value = Event(chatRoomData.chatRoom)
                     }
                 }
 
@@ -103,17 +122,17 @@ class ChatRoomsListAdapter(
     }
 }
 
-private class ChatRoomDiffCallback : DiffUtil.ItemCallback<ChatRoom>() {
+private class ChatRoomDiffCallback : DiffUtil.ItemCallback<ChatRoomData>() {
     override fun areItemsTheSame(
-        oldItem: ChatRoom,
-        newItem: ChatRoom
+        oldItem: ChatRoomData,
+        newItem: ChatRoomData
     ): Boolean {
-        return oldItem == newItem
+        return oldItem.id == newItem.id
     }
 
     override fun areContentsTheSame(
-        oldItem: ChatRoom,
-        newItem: ChatRoom
+        oldItem: ChatRoomData,
+        newItem: ChatRoomData
     ): Boolean {
         return false // To force redraw
     }

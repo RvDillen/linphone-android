@@ -146,12 +146,20 @@ Warning: This command won't print anything until you reproduce the crash!
 
 ## Create an APK with a different package name
 
-Before the 4.1 release, there were a lot of files to edit to change the package name.  
-Now, simply edit the app/build.gradle file and change the value returned by method ```getPackageName()```  
+Simply edit the app/build.gradle file and change the value of the ```packageName``` variable.
 The next build will automatically use this value everywhere thanks to ```manifestPlaceholders``` feature of gradle and Android.
 
 You may have already noticed that the app installed by Android Studio has ```org.linphone.debug``` package name.  
 If you build the app as release, the package name will be ```org.linphone```.
+
+If you encounter
+```
+Execution failed for task ':app:processDebugGoogleServices'.
+> No matching client found for package name 'your package name'
+```
+
+error when building, make sure you have replaced ```app/google-services.json``` file by yours (containing your package name).
+If you don't have such file, remove ours.
 
 ## Firebase push notifications
 
@@ -168,6 +176,10 @@ If you have your own push server, replace this file by yours.
 We no longer use transifex for the translation process, instead we have deployed our own instance of [Weblate](https://weblate.linphone.org/).
 
 Due to the full app rewrite we can't re-use previous translations, so we'll be very happy if you want to contribute.
+
+<a href="https://weblate.linphone.org/engage/linphone/?utm_source=widget">
+<img src="https://weblate.linphone.org/widgets/linphone/-/linphone-android/multi-auto.svg" alt="Translation status" />
+</a>
 
 # CONTRIBUTIONS
 

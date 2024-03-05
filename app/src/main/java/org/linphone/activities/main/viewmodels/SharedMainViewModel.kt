@@ -39,10 +39,6 @@ class SharedMainViewModel : ViewModel() {
 
     /* Chat */
 
-    val chatRoomFragmentOpenedEvent: MutableLiveData<Event<Boolean>> by lazy {
-        MutableLiveData<Event<Boolean>>()
-    }
-
     val selectedChatRoom = MutableLiveData<ChatRoom>()
     var destructionPendingChatRoom: ChatRoom? = null
 
@@ -75,10 +71,6 @@ class SharedMainViewModel : ViewModel() {
 
     /* Contacts */
 
-    val contactFragmentOpenedEvent: MutableLiveData<Event<Boolean>> by lazy {
-        MutableLiveData<Event<Boolean>>()
-    }
-
     val selectedContact = MutableLiveData<Friend>()
 
     // For correct animations directions
@@ -88,9 +80,17 @@ class SharedMainViewModel : ViewModel() {
 
     /* Accounts */
 
-    val defaultAccountChanged = MutableLiveData<Boolean>()
+    val defaultAccountChanged: MutableLiveData<Boolean> by lazy {
+        MutableLiveData<Boolean>()
+    }
 
-    val accountRemoved = MutableLiveData<Boolean>()
+    val accountRemoved: MutableLiveData<Boolean> by lazy {
+        MutableLiveData<Boolean>()
+    }
+
+    val publishPresenceToggled: MutableLiveData<Boolean> by lazy {
+        MutableLiveData<Boolean>()
+    }
 
     val accountSettingsFragmentOpenedEvent: MutableLiveData<Event<Boolean>> by lazy {
         MutableLiveData<Event<Boolean>>()

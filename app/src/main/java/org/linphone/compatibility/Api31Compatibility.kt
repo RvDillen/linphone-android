@@ -19,7 +19,6 @@
  */
 package org.linphone.compatibility
 
-import android.Manifest
 import android.annotation.TargetApi
 import android.app.*
 import android.content.Context
@@ -52,12 +51,29 @@ class Api31Compatibility {
             notificationsManager: NotificationsManager
         ): Notification {
             val remoteContact = call.remoteContact
-            val conferenceAddress = if (remoteContact != null) coreContext.core.interpretUrl(remoteContact, false) else null
-            val conferenceInfo = if (conferenceAddress != null) coreContext.core.findConferenceInformationFromUri(conferenceAddress) else null
-            if (conferenceInfo != null) {
-                Log.i("[Notifications Manager] Displaying incoming group call notification with subject ${conferenceInfo.subject} and remote contact address $remoteContact")
+            val conferenceAddress = if (remoteContact != null) {
+                coreContext.core.interpretUrl(
+                    remoteContact,
+                    false
+                )
             } else {
-                Log.i("[Notifications Manager] No conference info found for remote contact address $remoteContact")
+                null
+            }
+            val conferenceInfo = if (conferenceAddress != null) {
+                coreContext.core.findConferenceInformationFromUri(
+                    conferenceAddress
+                )
+            } else {
+                null
+            }
+            if (conferenceInfo != null) {
+                Log.i(
+                    "[Notifications Manager] Displaying incoming group call notification with subject ${conferenceInfo.subject} and remote contact address $remoteContact"
+                )
+            } else {
+                Log.i(
+                    "[Notifications Manager] No conference info found for remote contact address $remoteContact"
+                )
             }
 
             val caller = if (conferenceInfo == null) {
@@ -77,7 +93,15 @@ class Api31Compatibility {
                     .build()
             } else {
                 Person.Builder()
-                    .setName(if (conferenceInfo.subject.isNullOrEmpty()) context.getString(R.string.conference_incoming_title) else conferenceInfo.subject)
+                    .setName(
+                        if (conferenceInfo.subject.isNullOrEmpty()) {
+                            context.getString(
+                                R.string.conference_incoming_title
+                            )
+                        } else {
+                            conferenceInfo.subject
+                        }
+                    )
                     .setIcon(coreContext.contactsManager.groupAvatar.toIcon(context))
                     .setImportant(false)
                     .build()
@@ -90,7 +114,10 @@ class Api31Compatibility {
             val isVideoAutomaticallyAccepted = call.core.videoActivationPolicy.automaticallyAccept
             val isVideo = isVideoEnabledInRemoteParams && isVideoAutomaticallyAccepted
 
-            val builder = Notification.Builder(context, context.getString(R.string.notification_channel_incoming_call_id)).apply {
+            val builder = Notification.Builder(
+                context,
+                context.getString(R.string.notification_channel_incoming_call_id)
+            ).apply {
                 try {
                     style = Notification.CallStyle.forIncomingCall(
                         caller,
@@ -98,8 +125,16 @@ class Api31Compatibility {
                         answerIntent
                     ).setIsVideo(isVideo)
                 } catch (iae: IllegalArgumentException) {
-                    Log.e("[Api31 Compatibility] Can't use notification call style: $iae, using API 26 notification instead")
-                    return Api26Compatibility.createIncomingCallNotification(context, call, notifiable, pendingIntent, notificationsManager)
+                    Log.e(
+                        "[Api31 Compatibility] Can't use notification call style: $iae, using API 26 notification instead"
+                    )
+                    return Api26Compatibility.createIncomingCallNotification(
+                        context,
+                        call,
+                        notifiable,
+                        pendingIntent,
+                        notificationsManager
+                    )
                 }
                 setSmallIcon(R.drawable.topbar_call_notification)
                 setCategory(Notification.CATEGORY_CALL)
@@ -128,11 +163,21 @@ class Api31Compatibility {
             notificationsManager: NotificationsManager
         ): Notification {
             val conferenceAddress = LinphoneUtils.getConferenceAddress(call)
-            val conferenceInfo = if (conferenceAddress != null) coreContext.core.findConferenceInformationFromUri(conferenceAddress) else null
-            if (conferenceInfo != null) {
-                Log.i("[Notifications Manager] Displaying group call notification with subject ${conferenceInfo.subject}")
+            val conferenceInfo = if (conferenceAddress != null) {
+                coreContext.core.findConferenceInformationFromUri(
+                    conferenceAddress
+                )
             } else {
-                Log.i("[Notifications Manager] No conference info found for remote contact address ${call.remoteAddress} (${call.remoteContact})")
+                null
+            }
+            if (conferenceInfo != null) {
+                Log.i(
+                    "[Notifications Manager] Displaying group call notification with subject ${conferenceInfo.subject}"
+                )
+            } else {
+                Log.i(
+                    "[Notifications Manager] No conference info found for remote contact address ${call.remoteAddress} (${call.remoteContact})"
+                )
             }
 
             val caller = if (conferenceInfo == null) {
@@ -173,14 +218,24 @@ class Api31Compatibility {
             val declineIntent = notificationsManager.getCallDeclinePendingIntent(notifiable)
 
             val builder = Notification.Builder(
-                context, channel
+                context,
+                channel
             ).apply {
                 try {
                     style = Notification.CallStyle.forOngoingCall(caller, declineIntent)
                         .setIsVideo(isVideo)
                 } catch (iae: IllegalArgumentException) {
-                    Log.e("[Api31 Compatibility] Can't use notification call style: $iae, using API 26 notification instead")
-                    return Api26Compatibility.createCallNotification(context, call, notifiable, pendingIntent, channel, notificationsManager)
+                    Log.e(
+                        "[Api31 Compatibility] Can't use notification call style: $iae, using API 26 notification instead"
+                    )
+                    return Api26Compatibility.createCallNotification(
+                        context,
+                        call,
+                        notifiable,
+                        pendingIntent,
+                        channel,
+                        notificationsManager
+                    )
                 }
                 setSmallIcon(iconResourceId)
                 setAutoCancel(false)
@@ -206,6 +261,10 @@ class Api31Compatibility {
                 context.startForegroundService(intent)
             } catch (fssnae: ForegroundServiceStartNotAllowedException) {
                 Log.e("[Api31 Compatibility] Can't start service as foreground! $fssnae")
+            } catch (se: SecurityException) {
+                Log.e("[Api31 Compatibility] Can't start service as foreground! $se")
+            } catch (e: Exception) {
+                Log.e("[Api31 Compatibility] Can't start service as foreground! $e")
             }
         }
 
@@ -214,6 +273,10 @@ class Api31Compatibility {
                 service.startForeground(notifId, notif)
             } catch (fssnae: ForegroundServiceStartNotAllowedException) {
                 Log.e("[Api31 Compatibility] Can't start service as foreground! $fssnae")
+            } catch (se: SecurityException) {
+                Log.e("[Api31 Compatibility] Can't start service as foreground! $se")
+            } catch (e: Exception) {
+                Log.e("[Api31 Compatibility] Can't start service as foreground! $e")
             }
         }
 
@@ -230,15 +293,13 @@ class Api31Compatibility {
                     .build()
                 try {
                     activity.setPictureInPictureParams(params)
-                    Log.i("[Call] PiP auto enter enabled params set to $enable with ${if (conference) "portrait" else "landscape"} aspect ratio")
+                    Log.i(
+                        "[Call] PiP auto enter enabled params set to $enable with ${if (conference) "portrait" else "landscape"} aspect ratio"
+                    )
                 } catch (e: Exception) {
                     Log.e("[Call] Can't build PiP params: $e")
                 }
             }
-        }
-
-        fun hasBluetoothConnectPermission(context: Context): Boolean {
-            return Compatibility.hasPermission(context, Manifest.permission.BLUETOOTH_CONNECT)
         }
     }
 }

@@ -377,7 +377,6 @@
     <string name="settings_chat_title">Chatear</string>
     <string name="settings_network_title">Red</string>
     <string name="settings_advanced_title">Avanzado</string>
-    <string name="audio_settings_echo_cancellation_title">Cancelación de eco</string>
     <string name="audio_settings_echo_cancellation_summary">Elimina el eco que se escucha por el otro extremo</string>
     <string name="audio_settings_echo_canceller_calibration_summary">Pulse para iniciar la calibración del cancelador de eco</string>
     <string name="audio_settings_echo_cancellation_calibration_started">Se inició la calibración del cancelador de eco</string>
@@ -572,4 +571,11 @@
     <string name="call_settings_use_telecom_manager_summary">Requiere permisos adicionales</string>
     <string name="content_descripton_scroll_to_bottom">Desplazarse al final o al primer mensaje no leído</string>
     <string name="call_settings_use_telecom_manager_title">Mejorar las interacciones con los dispositivos bluetooth</string>
+    <string name="chat_room_presence_online">En línea</string>
+    <string name="chat_room_context_menu_go_to_contact">Ir al contacto</string>
+    <string name="chat_message_context_menu_turn_off_notifications">Desactiva notificaciones</string>
+    <string name="chat_message_context_menu_turn_on_notifications">Habilita notificaciones</string>
+    <string name="chat_message_download_already_in_progress">"Por favor esperar que  finalice la bajada antes de comenzar otra"</string>
+    <string name="chat_message_voice_recording_received_notification">Tu has recibido un mensaje de voz</string>
+    <string name="chat_message_voice_recording">Mensaje de voz</string>
 </resources>

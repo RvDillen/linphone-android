@@ -4,6 +4,7 @@
 
     <data>
         <import type="android.view.View"/>
+        <import type="android.text.InputType"/>
         <variable
             name="viewModel"
             type="org.linphone.activities.main.viewmodels.DialogViewModel" />
@@ -42,6 +43,42 @@
             android:layout_margin="15dp"
             android:gravity="center"
             android:text="@{viewModel.message, default=Message}"/>
+
+        <TextView
+            android:textColor="?attr/accentColor"
+            android:textSize="16sp"
+            android:textColorLink="@color/primary_color"
+            android:autoLink="web"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:text="@string/assistant_forgotten_password_link"
+            android:visibility="@{viewModel.showSubscribeLinphoneOrgLink ? View.VISIBLE : View.GONE}" />
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/settings_input_layout"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_margin="@dimen/settings_margin"
+            android:hint="@{viewModel.passwordTitle}"
+            android:textColorHint="@color/white_color"
+            android:visibility="@{viewModel.showPassword ? View.VISIBLE : View.GONE}"
+            app:helperTextTextColor="@color/white_color"
+            app:helperText="@{viewModel.passwordSubtitle}"
+            app:helperTextEnabled="@{viewModel.passwordSubtitle.length() > 0}">
+
+            <org.linphone.views.SettingTextInputEditText
+                android:id="@+id/settings_input"
+                android:text="@={viewModel.password}"
+                android:imeOptions="actionDone"
+                android:inputType="@{InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD}"
+                android:maxLines="1"
+                android:background="@color/transparent_color"
+                android:textColor="@color/white_color"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"/>
+
+        </com.google.android.material.textfield.TextInputLayout>
 
         <LinearLayout
             android:layout_width="wrap_content"

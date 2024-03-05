@@ -30,6 +30,7 @@ import java.security.KeyStoreException
 import org.linphone.LinphoneApplication.Companion.coreContext
 import org.linphone.compatibility.Compatibility
 import org.linphone.core.tools.Log
+import org.linphone.utils.LinphoneUtils
 
 class CorePreferences constructor(private val context: Context) {
     private var _config: Config? = null
@@ -52,9 +53,12 @@ class CorePreferences constructor(private val context: Context) {
             context,
             MasterKey.DEFAULT_MASTER_KEY_ALIAS
         ).setKeyScheme(MasterKey.KeyScheme.AES256_GCM).build()
+
         try {
             EncryptedSharedPreferences.create(
-                context, encryptedSharedPreferencesFile, masterKey,
+                context,
+                encryptedSharedPreferencesFile,
+                masterKey,
                 EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
                 EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
             )
@@ -86,18 +90,6 @@ class CorePreferences constructor(private val context: Context) {
             // TODO: decide if we do it
             // logcatLogsOutput = false
         }
-
-    fun chatRoomMuted(id: String): Boolean {
-        val sharedPreferences: SharedPreferences = coreContext.context.getSharedPreferences("notifications", Context.MODE_PRIVATE)
-        return sharedPreferences.getBoolean(id, false)
-    }
-
-    fun muteChatRoom(id: String, mute: Boolean) {
-        val sharedPreferences: SharedPreferences = coreContext.context.getSharedPreferences("notifications", Context.MODE_PRIVATE)
-        val editor = sharedPreferences.edit()
-        editor.putBoolean(id, mute)
-        editor.apply()
-    }
 
     /* App settings */
 
@@ -277,6 +269,12 @@ class CorePreferences constructor(private val context: Context) {
             config.setBool("app", "contact_shortcuts", value)
         }
 
+    var publishPresence: Boolean
+        get() = config.getBool("app", "publish_presence", true)
+        set(value) {
+            config.setBool("app", "publish_presence", value)
+        }
+
     /* Call */
 
     var isDeviceRingtoneEnabled: Boolean
@@ -335,6 +333,13 @@ class CorePreferences constructor(private val context: Context) {
             config.setBool("app", "call_right_away", value)
         }
 
+    // Will send user to contacts list directly
+    var skipDialerForNewCallAndTransfer: Boolean
+        get() = config.getBool("app", "skip_dialer_for_new_call_and_transfer", false)
+        set(value) {
+            config.setBool("app", "skip_dialer_for_new_call_and_transfer", value)
+        }
+
     var automaticallyStartCallRecording: Boolean
         get() = config.getBool("app", "auto_start_call_record", false)
         set(value) {
@@ -357,6 +362,7 @@ class CorePreferences constructor(private val context: Context) {
             config.setBool("app", "user_disabled_self_managed_telecom_manager", value)
         }
 
+    // Also uses Hearing Aids if available
     var routeAudioToBluetoothIfAvailable: Boolean
         get() = config.getBool("app", "route_audio_to_bluetooth_if_available", true)
         set(value) {
@@ -387,6 +393,12 @@ class CorePreferences constructor(private val context: Context) {
         get() = config.getBool("app", "enter_video_conference_enable_full_screen_mode", true)
         set(value) {
             config.setBool("app", "enter_video_conference_enable_full_screen_mode", value)
+        }
+
+    var disableBroadcastConference: Boolean
+        get() = config.getBool("app", "disable_broadcast_conference_feature", true)
+        set(value) {
+            config.setBool("app", "disable_broadcast_conference_feature", value)
         }
 
     /* Assistant */
@@ -494,12 +506,35 @@ class CorePreferences constructor(private val context: Context) {
     val hideStaticImageCamera: Boolean
         get() = config.getBool("app", "hide_static_image_camera", true)
 
+    // Will prevent user adding contact and editing / removing existing contacts
+    val readOnlyNativeContacts: Boolean
+        get() = config.getBool("app", "read_only_native_address_book", false)
+
+    // Will hide the contacts selector to allow listing all contacts, even those without a SIP address
+    val onlyShowSipContactsList: Boolean
+        get() = config.getBool("app", "only_show_sip_contacts_list", false)
+
+    // Will hide the SIP contacts selector, leaving only the all contacts list
+    val hideSipContactsList: Boolean
+        get() = config.getBool("app", "hide_sip_contacts_list", false)
+
     // Will disable chat feature completely
     val disableChat: Boolean
         get() = config.getBool("app", "disable_chat_feature", false)
 
+    // Will disable video feature completely
+    val disableVideo: Boolean
+        get() = config.getBool("app", "disable_video_feature", false)
+
     val forceEndToEndEncryptedChat: Boolean
         get() = config.getBool("app", "force_lime_chat_rooms", false)
+
+    // Turning this ON will show the secure chat button even if there is no LIME capability in presence (or no presence)
+    val allowEndToEndEncryptedChatWithoutPresence: Boolean
+        get() = config.getBool("app", "allow_lime_friend_without_capability", false)
+
+    val showEmojiPickerButton: Boolean
+        get() = config.getBool("app", "show_emoji_picker", true)
 
     // This will prevent UI from showing up, except for the launcher & the foreground service notification
     val preventInterfaceFromShowingUp: Boolean
@@ -521,10 +556,13 @@ class CorePreferences constructor(private val context: Context) {
     val showContactInviteBySms: Boolean
         get() = config.getBool("app", "show_invite_contact_by_sms", true)
 
-    /* Default values related */
+    val autoRemoteProvisioningOnConfigUriHandler: Boolean
+        get() = config.getBool("app", "auto_apply_provisioning_config_uri_handler", false)
 
-    val echoCancellerCalibration: Int
-        get() = config.getInt("sound", "ec_delay", -1)
+    val askForAccountPasswordToAccessSettings: Boolean
+        get() = config.getBool("app", "require_password_to_access_settings", false)
+
+    /* Default values related */
 
     val defaultDomain: String
         get() = config.getString("app", "default_domain", "sip.linphone.org")!!
@@ -592,7 +630,11 @@ class CorePreferences constructor(private val context: Context) {
         get() = config.getBool("app", "side_menu_recordings", true)
 
     val showScheduledConferencesInSideMenu: Boolean
-        get() = config.getBool("app", "side_menu_conferences", true)
+        get() = config.getBool(
+            "app",
+            "side_menu_conferences",
+            LinphoneUtils.isRemoteConferencingAvailable()
+        )
 
     val showAboutInSideMenu: Boolean
         get() = config.getBool("app", "side_menu_about", true)
@@ -615,13 +657,13 @@ class CorePreferences constructor(private val context: Context) {
         get() = config.getBool("app", "settings_audio", true)
 
     val showVideoSettings: Boolean
-        get() = config.getBool("app", "settings_video", true)
+        get() = config.getBool("app", "settings_video", !disableVideo)
 
     val showCallSettings: Boolean
         get() = config.getBool("app", "settings_call", true)
 
     val showChatSettings: Boolean
-        get() = config.getBool("app", "settings_chat", true)
+        get() = config.getBool("app", "settings_chat", !disableChat)
 
     val showNetworkSettings: Boolean
         get() = config.getBool("app", "settings_network", true)
@@ -633,7 +675,11 @@ class CorePreferences constructor(private val context: Context) {
         get() = config.getBool("app", "settings_advanced", true)
 
     val showConferencesSettings: Boolean
-        get() = config.getBool("app", "settings_conferences", true)
+        get() = config.getBool(
+            "app",
+            "settings_conferences",
+            LinphoneUtils.isRemoteConferencingAvailable()
+        )
 
     /* Assets stuff */
 
@@ -670,8 +716,14 @@ class CorePreferences constructor(private val context: Context) {
         copy("assistant_linphone_default_values", linphoneDefaultValuesPath, true)
         copy("assistant_default_values", defaultValuesPath, true)
 
-        move(context.filesDir.absolutePath + "/linphone-log-history.db", context.filesDir.absolutePath + "/call-history.db")
-        move(context.filesDir.absolutePath + "/zrtp_secrets", context.filesDir.absolutePath + "/zrtp-secrets.db")
+        move(
+            context.filesDir.absolutePath + "/linphone-log-history.db",
+            context.filesDir.absolutePath + "/call-history.db"
+        )
+        move(
+            context.filesDir.absolutePath + "/zrtp_secrets",
+            context.filesDir.absolutePath + "/zrtp-secrets.db"
+        )
     }
 
     fun getString(resource: Int): String {
@@ -682,11 +734,17 @@ class CorePreferences constructor(private val context: Context) {
         val outFile = File(to)
         if (outFile.exists()) {
             if (!overrideIfExists) {
-                android.util.Log.i(context.getString(org.linphone.R.string.app_name), "[Preferences] File $to already exists")
+                android.util.Log.i(
+                    context.getString(org.linphone.R.string.app_name),
+                    "[Preferences] File $to already exists"
+                )
                 return
             }
         }
-        android.util.Log.i(context.getString(org.linphone.R.string.app_name), "[Preferences] Overriding $to by $from asset")
+        android.util.Log.i(
+            context.getString(org.linphone.R.string.app_name),
+            "[Preferences] Overriding $to by $from asset"
+        )
 
         val outStream = FileOutputStream(outFile)
         val inFile = context.assets.open(from)
@@ -708,7 +766,10 @@ class CorePreferences constructor(private val context: Context) {
         val outFile = File(to)
         if (inFile.exists()) {
             if (outFile.exists() && !overrideIfExists) {
-                android.util.Log.w(context.getString(org.linphone.R.string.app_name), "[Preferences] Can't move [$from] to [$to], destination file already exists")
+                android.util.Log.w(
+                    context.getString(org.linphone.R.string.app_name),
+                    "[Preferences] Can't move [$from] to [$to], destination file already exists"
+                )
             } else {
                 val inStream = FileInputStream(inFile)
                 val outStream = FileOutputStream(outFile)
@@ -724,10 +785,16 @@ class CorePreferences constructor(private val context: Context) {
                 outStream.close()
 
                 inFile.delete()
-                android.util.Log.i(context.getString(org.linphone.R.string.app_name), "[Preferences] Successfully moved [$from] to [$to]")
+                android.util.Log.i(
+                    context.getString(org.linphone.R.string.app_name),
+                    "[Preferences] Successfully moved [$from] to [$to]"
+                )
             }
         } else {
-            android.util.Log.w(context.getString(org.linphone.R.string.app_name), "[Preferences] Can't move [$from] to [$to], source file doesn't exists")
+            android.util.Log.w(
+                context.getString(org.linphone.R.string.app_name),
+                "[Preferences] Can't move [$from] to [$to], source file doesn't exists"
+            )
         }
     }
 }

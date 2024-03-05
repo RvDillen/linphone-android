@@ -17,15 +17,12 @@ class LockHelperExt(activity: Activity) {
     var activity: Activity = activity
 
     fun lockScreen() {
-
         org.linphone.clb.LockHelper.LockScreen(activity)
     }
 
     fun setWakeLocks() {
-
         // CLB startUp A11
         if (Build.VERSION.SDK_INT > Build.VERSION_CODES.Q) {
-
             if (LockHelper.IsScreenOn(activity) == false) {
                 wakeLock = LockHelper.SetWakeLock(activity)
             }
@@ -36,7 +33,6 @@ class LockHelperExt(activity: Activity) {
     }
 
     fun unlockScreen() {
-
         LockHelper.UnlockScreen(activity)
         if (wakeLock != null) {
             LockHelper.ReleaseWakeLock(wakeLock)

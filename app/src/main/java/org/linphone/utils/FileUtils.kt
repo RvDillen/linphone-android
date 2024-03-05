@@ -26,7 +26,10 @@ import android.content.Intent
 import android.database.CursorIndexOutOfBoundsException
 import android.net.Uri
 import android.os.Environment
+import android.os.ParcelFileDescriptor
+import android.os.Process.myUid
 import android.provider.OpenableColumns
+import android.system.Os.fstat
 import android.webkit.MimeTypeMap
 import androidx.core.content.FileProvider
 import java.io.*
@@ -42,6 +45,15 @@ import org.linphone.R
 import org.linphone.core.tools.Log
 
 class FileUtils {
+    enum class MimeType {
+        PlainText,
+        Pdf,
+        Image,
+        Video,
+        Audio,
+        Unknown
+    }
+
     companion object {
         fun getNameFromFilePath(filePath: String): String {
             var name = filePath
@@ -64,43 +76,37 @@ class FileUtils {
             return extension.lowercase(Locale.getDefault())
         }
 
-        fun isMimePlainText(type: String?): Boolean {
-            return type?.startsWith("text/plain") ?: false
-        }
-
-        fun isMimePdf(type: String?): Boolean {
-            return type?.startsWith("application/pdf") ?: false
-        }
-
-        fun isMimeImage(type: String?): Boolean {
-            return type?.startsWith("image/") ?: false
-        }
-
-        fun isMimeVideo(type: String?): Boolean {
-            return type?.startsWith("video/") ?: false
-        }
-
-        fun isMimeAudio(type: String?): Boolean {
-            return type?.startsWith("audio/") ?: false
+        fun getMimeType(type: String?): MimeType {
+            if (type.isNullOrEmpty()) return MimeType.Unknown
+            return when {
+                type.startsWith("image/") -> MimeType.Image
+                type.startsWith("text/plain") -> MimeType.PlainText
+                type.startsWith("video/") -> MimeType.Video
+                type.startsWith("audio/") -> MimeType.Audio
+                type.startsWith("application/pdf") -> MimeType.Pdf
+                else -> MimeType.Unknown
+            }
         }
 
         fun isExtensionImage(path: String): Boolean {
             val extension = getExtensionFromFileName(path)
             val type = MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension)
-            return isMimeImage(type)
+            return getMimeType(type) == MimeType.Image
         }
 
         fun isExtensionVideo(path: String): Boolean {
             val extension = getExtensionFromFileName(path)
             val type = MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension)
-            return isMimeVideo(type)
+            return getMimeType(type) == MimeType.Video
         }
 
         fun clearExistingPlainFiles() {
             val dir = File(corePreferences.vfsCachePath)
             if (dir.exists()) {
                 for (file in dir.listFiles().orEmpty()) {
-                    Log.w("[File Utils] [VFS] Found forgotten plain file [${file.path}], deleting it")
+                    Log.w(
+                        "[File Utils] [VFS] Found forgotten plain file [${file.path}], deleting it"
+                    )
                     deleteFile(file.path)
                 }
             }
@@ -119,7 +125,11 @@ class FileUtils {
             }
 
             val returnPath: File = path ?: coreContext.context.filesDir
-            if (path == null) Log.w("[File Utils] Couldn't get external storage path, using internal")
+            if (path == null) {
+                Log.w(
+                    "[File Utils] Couldn't get external storage path, using internal"
+                )
+            }
 
             return returnPath
         }
@@ -230,7 +240,9 @@ class FileUtils {
                     filePath.startsWith("file://")
                 ) {
                     val result = getFilePath(coreContext.context, uriToParse)
-                    Log.i("[File Utils] Path was using a content or file scheme, real path is: $result")
+                    Log.i(
+                        "[File Utils] Path was using a content or file scheme, real path is: $result"
+                    )
                     if (result == null) {
                         Log.e("[File Utils] Failed to get access to file $uriToParse")
                     }
@@ -260,6 +272,21 @@ class FileUtils {
         suspend fun getFilePath(context: Context, uri: Uri): String? {
             var result: String? = null
             val name: String = getNameFromUri(uri, context)
+
+            try {
+                if (fstat(
+                        ParcelFileDescriptor.open(
+                                File(uri.path),
+                                ParcelFileDescriptor.MODE_READ_ONLY
+                            ).fileDescriptor
+                    ).st_uid != myUid()
+                ) {
+                    Log.e("[File Utils] File descriptor UID different from our, denying copy!")
+                    return result
+                }
+            } catch (e: Exception) {
+                Log.e("[File Utils] Can't check file ownership: ", e)
+            }
 
             try {
                 val localFile: File = createFile(name)
@@ -304,10 +331,14 @@ class FileUtils {
                             if (displayName != null) {
                                 name = displayName
                             } else {
-                                Log.e("[File Utils] Failed to get the display name for URI $uri, returned value is null")
+                                Log.e(
+                                    "[File Utils] Failed to get the display name for URI $uri, returned value is null"
+                                )
                             }
                         } catch (e: CursorIndexOutOfBoundsException) {
-                            Log.e("[File Utils] Failed to get the display name for URI $uri, exception is $e")
+                            Log.e(
+                                "[File Utils] Failed to get the display name for URI $uri, exception is $e"
+                            )
                         }
                     } else {
                         Log.e("[File Utils] Couldn't get DISPLAY_NAME column index for URI: $uri")
@@ -463,7 +494,9 @@ class FileUtils {
                 } else {
                     "file/$extension"
                 }
-                Log.w("[File Viewer] Can't get MIME type from extension: $extension, will use $type")
+                Log.w(
+                    "[File Viewer] Can't get MIME type from extension: $extension, will use $type"
+                )
             }
 
             intent.setDataAndType(contentUri, type)

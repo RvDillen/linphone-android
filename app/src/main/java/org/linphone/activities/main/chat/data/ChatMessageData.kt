@@ -24,12 +24,17 @@ import android.text.Spannable
 import android.util.Patterns
 import androidx.lifecycle.MutableLiveData
 import java.util.regex.Pattern
+import org.linphone.LinphoneApplication.Companion.coreContext
 import org.linphone.R
+import org.linphone.contact.ContactsUpdatedListenerStub
 import org.linphone.contact.GenericContactData
+import org.linphone.core.Address
 import org.linphone.core.ChatMessage
 import org.linphone.core.ChatMessageListenerStub
+import org.linphone.core.ChatMessageReaction
 import org.linphone.core.tools.Log
 import org.linphone.utils.AppUtils
+import org.linphone.utils.Event
 import org.linphone.utils.PatternClickableSpan
 import org.linphone.utils.TimestampUtils
 
@@ -37,6 +42,8 @@ class ChatMessageData(val chatMessage: ChatMessage) : GenericContactData(chatMes
     private var contentListener: OnContentClickedListener? = null
 
     val sendInProgress = MutableLiveData<Boolean>()
+
+    // val transferInProgress = MutableLiveData<Boolean>() // TODO: Determine to use or not...
 
     val showImdn = MutableLiveData<Boolean>()
 
@@ -56,11 +63,19 @@ class ChatMessageData(val chatMessage: ChatMessage) : GenericContactData(chatMes
 
     val text = MutableLiveData<Spannable>()
 
+    val isTextEmoji = MutableLiveData<Boolean>()
+
     val replyData = MutableLiveData<ChatMessageData>()
 
     val isDisplayed = MutableLiveData<Boolean>()
 
     val isOutgoing = chatMessage.isOutgoing
+
+    val contactNewlyFoundEvent: MutableLiveData<Event<Boolean>> by lazy {
+        MutableLiveData<Event<Boolean>>()
+    }
+
+    val reactions = MutableLiveData<ArrayList<String>>()
 
     var hasPreviousMessage = false
     var hasNextMessage = false
@@ -76,6 +91,30 @@ class ChatMessageData(val chatMessage: ChatMessage) : GenericContactData(chatMes
         override fun onEphemeralMessageTimerStarted(message: ChatMessage) {
             updateEphemeralTimer()
         }
+
+        override fun onNewMessageReaction(message: ChatMessage, reaction: ChatMessageReaction) {
+            Log.i(
+                "[Chat Message Data] New reaction to display [${reaction.body}] from [${reaction.fromAddress.asStringUriOnly()}]"
+            )
+            updateReactionsList()
+        }
+
+        override fun onReactionRemoved(message: ChatMessage, address: Address) {
+            Log.i(
+                "[Chat Message Data] [${address.asStringUriOnly()}] removed it's previous reaction"
+            )
+            updateReactionsList()
+        }
+    }
+
+    private val contactsListener = object : ContactsUpdatedListenerStub() {
+        override fun onContactsUpdated() {
+            contactLookup()
+            if (contact.value != null) {
+                coreContext.contactsManager.removeListener(this)
+                contactNewlyFoundEvent.value = Event(true)
+            }
+        }
     }
 
     init {
@@ -87,7 +126,9 @@ class ChatMessageData(val chatMessage: ChatMessage) : GenericContactData(chatMes
         if (chatMessage.isReply) {
             val reply = chatMessage.replyMessage
             if (reply != null) {
-                Log.i("[Chat Message Data] Message is a reply of message id [${chatMessage.replyMessageId}] sent by [${chatMessage.replyMessageSenderAddress?.asStringUriOnly()}]")
+                Log.i(
+                    "[Chat Message Data] Message is a reply of message id [${chatMessage.replyMessageId}] sent by [${chatMessage.replyMessageSenderAddress?.asStringUriOnly()}]"
+                )
                 replyData.value = ChatMessageData(reply)
             }
         }
@@ -97,6 +138,12 @@ class ChatMessageData(val chatMessage: ChatMessage) : GenericContactData(chatMes
 
         updateChatMessageState(chatMessage.state)
         updateContentsList()
+
+        if (contact.value == null) {
+            coreContext.contactsManager.addListener(contactsListener)
+        }
+
+        updateReactionsList()
     }
 
     override fun destroy() {
@@ -154,6 +201,10 @@ class ChatMessageData(val chatMessage: ChatMessage) : GenericContactData(chatMes
         }
     }
 
+    fun showReactionsList() {
+        contentListener?.onShowReactionsList(chatMessage)
+    }
+
     private fun updateChatMessageState(state: ChatMessage.State) {
         sendInProgress.value = when (state) {
             ChatMessage.State.InProgress, ChatMessage.State.FileTransferInProgress, ChatMessage.State.FileTransferDone -> true
@@ -188,13 +239,34 @@ class ChatMessageData(val chatMessage: ChatMessage) : GenericContactData(chatMes
                 data.listener = contentListener
                 list.add(data)
             } else if (content.isText) {
-                val spannable = Spannable.Factory.getInstance().newSpannable(content.utf8Text?.trim())
+                val textContent = content.utf8Text.orEmpty().trim()
+                val spannable = Spannable.Factory.getInstance().newSpannable(textContent)
                 text.value = PatternClickableSpan()
                     .add(
-                        Pattern.compile("(?:<?sips?:)?[a-zA-Z0-9+_.\\-]+(?:@([a-zA-Z0-9+_.\\-;=~]+))+(>)?"),
+                        Pattern.compile(
+                            "(?:<?sips?:)[a-zA-Z0-9+_.\\-]+(?:@([a-zA-Z0-9+_.\\-;=~]+))+(>)?"
+                        ),
                         object : PatternClickableSpan.SpannableClickedListener {
                             override fun onSpanClicked(text: String) {
                                 Log.i("[Chat Message Data] Clicked on SIP URI: $text")
+                                contentListener?.onSipAddressClicked(text)
+                            }
+                        }
+                    )
+                    .add(
+                        Patterns.EMAIL_ADDRESS,
+                        object : PatternClickableSpan.SpannableClickedListener {
+                            override fun onSpanClicked(text: String) {
+                                Log.i("[Chat Message Data] Clicked on email address: $text")
+                                contentListener?.onEmailAddressClicked(text)
+                            }
+                        }
+                    )
+                    .add(
+                        Patterns.PHONE,
+                        object : PatternClickableSpan.SpannableClickedListener {
+                            override fun onSpanClicked(text: String) {
+                                Log.i("[Chat Message Data] Clicked on phone number: $text")
                                 contentListener?.onSipAddressClicked(text)
                             }
                         }
@@ -207,22 +279,39 @@ class ChatMessageData(val chatMessage: ChatMessage) : GenericContactData(chatMes
                                 contentListener?.onWebUrlClicked(text)
                             }
                         }
-                    )
-                    .add(
-                        Patterns.PHONE,
-                        object : PatternClickableSpan.SpannableClickedListener {
-                            override fun onSpanClicked(text: String) {
-                                Log.i("[Chat Message Data] Clicked on phone number: $text")
-                                contentListener?.onSipAddressClicked(text)
-                            }
-                        }
                     ).build(spannable)
+                isTextEmoji.value = AppUtils.isTextOnlyContainingEmoji(textContent)
             } else {
-                Log.e("[Chat Message Data] Unexpected content with type: ${content.type}/${content.subtype}")
+                Log.e(
+                    "[Chat Message Data] Unexpected content with type: ${content.type}/${content.subtype}"
+                )
             }
         }
 
         contents.value = list
+    }
+
+    fun updateReactionsList() {
+        val reactionsList = arrayListOf<String>()
+        val allReactions = chatMessage.reactions
+
+        var sameReactionTwiceOrMore = false
+        if (allReactions.isNotEmpty()) {
+            for (reaction in allReactions) {
+                val body = reaction.body
+                if (!reactionsList.contains(body)) {
+                    reactionsList.add(body)
+                } else {
+                    sameReactionTwiceOrMore = true
+                }
+            }
+
+            if (sameReactionTwiceOrMore) {
+                reactionsList.add(allReactions.size.toString())
+            }
+        }
+
+        reactions.value = reactionsList
     }
 
     private fun updateEphemeralTimer() {
@@ -253,7 +342,12 @@ class ChatMessageData(val chatMessage: ChatMessage) : GenericContactData(chatMes
         val days = seconds / 86400
         return when {
             days >= 1L -> AppUtils.getStringWithPlural(R.plurals.days, days.toInt())
-            else -> String.format("%02d:%02d:%02d", seconds / 3600, (seconds % 3600) / 60, (seconds % 60))
+            else -> String.format(
+                "%02d:%02d:%02d",
+                seconds / 3600,
+                (seconds % 3600) / 60,
+                (seconds % 60)
+            )
         }
     }
 }

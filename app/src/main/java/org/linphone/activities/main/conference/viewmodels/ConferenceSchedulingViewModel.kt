@@ -23,6 +23,7 @@ import androidx.lifecycle.MediatorLiveData
 import androidx.lifecycle.MutableLiveData
 import java.util.*
 import org.linphone.LinphoneApplication.Companion.coreContext
+import org.linphone.LinphoneApplication.Companion.corePreferences
 import org.linphone.R
 import org.linphone.activities.main.conference.data.ConferenceSchedulingParticipantData
 import org.linphone.activities.main.conference.data.Duration
@@ -30,6 +31,7 @@ import org.linphone.activities.main.conference.data.TimeZoneData
 import org.linphone.contact.ContactsSelectionViewModel
 import org.linphone.core.*
 import org.linphone.core.tools.Log
+import org.linphone.utils.AppUtils
 import org.linphone.utils.Event
 import org.linphone.utils.LinphoneUtils
 import org.linphone.utils.TimestampUtils
@@ -41,6 +43,10 @@ class ConferenceSchedulingViewModel : ContactsSelectionViewModel() {
     val scheduleForLater = MutableLiveData<Boolean>()
     val isUpdate = MutableLiveData<Boolean>()
 
+    val isBroadcastAllowed = MutableLiveData<Boolean>()
+    val mode = MutableLiveData<String>()
+    val modesList: List<String>
+
     val formattedDate = MutableLiveData<String>()
     val formattedTime = MutableLiveData<String>()
 
@@ -50,6 +56,7 @@ class ConferenceSchedulingViewModel : ContactsSelectionViewModel() {
     val sendInviteViaEmail = MutableLiveData<Boolean>()
 
     val participantsData = MutableLiveData<List<ConferenceSchedulingParticipantData>>()
+    val speakersData = MutableLiveData<List<ConferenceSchedulingParticipantData>>()
 
     val address = MutableLiveData<Address>()
 
@@ -74,6 +81,8 @@ class ConferenceSchedulingViewModel : ContactsSelectionViewModel() {
     private var confInfo: ConferenceInfo? = null
     private val conferenceScheduler = coreContext.core.createConferenceScheduler()
 
+    private val selectedSpeakersAddresses = MutableLiveData<ArrayList<Address>>()
+
     private val listener = object : ConferenceSchedulerListenerStub() {
         override fun onStateChanged(
             conferenceScheduler: ConferenceScheduler,
@@ -82,18 +91,33 @@ class ConferenceSchedulingViewModel : ContactsSelectionViewModel() {
             Log.i("[Conference Creation] Conference scheduler state is $state")
             if (state == ConferenceScheduler.State.Ready) {
                 val conferenceAddress = conferenceScheduler.info?.uri
-                Log.i("[Conference Creation] Conference info created, address will be ${conferenceAddress?.asStringUriOnly()}")
+                Log.i(
+                    "[Conference Creation] Conference info created, address will be ${conferenceAddress?.asStringUriOnly()}"
+                )
                 conferenceAddress ?: return
 
                 address.value = conferenceAddress!!
 
-                if (scheduleForLater.value == true && sendInviteViaChat.value == true) {
-                    // Send conference info even when conf is not scheduled for later
-                    // as the conference server doesn't invite participants automatically
-                    val chatRoomParams = LinphoneUtils.getConferenceInvitationsChatRoomParams()
-                    conferenceScheduler.sendInvitations(chatRoomParams)
+                if (scheduleForLater.value == true) {
+                    if (sendInviteViaChat.value == true) {
+                        // Send conference info even when conf is not scheduled for later
+                        // as the conference server doesn't invite participants automatically
+                        Log.i(
+                            "[Conference Creation] Scheduled conference is ready, sending invitations by chat"
+                        )
+                        val chatRoomParams = LinphoneUtils.getConferenceInvitationsChatRoomParams()
+                        conferenceScheduler.sendInvitations(chatRoomParams)
+                    } else {
+                        Log.i(
+                            "[Conference Creation] Scheduled conference is ready, we were asked not to send invitations by chat so leaving fragment"
+                        )
+                        conferenceCreationInProgress.value = false
+                        conferenceCreationCompletedEvent.value = Event(true)
+                    }
                 } else {
-                    // Will be done in coreListener
+                    Log.i("[Conference Creation] Group call is ready, leaving fragment")
+                    conferenceCreationInProgress.value = false
+                    conferenceCreationCompletedEvent.value = Event(true)
                 }
             } else if (state == ConferenceScheduler.State.Error) {
                 Log.e("[Conference Creation] Failed to create conference!")
@@ -110,11 +134,17 @@ class ConferenceSchedulingViewModel : ContactsSelectionViewModel() {
 
             if (failedInvitations?.isNotEmpty() == true) {
                 for (address in failedInvitations) {
-                    Log.e("[Conference Creation] Conference information wasn't sent to participant ${address.asStringUriOnly()}")
+                    Log.e(
+                        "[Conference Creation] Conference information wasn't sent to participant ${address.asStringUriOnly()}"
+                    )
                 }
-                onMessageToNotifyEvent.value = Event(R.string.conference_schedule_info_not_sent_to_participant)
+                onMessageToNotifyEvent.value = Event(
+                    R.string.conference_schedule_info_not_sent_to_participant
+                )
             } else {
-                Log.i("[Conference Creation] Conference information successfully sent to all participants")
+                Log.i(
+                    "[Conference Creation] Conference information successfully sent to all participants"
+                )
             }
 
             val conferenceAddress = conferenceScheduler.info?.uri
@@ -126,36 +156,19 @@ class ConferenceSchedulingViewModel : ContactsSelectionViewModel() {
         }
     }
 
-    private val coreListener: CoreListenerStub = object : CoreListenerStub() {
-        override fun onCallStateChanged(
-            core: Core,
-            call: Call,
-            state: Call.State?,
-            message: String
-        ) {
-            when (state) {
-                Call.State.OutgoingProgress -> {
-                    conferenceCreationInProgress.value = false
-                }
-                Call.State.End -> {
-                    Log.i("[Conference Creation] Call has ended, leaving waiting room fragment")
-                    conferenceCreationCompletedEvent.value = Event(true)
-                }
-                Call.State.Error -> {
-                    Log.w("[Conference Creation] Call has failed, leaving waiting room fragment")
-                    conferenceCreationCompletedEvent.value = Event(true)
-                }
-                else -> {}
-            }
-        }
-    }
-
     init {
         sipContactsSelected.value = true
 
         subject.value = ""
         scheduleForLater.value = false
         isUpdate.value = false
+
+        isBroadcastAllowed.value = !corePreferences.disableBroadcastConference
+        modesList = arrayListOf(
+            AppUtils.getString(R.string.conference_schedule_mode_meeting),
+            AppUtils.getString(R.string.conference_schedule_mode_broadcast)
+        )
+        mode.value = modesList.first() // Meeting by default
 
         isEncrypted.value = false
         sendInviteViaChat.value = true
@@ -183,13 +196,12 @@ class ConferenceSchedulingViewModel : ContactsSelectionViewModel() {
         }
 
         conferenceScheduler.addListener(listener)
-        coreContext.core.addListener(coreListener)
     }
 
     override fun onCleared() {
-        coreContext.core.removeListener(coreListener)
         conferenceScheduler.removeListener(listener)
         participantsData.value.orEmpty().forEach(ConferenceSchedulingParticipantData::destroy)
+        speakersData.value.orEmpty().forEach(ConferenceSchedulingParticipantData::destroy)
 
         super.onCleared()
     }
@@ -200,6 +212,7 @@ class ConferenceSchedulingViewModel : ContactsSelectionViewModel() {
     }
 
     fun populateFromConferenceInfo(conferenceInfo: ConferenceInfo) {
+        // Pre-set data from existing conference info, used when editing an already scheduled broadcast or meeting
         confInfo = conferenceInfo
 
         address.value = conferenceInfo.uri
@@ -218,10 +231,26 @@ class ConferenceSchedulingViewModel : ContactsSelectionViewModel() {
         scheduleForLater.value = conferenceDuration > 0
 
         val participantsList = arrayListOf<Address>()
-        for (participant in conferenceInfo.participants) {
+        val speakersList = arrayListOf<Address>()
+        for (info in conferenceInfo.participantInfos) {
+            val participant = info.address
             participantsList.add(participant)
+            if (info.role == Participant.Role.Speaker) {
+                speakersList.add(participant)
+            }
+        }
+        if (participantsList.count() == speakersList.count()) {
+            // All participants are speaker, this is a meeting, clear speakers
+            Log.i("[Conference Creation] Conference info is a meeting")
+            speakersList.clear()
+            mode.value = modesList.first()
+        } else {
+            Log.i("[Conference Creation] Conference info is a broadcast")
+            mode.value = modesList.last()
         }
         selectedAddresses.value = participantsList
+        selectedSpeakersAddresses.value = speakersList
+
         computeParticipantsData()
     }
 
@@ -246,14 +275,57 @@ class ConferenceSchedulingViewModel : ContactsSelectionViewModel() {
 
     fun computeParticipantsData() {
         participantsData.value.orEmpty().forEach(ConferenceSchedulingParticipantData::destroy)
-        val list = arrayListOf<ConferenceSchedulingParticipantData>()
+        speakersData.value.orEmpty().forEach(ConferenceSchedulingParticipantData::destroy)
+
+        val participantsList = arrayListOf<ConferenceSchedulingParticipantData>()
+        val speakersList = arrayListOf<ConferenceSchedulingParticipantData>()
 
         for (address in selectedAddresses.value.orEmpty()) {
-            val data = ConferenceSchedulingParticipantData(address, isEncrypted.value == true)
-            list.add(data)
+            val isSpeaker = address in selectedSpeakersAddresses.value.orEmpty()
+            val data = ConferenceSchedulingParticipantData(
+                address,
+                showLimeBadge = isEncrypted.value == true,
+                showBroadcastControls = isModeBroadcastCurrentlySelected(),
+                speaker = isSpeaker,
+                onAddedToSpeakers = { data ->
+                    Log.i(
+                        "[Conference Creation] Participant [${address.asStringUriOnly()}] added to speakers"
+                    )
+                    val participants = arrayListOf<ConferenceSchedulingParticipantData>()
+                    participants.addAll(participantsData.value.orEmpty())
+                    participants.remove(data)
+                    participantsData.value = participants
+
+                    val speakers = arrayListOf<ConferenceSchedulingParticipantData>()
+                    speakers.addAll(speakersData.value.orEmpty())
+                    speakers.add(data)
+                    speakersData.value = speakers
+                },
+                onRemovedFromSpeakers = { data ->
+                    Log.i(
+                        "[Conference Creation] Participant [${address.asStringUriOnly()}] removed from speakers"
+                    )
+                    val speakers = arrayListOf<ConferenceSchedulingParticipantData>()
+                    speakers.addAll(speakersData.value.orEmpty())
+                    speakers.remove(data)
+                    speakersData.value = speakers
+
+                    val participants = arrayListOf<ConferenceSchedulingParticipantData>()
+                    participants.addAll(participantsData.value.orEmpty())
+                    participants.add(data)
+                    participantsData.value = participants
+                }
+            )
+
+            if (isSpeaker) {
+                speakersList.add(data)
+            } else {
+                participantsList.add(data)
+            }
         }
 
-        participantsData.value = list
+        participantsData.value = participantsList
+        speakersData.value = speakersList
     }
 
     fun createConference() {
@@ -265,8 +337,6 @@ class ConferenceSchedulingViewModel : ContactsSelectionViewModel() {
 
         conferenceCreationInProgress.value = true
         val core = coreContext.core
-        val participants = arrayOfNulls<Address>(selectedAddresses.value.orEmpty().size)
-        selectedAddresses.value?.toArray(participants)
         val localAccount = core.defaultAccount
         val localAddress = localAccount?.params?.identityAddress
 
@@ -278,7 +348,25 @@ class ConferenceSchedulingViewModel : ContactsSelectionViewModel() {
         conferenceInfo.organizer = localAddress
         conferenceInfo.subject = subject.value
         conferenceInfo.description = description.value
-        conferenceInfo.setParticipants(participants)
+
+        val participants = arrayOfNulls<ParticipantInfo>(selectedAddresses.value.orEmpty().size)
+        var index = 0
+        val isBroadcast = isModeBroadcastCurrentlySelected()
+        for (participant in participantsData.value.orEmpty()) {
+            val info = Factory.instance().createParticipantInfo(participant.sipAddress)
+            // For meetings, all participants must have Speaker role
+            info?.role = if (isBroadcast) Participant.Role.Listener else Participant.Role.Speaker
+            participants[index] = info
+            index += 1
+        }
+        for (speaker in speakersData.value.orEmpty()) {
+            val info = Factory.instance().createParticipantInfo(speaker.sipAddress)
+            info?.role = Participant.Role.Speaker
+            participants[index] = info
+            index += 1
+        }
+        conferenceInfo.setParticipantInfos(participants)
+
         if (scheduleForLater.value == true) {
             val startTime = getConferenceStartTimestamp()
             conferenceInfo.dateTime = startTime
@@ -290,6 +378,10 @@ class ConferenceSchedulingViewModel : ContactsSelectionViewModel() {
         conferenceScheduler.account = localAccount
         // Will trigger the conference creation/update automatically
         conferenceScheduler.info = conferenceInfo
+    }
+
+    fun isModeBroadcastCurrentlySelected(): Boolean {
+        return mode.value == AppUtils.getString(R.string.conference_schedule_mode_broadcast)
     }
 
     private fun computeTimeZonesList(): List<TimeZoneData> {
@@ -313,7 +405,9 @@ class ConferenceSchedulingViewModel : ContactsSelectionViewModel() {
     }
 
     private fun getConferenceStartTimestamp(): Long {
-        val calendar = Calendar.getInstance(TimeZone.getTimeZone(timeZone.value?.id ?: TimeZone.getDefault().id))
+        val calendar = Calendar.getInstance(
+            TimeZone.getTimeZone(timeZone.value?.id ?: TimeZone.getDefault().id)
+        )
         calendar.timeInMillis = dateTimestamp
         calendar.set(Calendar.HOUR_OF_DAY, hour)
         calendar.set(Calendar.MINUTE, minutes)

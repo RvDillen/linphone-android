@@ -27,6 +27,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.PopupWindow
+import android.widget.TextView
 import androidx.databinding.DataBindingUtil
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.MutableLiveData
@@ -34,6 +35,7 @@ import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
 import kotlin.math.abs
 import org.linphone.LinphoneApplication.Companion.coreContext
+import org.linphone.LinphoneApplication.Companion.corePreferences
 import org.linphone.R
 import org.linphone.activities.main.adapters.SelectionListAdapter
 import org.linphone.activities.main.chat.data.ChatMessageData
@@ -54,7 +56,10 @@ import org.linphone.utils.HeaderAdapter
 class ChatMessagesListAdapter(
     selectionVM: ListTopBarViewModel,
     private val viewLifecycleOwner: LifecycleOwner
-) : SelectionListAdapter<EventLogData, RecyclerView.ViewHolder>(selectionVM, ChatMessageDiffCallback()),
+) : SelectionListAdapter<EventLogData, RecyclerView.ViewHolder>(
+    selectionVM,
+    ChatMessageDiffCallback()
+),
     HeaderAdapter {
     companion object {
         const val MAX_TIME_TO_GROUP_MESSAGES = 60 // 1 minute
@@ -104,6 +109,10 @@ class ChatMessagesListAdapter(
         MutableLiveData<Event<ChatMessage>>()
     }
 
+    val showReactionsListEvent: MutableLiveData<Event<ChatMessage>> by lazy {
+        MutableLiveData<Event<ChatMessage>>()
+    }
+
     val errorEvent: MutableLiveData<Event<Int>> by lazy {
         MutableLiveData<Event<Int>>()
     }
@@ -115,22 +124,42 @@ class ChatMessagesListAdapter(
 
         override fun onWebUrlClicked(url: String) {
             if (popup?.isShowing == true) {
-                Log.w("[Chat Message Data] Long press that displayed context menu detected, aborting click on URL [$url]")
+                Log.w(
+                    "[Chat Message Data] Long press that displayed context menu detected, aborting click on URL [$url]"
+                )
                 return
             }
-            urlClickEvent.value = Event(url)
+            val urlWithScheme = if (!url.startsWith("http")) "http://$url" else url
+            urlClickEvent.value = Event(urlWithScheme)
         }
 
         override fun onSipAddressClicked(sipUri: String) {
             if (popup?.isShowing == true) {
-                Log.w("[Chat Message Data] Long press that displayed context menu detected, aborting click on SIP URI [$sipUri]")
+                Log.w(
+                    "[Chat Message Data] Long press that displayed context menu detected, aborting click on SIP URI [$sipUri]"
+                )
                 return
             }
             sipUriClickedEvent.value = Event(sipUri)
         }
 
+        override fun onEmailAddressClicked(email: String) {
+            if (popup?.isShowing == true) {
+                Log.w(
+                    "[Chat Message Data] Long press that displayed context menu detected, aborting click on email address [$email]"
+                )
+                return
+            }
+            val urlWithScheme = if (!email.startsWith("mailto:")) "mailto:$email" else email
+            urlClickEvent.value = Event(urlWithScheme)
+        }
+
         override fun onCallConference(address: String, subject: String?) {
             callConferenceEvent.value = Event(Pair(address, subject))
+        }
+
+        override fun onShowReactionsList(chatMessage: ChatMessage) {
+            showReactionsListEvent.value = Event(chatMessage)
         }
 
         override fun onError(messageId: Int) {
@@ -154,7 +183,9 @@ class ChatMessagesListAdapter(
     private fun createChatMessageViewHolder(parent: ViewGroup): ChatMessageViewHolder {
         val binding: ChatMessageListCellBinding = DataBindingUtil.inflate(
             LayoutInflater.from(parent.context),
-            R.layout.chat_message_list_cell, parent, false
+            R.layout.chat_message_list_cell,
+            parent,
+            false
         )
         return ChatMessageViewHolder(binding)
     }
@@ -162,7 +193,9 @@ class ChatMessagesListAdapter(
     private fun createEventViewHolder(parent: ViewGroup): EventViewHolder {
         val binding: ChatEventListCellBinding = DataBindingUtil.inflate(
             LayoutInflater.from(parent.context),
-            R.layout.chat_event_list_cell, parent, false
+            R.layout.chat_event_list_cell,
+            parent,
+            false
         )
         return EventViewHolder(binding)
     }
@@ -184,11 +217,17 @@ class ChatMessagesListAdapter(
         previousList: MutableList<EventLogData>,
         currentList: MutableList<EventLogData>
     ) {
+        Log.i(
+            "[Chat Messages Adapter] List has changed, clearing previous first unread message position"
+        )
         // Need to wait for messages to be added before computing new first unread message position
         firstUnreadMessagePosition = -1
     }
 
     override fun displayHeaderForPosition(position: Int): Boolean {
+        Log.i(
+            "[Chat Messages Adapter] Unread message count is [$unreadMessagesCount], first unread message position is [$firstUnreadMessagePosition]"
+        )
         if (unreadMessagesCount > 0 && firstUnreadMessagePosition == -1) {
             computeFirstUnreadMessagePosition()
         }
@@ -198,9 +237,14 @@ class ChatMessagesListAdapter(
     override fun getHeaderViewForPosition(context: Context, position: Int): View {
         val binding: ChatUnreadMessagesListHeaderBinding = DataBindingUtil.inflate(
             LayoutInflater.from(context),
-            R.layout.chat_unread_messages_list_header, null, false
+            R.layout.chat_unread_messages_list_header,
+            null,
+            false
         )
-        binding.title = AppUtils.getStringWithPlural(R.plurals.chat_room_unread_messages_event, unreadMessagesCount)
+        binding.title = AppUtils.getStringWithPlural(
+            R.plurals.chat_room_unread_messages_event,
+            unreadMessagesCount
+        )
         binding.executePendingBindings()
         return binding.root
     }
@@ -210,18 +254,29 @@ class ChatMessagesListAdapter(
     }
 
     fun setUnreadMessageCount(count: Int, forceUpdate: Boolean) {
+        Log.i("[Chat Messages Adapter] [$count] unread message in chat room")
         // Once list has been filled once, don't show the unread message header
         // when new messages are added to the history whilst it is visible
         unreadMessagesCount = if (itemCount == 0 || forceUpdate) count else 0
         firstUnreadMessagePosition = -1
+        Log.i(
+            "[Chat Messages Adapter] Set [$unreadMessagesCount] unread message(s) for current chat room"
+        )
     }
 
     fun getFirstUnreadMessagePosition(): Int {
+        Log.i(
+            "[Chat Messages Adapter] First unread message position is [$firstUnreadMessagePosition]"
+        )
         return firstUnreadMessagePosition
     }
 
     private fun computeFirstUnreadMessagePosition() {
+        Log.i(
+            "[Chat Messages Adapter] [$unreadMessagesCount] unread message(s) for current chat room"
+        )
         if (unreadMessagesCount > 0) {
+            Log.i("[Chat Messages Adapter] Computing first unread message position")
             var messageCount = 0
             for (position in itemCount - 1 downTo 0) {
                 val eventLog = getItem(position)
@@ -230,6 +285,9 @@ class ChatMessagesListAdapter(
                     messageCount += 1
                     if (messageCount == unreadMessagesCount) {
                         firstUnreadMessagePosition = position
+                        Log.i(
+                            "[Chat Messages Adapter] First unread message position found [$firstUnreadMessagePosition]"
+                        )
                         break
                     }
                 }
@@ -243,11 +301,26 @@ class ChatMessagesListAdapter(
         fun bind(eventLog: EventLogData) {
             with(binding) {
                 if (eventLog.eventLog.type == EventLog.Type.ConferenceChatMessage) {
-                    val chatMessageViewModel = eventLog.data as ChatMessageData
-                    chatMessageViewModel.setContentClickListener(contentClickedListener)
+                    val chatMessageData = eventLog.data as ChatMessageData
+                    chatMessageData.setContentClickListener(contentClickedListener)
 
-                    val chatMessage = chatMessageViewModel.chatMessage
-                    data = chatMessageViewModel
+                    val chatMessage = chatMessageData.chatMessage
+                    data = chatMessageData
+
+                    chatMessageData.contactNewlyFoundEvent.observe(viewLifecycleOwner) {
+                        it.consume {
+                            // Post to prevent IllegalStateException: Cannot call this method while RecyclerView is computing a layout or scrolling
+                            binding.root.post {
+                                try {
+                                    notifyItemChanged(bindingAdapterPosition)
+                                } catch (e: Exception) {
+                                    Log.e(
+                                        "[Chat Messages Adapter] Can't notify item [$bindingAdapterPosition] has changed: $e"
+                                    )
+                                }
+                            }
+                        }
+                    }
 
                     lifecycleOwner = viewLifecycleOwner
 
@@ -266,7 +339,7 @@ class ChatMessagesListAdapter(
                     }
 
                     setReplyClickListener {
-                        val reply = chatMessageViewModel.replyData.value?.chatMessage
+                        val reply = chatMessageData.replyData.value?.chatMessage
                         if (reply != null) {
                             scrollToChatMessageEvent.value = Event(reply)
                         }
@@ -280,7 +353,10 @@ class ChatMessagesListAdapter(
                         val previousItem = getItem(bindingAdapterPosition - 1)
                         if (previousItem.eventLog.type == EventLog.Type.ConferenceChatMessage) {
                             val previousMessage = previousItem.eventLog.chatMessage
-                            if (previousMessage != null && previousMessage.fromAddress.weakEqual(chatMessage.fromAddress)) {
+                            if (previousMessage != null && previousMessage.fromAddress.weakEqual(
+                                    chatMessage.fromAddress
+                                )
+                            ) {
                                 if (abs(chatMessage.time - previousMessage.time) < MAX_TIME_TO_GROUP_MESSAGES) {
                                     hasPrevious = true
                                 }
@@ -292,7 +368,10 @@ class ChatMessagesListAdapter(
                         val nextItem = getItem(bindingAdapterPosition + 1)
                         if (nextItem.eventLog.type == EventLog.Type.ConferenceChatMessage) {
                             val nextMessage = nextItem.eventLog.chatMessage
-                            if (nextMessage != null && nextMessage.fromAddress.weakEqual(chatMessage.fromAddress)) {
+                            if (nextMessage != null && nextMessage.fromAddress.weakEqual(
+                                    chatMessage.fromAddress
+                                )
+                            ) {
                                 if (abs(nextMessage.time - chatMessage.time) < MAX_TIME_TO_GROUP_MESSAGES) {
                                     hasNext = true
                                 }
@@ -300,19 +379,24 @@ class ChatMessagesListAdapter(
                         }
                     }
 
-                    chatMessageViewModel.updateBubbleBackground(hasPrevious, hasNext)
+                    chatMessageData.updateBubbleBackground(hasPrevious, hasNext)
 
                     executePendingBindings()
 
                     setContextMenuClickListener {
                         val popupView: ChatMessageLongPressMenuBindingImpl = DataBindingUtil.inflate(
                             LayoutInflater.from(root.context),
-                            R.layout.chat_message_long_press_menu, null, false
+                            R.layout.chat_message_long_press_menu,
+                            null,
+                            false
                         )
 
                         val itemSize = AppUtils.getDimension(R.dimen.chat_message_popup_item_height).toInt()
-                        var totalSize = itemSize * 7
-                        if (chatMessage.chatRoom.hasCapability(ChatRoomCapabilities.OneToOne.toInt())) {
+                        var totalSize = itemSize * 8
+                        if (chatMessage.chatRoom.hasCapability(
+                                ChatRoom.Capabilities.OneToOne.toInt()
+                            )
+                        ) {
                             // No message id
                             popupView.imdnHidden = true
                             totalSize -= itemSize
@@ -326,8 +410,9 @@ class ChatMessagesListAdapter(
                             totalSize -= itemSize
                         }
                         if (chatMessage.isOutgoing ||
-                            chatMessageViewModel.contact.value != null ||
-                            advancedContextMenuOptionsDisabled
+                            chatMessageData.contact.value != null ||
+                            advancedContextMenuOptionsDisabled ||
+                            corePreferences.readOnlyNativeContacts
                         ) {
                             popupView.addToContactsHidden = true
                             totalSize -= itemSize
@@ -339,6 +424,27 @@ class ChatMessagesListAdapter(
                         if (advancedContextMenuOptionsDisabled) {
                             popupView.forwardHidden = true
                             totalSize -= itemSize
+                        }
+
+                        val reaction = chatMessage.ownReaction
+                        if (reaction != null) {
+                            when (reaction.body) {
+                                AppUtils.getString(R.string.emoji_love) -> {
+                                    popupView.heartSelected = true
+                                }
+                                AppUtils.getString(R.string.emoji_laughing) -> {
+                                    popupView.laughingSelected = true
+                                }
+                                AppUtils.getString(R.string.emoji_surprised) -> {
+                                    popupView.surprisedSelected = true
+                                }
+                                AppUtils.getString(R.string.emoji_thumbs_up) -> {
+                                    popupView.thumbsUpSelected = true
+                                }
+                                AppUtils.getString(R.string.emoji_tear) -> {
+                                    popupView.cryingSelected = true
+                                }
+                            }
                         }
 
                         // When using WRAP_CONTENT instead of real size, fails to place the
@@ -354,6 +460,13 @@ class ChatMessagesListAdapter(
                         // Elevation is for showing a shadow around the popup
                         popupWindow.elevation = 20f
 
+                        popupView.setEmojiClickListener {
+                            val emoji = it as? TextView
+                            if (emoji != null) {
+                                reactToMessage(emoji.text.toString())
+                                popupWindow.dismiss()
+                            }
+                        }
                         popupView.setResendClickListener {
                             resendMessage()
                             popupWindow.dismiss()
@@ -388,6 +501,27 @@ class ChatMessagesListAdapter(
 
                         true
                     }
+                }
+            }
+        }
+
+        private fun reactToMessage(reaction: String) {
+            val chatMessage = binding.data?.chatMessage
+            if (chatMessage != null) {
+                val ownReaction = chatMessage.ownReaction
+                if (ownReaction != null && ownReaction.body == reaction) {
+                    Log.i(
+                        "[Chat Message Data] Removing our reaction to message [$chatMessage] (previously [$reaction])"
+                    )
+                    // Empty string means remove existing reaction
+                    val reactionMessage = chatMessage.createReaction("")
+                    reactionMessage.send()
+                } else {
+                    Log.i(
+                        "[Chat Message Data] Reacting to message [$chatMessage] with [$reaction] emoji"
+                    )
+                    val reactionMessage = chatMessage.createReaction(reaction)
+                    reactionMessage.send()
                 }
             }
         }
@@ -495,7 +629,9 @@ private class ChatMessageDiffCallback : DiffUtil.ItemCallback<EventLogData>() {
 
             oldData.time.value == newData.time.value &&
                 oldData.isOutgoing == newData.isOutgoing
-        } else oldItem.notifyId == newItem.notifyId
+        } else {
+            oldItem.notifyId == newItem.notifyId
+        }
     }
 
     override fun areContentsTheSame(

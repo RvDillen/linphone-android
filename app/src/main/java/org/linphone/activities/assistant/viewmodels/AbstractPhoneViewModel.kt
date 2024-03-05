@@ -21,18 +21,18 @@
 package org.linphone.activities.assistant.viewmodels
 
 import androidx.lifecycle.MutableLiveData
-import androidx.lifecycle.ViewModel
 import org.linphone.activities.assistant.fragments.CountryPickerFragment
 import org.linphone.core.AccountCreator
 import org.linphone.core.DialPlan
 import org.linphone.core.tools.Log
 import org.linphone.utils.PhoneNumberUtils
 
-abstract class AbstractPhoneViewModel(val accountCreator: AccountCreator) :
-    ViewModel(),
+abstract class AbstractPhoneViewModel(accountCreator: AccountCreator) :
+    AbstractPushTokenViewModel(accountCreator),
     CountryPickerFragment.CountryPickedListener {
 
     val prefix = MutableLiveData<String>()
+    val prefixError = MutableLiveData<String>()
 
     val phoneNumber = MutableLiveData<String>()
     val phoneNumberError = MutableLiveData<String>()
@@ -49,6 +49,12 @@ abstract class AbstractPhoneViewModel(val accountCreator: AccountCreator) :
     }
 
     fun isPhoneNumberOk(): Boolean {
+    /* TODO: Determine which should be used.
+        return prefix.value.orEmpty().length > 1 && // Not just '+' character
+            prefixError.value.orEmpty().isEmpty() &&
+            phoneNumber.value.orEmpty().isNotEmpty() &&
+            phoneNumberError.value.orEmpty().isEmpty()
+    */
         return prefix.value.orEmpty().isNotEmpty() && phoneNumber.value.orEmpty().isNotEmpty() && phoneNumberError.value.orEmpty().isEmpty()
     }
 
@@ -70,12 +76,16 @@ abstract class AbstractPhoneViewModel(val accountCreator: AccountCreator) :
         }
     }
 
-    private fun getCountryNameFromPrefix(prefix: String?) {
-        if (prefix != null && prefix.isNotEmpty()) {
+    fun getCountryNameFromPrefix(prefix: String?): MutableLiveData<String> {
+        val country = MutableLiveData<String>()
+        country.value = ""
+
+        if (!prefix.isNullOrEmpty()) {
             val countryCode = if (prefix.first() == '+') prefix.substring(1) else prefix
             val dialPlan = PhoneNumberUtils.getDialPlanFromCountryCallingPrefix(countryCode)
             Log.i("[Assistant] Found dial plan $dialPlan from country code: $countryCode")
             countryName.value = dialPlan?.country
         }
+        return country
     }
 }

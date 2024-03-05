@@ -31,20 +31,18 @@ import androidx.lifecycle.lifecycleScope
 import java.io.File
 import kotlinx.coroutines.launch
 import org.linphone.LinphoneApplication.Companion.coreContext
+import org.linphone.LinphoneApplication.Companion.corePreferences
 import org.linphone.R
 import org.linphone.activities.*
 import org.linphone.activities.assistant.AssistantActivity
+import org.linphone.activities.main.MainActivity
 import org.linphone.activities.main.settings.SettingListenerStub
 import org.linphone.activities.main.sidemenu.viewmodels.SideMenuViewModel
-import org.linphone.activities.navigateToAbout
-import org.linphone.activities.navigateToAccountSettings
-import org.linphone.activities.navigateToRecordings
-import org.linphone.activities.navigateToSettings
+import org.linphone.activities.main.viewmodels.DialogViewModel
+import org.linphone.core.Factory
 import org.linphone.core.tools.Log
 import org.linphone.databinding.SideMenuFragmentBinding
-import org.linphone.utils.Event
-import org.linphone.utils.FileUtils
-import org.linphone.utils.PermissionHelper
+import org.linphone.utils.*
 
 class SideMenuFragment : GenericFragment<SideMenuFragmentBinding>() {
     private lateinit var viewModel: SideMenuViewModel
@@ -74,14 +72,23 @@ class SideMenuFragment : GenericFragment<SideMenuFragmentBinding>() {
             viewModel.updateAccountsList()
         }
 
+        sharedViewModel.publishPresenceToggled.observe(
+            viewLifecycleOwner
+        ) {
+            viewModel.refreshConsolidatedPresence()
+        }
+
         viewModel.accountsSettingsListener = object : SettingListenerStub() {
             override fun onAccountClicked(identity: String) {
-                val args = Bundle()
-                args.putString("Identity", identity)
-                Log.i("[Side Menu] Navigation to settings for account with identity: $identity")
+                Log.i("[Side Menu] Navigating to settings for account with identity: $identity")
 
                 sharedViewModel.toggleDrawerEvent.value = Event(true)
-                navigateToAccountSettings(identity)
+
+                if (corePreferences.askForAccountPasswordToAccessSettings) {
+                    showPasswordDialog(goToAccountSettings = true, accountIdentity = identity)
+                } else {
+                    navigateToAccountSettings(identity)
+                }
             }
         }
 
@@ -96,7 +103,12 @@ class SideMenuFragment : GenericFragment<SideMenuFragmentBinding>() {
 
         binding.setSettingsClickListener {
             sharedViewModel.toggleDrawerEvent.value = Event(true)
-            navigateToSettings()
+
+            if (corePreferences.askForAccountPasswordToAccessSettings) {
+                showPasswordDialog(goToSettings = true)
+            } else {
+                navigateToSettings()
+            }
         }
 
         binding.setRecordingsClickListener {
@@ -128,7 +140,10 @@ class SideMenuFragment : GenericFragment<SideMenuFragmentBinding>() {
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         if (resultCode == Activity.RESULT_OK) {
             lifecycleScope.launch {
-                val contactImageFilePath = FileUtils.getFilePathFromPickerIntent(data, temporaryPicturePath)
+                val contactImageFilePath = FileUtils.getFilePathFromPickerIntent(
+                    data,
+                    temporaryPicturePath
+                )
                 if (contactImageFilePath != null) {
                     viewModel.setPictureFromPath(contactImageFilePath)
                 }
@@ -162,8 +177,90 @@ class SideMenuFragment : GenericFragment<SideMenuFragmentBinding>() {
 
         val chooserIntent =
             Intent.createChooser(galleryIntent, getString(R.string.chat_message_pick_file_dialog))
-        chooserIntent.putExtra(Intent.EXTRA_INITIAL_INTENTS, cameraIntents.toArray(arrayOf<Parcelable>()))
+        chooserIntent.putExtra(
+            Intent.EXTRA_INITIAL_INTENTS,
+            cameraIntents.toArray(arrayOf<Parcelable>())
+        )
 
         startActivityForResult(chooserIntent, 0)
+    }
+
+    private fun showPasswordDialog(
+        goToSettings: Boolean = false,
+        goToAccountSettings: Boolean = false,
+        accountIdentity: String = ""
+    ) {
+        val dialogViewModel = DialogViewModel(
+            getString(R.string.settings_password_protection_dialog_title)
+        )
+        dialogViewModel.showIcon = true
+        dialogViewModel.iconResource = R.drawable.security_toggle_icon_green
+        dialogViewModel.showPassword = true
+        dialogViewModel.passwordTitle = getString(
+            R.string.settings_password_protection_dialog_input_hint
+        )
+        val dialog = DialogUtils.getDialog(requireContext(), dialogViewModel)
+
+        dialogViewModel.showCancelButton {
+            dialog.dismiss()
+        }
+
+        dialogViewModel.showOkButton(
+            {
+                val defaultAccount = coreContext.core.defaultAccount ?: coreContext.core.accountList.firstOrNull()
+                if (defaultAccount == null) {
+                    Log.e("[Side Menu] No account found, can't check password input!")
+                    (requireActivity() as MainActivity).showSnackBar(R.string.error_unexpected)
+                } else {
+                    val authInfo = defaultAccount.findAuthInfo()
+                    if (authInfo == null) {
+                        Log.e(
+                            "[Side Menu] No auth info found for account [${defaultAccount.params.identityAddress?.asString()}], can't check password input!"
+                        )
+                        (requireActivity() as MainActivity).showSnackBar(R.string.error_unexpected)
+                    } else {
+                        val expectedHash = authInfo.ha1
+                        if (expectedHash == null) {
+                            Log.e(
+                                "[Side Menu] No ha1 found in auth info, can't check password input!"
+                            )
+                            (requireActivity() as MainActivity).showSnackBar(
+                                R.string.error_unexpected
+                            )
+                        } else {
+                            val hashAlgorithm = authInfo.algorithm ?: "MD5"
+                            val userId = (authInfo.userid ?: authInfo.username).orEmpty()
+                            val realm = authInfo.realm.orEmpty()
+                            val password = dialogViewModel.password
+                            val computedHash = Factory.instance().computeHa1ForAlgorithm(
+                                userId,
+                                password,
+                                realm,
+                                hashAlgorithm
+                            )
+                            if (computedHash != expectedHash) {
+                                Log.e(
+                                    "[Side Menu] Computed hash [$computedHash] using userId [$userId], realm [$realm] and algorithm [$hashAlgorithm] doesn't match expected hash!"
+                                )
+                                (requireActivity() as MainActivity).showSnackBar(
+                                    R.string.settings_password_protection_dialog_invalid_input
+                                )
+                            } else {
+                                if (goToSettings) {
+                                    navigateToSettings()
+                                } else if (goToAccountSettings) {
+                                    navigateToAccountSettings(accountIdentity)
+                                }
+                            }
+                        }
+                    }
+                }
+
+                dialog.dismiss()
+            },
+            getString(R.string.settings_password_protection_dialog_ok_label)
+        )
+
+        dialog.show()
     }
 }

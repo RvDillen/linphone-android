@@ -87,7 +87,17 @@ class VideoSettingsViewModel : GenericSettingsViewModel() {
     val videoPresetListener = object : SettingListenerStub() {
         override fun onListValueChanged(position: Int) {
             videoPresetIndex.value = position // Needed to display/hide two below settings
-            core.videoPreset = videoPresetLabels.value.orEmpty()[position]
+            val currentPreset = core.videoPreset
+            val newPreset = videoPresetLabels.value.orEmpty()[position]
+            if (newPreset != currentPreset) {
+                if (currentPreset == "custom") {
+                    // Not "custom" anymore, reset FPS & bandwidth
+                    core.preferredFramerate = 0f
+                    core.downloadBandwidth = 0
+                    core.uploadBandwidth = 0
+                }
+                core.videoPreset = newPreset
+            }
         }
     }
     val videoPresetIndex = MutableLiveData<Int>()
@@ -106,7 +116,7 @@ class VideoSettingsViewModel : GenericSettingsViewModel() {
             try {
                 core.downloadBandwidth = newValue.toInt()
                 core.uploadBandwidth = newValue.toInt()
-            } catch (nfe: NumberFormatException) {
+            } catch (_: NumberFormatException) {
             }
         }
     }
@@ -143,7 +153,9 @@ class VideoSettingsViewModel : GenericSettingsViewModel() {
         val index = labels.indexOf(core.videoDevice)
         if (index == -1) {
             val firstDevice = cameraDeviceLabels.value.orEmpty().firstOrNull()
-            Log.w("[Video Settings] Device not found in labels list: ${core.videoDevice}, replace it by $firstDevice")
+            Log.w(
+                "[Video Settings] Device not found in labels list: ${core.videoDevice}, replace it by $firstDevice"
+            )
             if (firstDevice != null) {
                 cameraDeviceIndex.value = 0
                 core.videoDevice = firstDevice

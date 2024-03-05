@@ -21,6 +21,11 @@ dependencyResolutionManagement {
             }
         }
 
+/*
+// Original Maven repository. Disabled for CLB's own repo (see below).
+        // For "org.jlleitschuh.gradle:ktlint-gradle"
+        mavenCentral()
+*/
         // CLB proprietary Maven repo. e.g. fallback for when Linphone's own repo fails.
         maven { name "CLB maven repository"
             url "https://repository.clb.nl:8443/repository/clb-maven/"

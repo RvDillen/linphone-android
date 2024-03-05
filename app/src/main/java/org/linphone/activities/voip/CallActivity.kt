@@ -55,12 +55,14 @@ class CallActivity : ProximitySensorActivity() {
     private lateinit var statsViewModel: StatisticsListViewModel
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
+        // Flag in manifest should be enough starting Android 8.1
+        if (Version.sdkStrictlyBelow(Version.API27_OREO_81)) {
+            Compatibility.setShowWhenLocked(this, true)
+            Compatibility.setTurnScreenOn(this, true)
+            Compatibility.requestDismissKeyguard(this)
+        }
 
-        Compatibility.setShowWhenLocked(this, true)
-        Compatibility.setTurnScreenOn(this, true)
-        // Leaks on API 27+: https://stackoverflow.com/questions/60477120/keyguardmanager-memory-leak
-        Compatibility.requestDismissKeyguard(this)
+        super.onCreate(savedInstanceState)
 
         binding = DataBindingUtil.setContentView(this, R.layout.voip_activity)
         binding.lifecycleOwner = this
@@ -104,14 +106,20 @@ class CallActivity : ProximitySensorActivity() {
         controlsViewModel.proximitySensorEnabled.observe(
             this
         ) { enabled ->
-            Log.i("[Call Activity] ${if (enabled) "Enabling" else "Disabling"} proximity sensor (if possible)")
+            Log.i(
+                "[Call Activity] ${if (enabled) "Enabling" else "Disabling"} proximity sensor (if possible)"
+            )
             enableProximitySensor(enabled)
         }
 
         controlsViewModel.isVideoEnabled.observe(
             this
         ) { enabled ->
-            Compatibility.enableAutoEnterPiP(this, enabled, conferenceViewModel.conferenceExists.value == true)
+            Compatibility.enableAutoEnterPiP(
+                this,
+                enabled,
+                conferenceViewModel.conferenceExists.value == true
+            )
         }
 
         controlsViewModel.callStatsVisible.observe(
@@ -136,10 +144,14 @@ class CallActivity : ProximitySensorActivity() {
         ) { callData ->
             val call = callData.call
             if (call.conference == null) {
-                Log.i("[Call Activity] Current call isn't linked to a conference, switching to SingleCall fragment")
+                Log.i(
+                    "[Call Activity] Current call isn't linked to a conference, switching to SingleCall fragment"
+                )
                 navigateToActiveCall()
             } else {
-                Log.i("[Call Activity] Current call is linked to a conference, switching to ConferenceCall fragment")
+                Log.i(
+                    "[Call Activity] Current call is linked to a conference, switching to ConferenceCall fragment"
+                )
                 navigateToConferenceCall()
             }
         }
@@ -157,10 +169,14 @@ class CallActivity : ProximitySensorActivity() {
             this
         ) { exists ->
             if (exists) {
-                Log.i("[Call Activity] Found active conference, changing  switching to ConferenceCall fragment")
+                Log.i(
+                    "[Call Activity] Found active conference, changing  switching to ConferenceCall fragment"
+                )
                 navigateToConferenceCall()
             } else if (coreContext.core.callsNb > 0) {
-                Log.i("[Call Activity] Conference no longer exists, switching to SingleCall fragment")
+                Log.i(
+                    "[Call Activity] Conference no longer exists, switching to SingleCall fragment"
+                )
                 navigateToActiveCall()
             }
         }
@@ -193,7 +209,9 @@ class CallActivity : ProximitySensorActivity() {
     ) {
         super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
 
-        Log.i("[Call Activity] onPictureInPictureModeChanged: is in PiP mode? $isInPictureInPictureMode")
+        Log.i(
+            "[Call Activity] onPictureInPictureModeChanged: is in PiP mode? $isInPictureInPictureMode"
+        )
         if (::controlsViewModel.isInitialized) {
             // To hide UI except for TextureViews
             controlsViewModel.pipMode.value = isInPictureInPictureMode
@@ -266,11 +284,6 @@ class CallActivity : ProximitySensorActivity() {
             permissionsRequiredList.add(Manifest.permission.CAMERA)
         }
 
-        if (Version.sdkAboveOrEqual(Version.API31_ANDROID_12) && !PermissionHelper.get().hasBluetoothConnectPermission()) {
-            Log.i("[Call Activity] Asking for BLUETOOTH_CONNECT permission")
-            permissionsRequiredList.add(Compatibility.BLUETOOTH_CONNECT)
-        }
-
         if (permissionsRequiredList.isNotEmpty()) {
             val permissionsRequired = arrayOfNulls<String>(permissionsRequiredList.size)
             permissionsRequiredList.toArray(permissionsRequired)
@@ -295,11 +308,10 @@ class CallActivity : ProximitySensorActivity() {
                         coreContext.core.reloadVideoDevices()
                         controlsViewModel.toggleVideo()
                     }
-                    Compatibility.BLUETOOTH_CONNECT -> if (grantResults[i] == PackageManager.PERMISSION_GRANTED) {
-                        Log.i("[Call Activity] BLUETOOTH_CONNECT permission has been granted")
-                    }
                     Manifest.permission.WRITE_EXTERNAL_STORAGE -> if (grantResults[i] == PackageManager.PERMISSION_GRANTED) {
-                        Log.i("[Call Activity] WRITE_EXTERNAL_STORAGE permission has been granted, taking snapshot")
+                        Log.i(
+                            "[Call Activity] WRITE_EXTERNAL_STORAGE permission has been granted, taking snapshot"
+                        )
                         controlsViewModel.takeSnapshot()
                     }
                 }
@@ -310,7 +322,9 @@ class CallActivity : ProximitySensorActivity() {
 
     override fun onLayoutChanges(foldingFeature: FoldingFeature?) {
         foldingFeature ?: return
-        Log.i("[Call Activity] Folding feature state changed: ${foldingFeature.state}, orientation is ${foldingFeature.orientation}")
+        Log.i(
+            "[Call Activity] Folding feature state changed: ${foldingFeature.state}, orientation is ${foldingFeature.orientation}"
+        )
 
         controlsViewModel.foldingState.value = foldingFeature
     }

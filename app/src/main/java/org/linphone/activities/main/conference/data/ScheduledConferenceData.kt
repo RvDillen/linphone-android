@@ -25,6 +25,7 @@ import org.linphone.LinphoneApplication.Companion.coreContext
 import org.linphone.R
 import org.linphone.core.ConferenceInfo
 import org.linphone.core.ConferenceInfo.State
+import org.linphone.core.Participant
 import org.linphone.core.tools.Log
 import org.linphone.utils.LinphoneUtils
 import org.linphone.utils.TimestampUtils
@@ -45,16 +46,24 @@ class ScheduledConferenceData(val conferenceInfo: ConferenceInfo, private val is
     val participantsExpanded = MutableLiveData<String>()
     val showDuration = MutableLiveData<Boolean>()
     val isConferenceCancelled = MutableLiveData<Boolean>()
+    val isBroadcast = MutableLiveData<Boolean>()
+    val speakersExpanded = MutableLiveData<String>()
 
     init {
         expanded.value = false
+        isBroadcast.value = false
 
         address.value = conferenceInfo.uri?.asStringUriOnly()
         subject.value = conferenceInfo.subject
         description.value = conferenceInfo.description
 
         time.value = TimestampUtils.timeToString(conferenceInfo.dateTime)
-        date.value = TimestampUtils.toString(conferenceInfo.dateTime, onlyDate = true, shortDate = false, hideYear = false)
+        date.value = TimestampUtils.toString(
+            conferenceInfo.dateTime,
+            onlyDate = true,
+            shortDate = false,
+            hideYear = false
+        )
         isConferenceCancelled.value = conferenceInfo.state == State.Cancelled
 
         val minutes = conferenceInfo.duration
@@ -72,13 +81,16 @@ class ScheduledConferenceData(val conferenceInfo: ConferenceInfo, private val is
             canEdit.value = localAccount != null
 
             val contact = coreContext.contactsManager.findContactByAddress(organizerAddress)
-            organizer.value = if (contact != null)
+            organizer.value = if (contact != null) {
                 contact.name
-            else
+            } else {
                 LinphoneUtils.getDisplayName(conferenceInfo.organizer)
+            }
         } else {
             canEdit.value = false
-            Log.e("[Scheduled Conference] No organizer SIP URI found for: ${conferenceInfo.uri?.asStringUriOnly()}")
+            Log.e(
+                "[Scheduled Conference] No organizer SIP URI found for: ${conferenceInfo.uri?.asStringUriOnly()}"
+            )
         }
 
         computeBackgroundResId()
@@ -88,7 +100,9 @@ class ScheduledConferenceData(val conferenceInfo: ConferenceInfo, private val is
     fun destroy() {}
 
     fun delete() {
-        Log.w("[Scheduled Conference] Deleting conference info with URI: ${conferenceInfo.uri?.asStringUriOnly()}")
+        Log.w(
+            "[Scheduled Conference] Deleting conference info with URI: ${conferenceInfo.uri?.asStringUriOnly()}"
+        )
         coreContext.core.deleteConferenceInformation(conferenceInfo)
     }
 
@@ -131,18 +145,53 @@ class ScheduledConferenceData(val conferenceInfo: ConferenceInfo, private val is
     private fun computeParticipantsLists() {
         var participantsListShort = ""
         var participantsListExpanded = ""
+        var speakersListExpanded = ""
 
-        for (participant in conferenceInfo.participants) {
+        var allSpeaker = true
+        for (info in conferenceInfo.participantInfos) {
+            val participant = info.address
+            Log.i(
+                "[Scheduled Conference] Conference [${subject.value}] participant [${participant.asStringUriOnly()}] is a [${info.role}]"
+            )
+
             val contact = coreContext.contactsManager.findContactByAddress(participant)
-            val name = if (contact != null) contact.name else LinphoneUtils.getDisplayName(participant)
+            val name = if (contact != null) {
+                contact.name
+            } else {
+                LinphoneUtils.getDisplayName(participant)
+            }
             val address = participant.asStringUriOnly()
             participantsListShort += "$name, "
-            participantsListExpanded += "$name ($address)\n"
+            when (info.role) {
+                Participant.Role.Speaker -> {
+                    speakersListExpanded += "$name ($address)\n"
+                }
+                Participant.Role.Listener -> {
+                    participantsListExpanded += "$name ($address)\n"
+                    allSpeaker = false
+                }
+                else -> { // For meetings created before 5.3 SDK
+                    participantsListExpanded += "$name ($address)\n"
+                    allSpeaker = false
+                }
+            }
         }
         participantsListShort = participantsListShort.dropLast(2)
         participantsListExpanded = participantsListExpanded.dropLast(1)
+        speakersListExpanded = speakersListExpanded.dropLast(1)
 
         participantsShort.value = participantsListShort
-        participantsExpanded.value = participantsListExpanded
+        // If all participants have Speaker role then it is a meeting, else it is a broadcast
+        if (!allSpeaker) {
+            participantsExpanded.value = participantsListExpanded
+            speakersExpanded.value = speakersListExpanded
+            isBroadcast.value = true
+        } else {
+            participantsExpanded.value = speakersListExpanded
+            isBroadcast.value = false
+        }
+        Log.i(
+            "[Scheduled Conference] Conference [${subject.value}] is a ${if (allSpeaker) "meeting" else "broadcast"}"
+        )
     }
 }

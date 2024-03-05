@@ -24,9 +24,12 @@ import android.content.Context
 import android.net.ConnectivityManager
 import android.net.NetworkInfo
 import android.telephony.TelephonyManager.*
+import java.security.MessageDigest
+import java.security.NoSuchAlgorithmException
 import java.text.DateFormat
 import java.text.SimpleDateFormat
 import java.util.*
+import okhttp3.internal.and
 import org.linphone.LinphoneApplication.Companion.coreContext
 import org.linphone.LinphoneApplication.Companion.corePreferences
 import org.linphone.R
@@ -48,7 +51,7 @@ class LinphoneUtils {
                 }
                 val localDisplayName = account?.params?.identityAddress?.displayName
                 // Do not return an empty local display name
-                if (localDisplayName != null && localDisplayName.isNotEmpty()) {
+                if (!localDisplayName.isNullOrEmpty()) {
                     return localDisplayName
                 }
             }
@@ -77,10 +80,11 @@ class LinphoneUtils {
         fun getConferenceAddress(call: Call): Address? {
             val remoteContact = call.remoteContact
             val conferenceAddress = if (call.dir == Call.Dir.Incoming) {
-                if (remoteContact != null)
+                if (remoteContact != null) {
                     coreContext.core.interpretUrl(remoteContact, false)
-                else
+                } else {
                     null
+                }
             } else {
                 call.remoteAddress
             }
@@ -89,7 +93,9 @@ class LinphoneUtils {
 
         fun getConferenceSubject(conference: Conference): String? {
             return if (conference.subject.isNullOrEmpty()) {
-                val conferenceInfo = coreContext.core.findConferenceInformationFromUri(conference.conferenceAddress)
+                val conferenceInfo = coreContext.core.findConferenceInformationFromUri(
+                    conference.conferenceAddress
+                )
                 if (conferenceInfo != null) {
                     conferenceInfo.subject
                 } else {
@@ -127,27 +133,36 @@ class LinphoneUtils {
 
             val params = core.createDefaultChatRoomParams()
             params.isGroupEnabled = false
-            params.backend = ChatRoomBackend.Basic
+            params.backend = ChatRoom.Backend.Basic
             if (isSecured) {
                 params.subject = AppUtils.getString(R.string.chat_room_dummy_subject)
                 params.isEncryptionEnabled = true
-                params.backend = ChatRoomBackend.FlexisipChat
+                params.backend = ChatRoom.Backend.FlexisipChat
             }
 
             val participants = arrayOf(participant)
 
-            return core.searchChatRoom(params, defaultAccount?.params?.identityAddress, null, participants)
-                ?: core.createChatRoom(params, defaultAccount?.params?.identityAddress, participants)
+            return core.searchChatRoom(
+                params,
+                defaultAccount?.params?.identityAddress,
+                null,
+                participants
+            )
+                ?: core.createChatRoom(
+                    params,
+                    defaultAccount?.params?.identityAddress,
+                    participants
+                )
         }
 
         fun getConferenceInvitationsChatRoomParams(): ChatRoomParams {
             val chatRoomParams = coreContext.core.createDefaultChatRoomParams()
             chatRoomParams.isGroupEnabled = false
             if (isEndToEndEncryptedChatAvailable()) {
-                chatRoomParams.backend = ChatRoomBackend.FlexisipChat
+                chatRoomParams.backend = ChatRoom.Backend.FlexisipChat
                 chatRoomParams.isEncryptionEnabled = true
             } else {
-                chatRoomParams.backend = ChatRoomBackend.Basic
+                chatRoomParams.backend = ChatRoom.Backend.Basic
                 chatRoomParams.isEncryptionEnabled = false
             }
             chatRoomParams.subject = "Meeting invitation" // Won't be used
@@ -164,7 +179,7 @@ class LinphoneUtils {
         fun deleteFilesAttachedToChatMessage(chatMessage: ChatMessage) {
             for (content in chatMessage.contents) {
                 val filePath = content.filePath
-                if (filePath != null && filePath.isNotEmpty()) {
+                if (!filePath.isNullOrEmpty()) {
                     Log.i("[Linphone Utils] Deleting file $filePath")
                     FileUtils.deleteFile(filePath)
                 }
@@ -186,10 +201,11 @@ class LinphoneUtils {
                 RECORDING_DATE_PATTERN,
                 Locale.getDefault()
             )
-            val fileName = if (subject.isNullOrEmpty())
+            val fileName = if (subject.isNullOrEmpty()) {
                 "conference_${dateFormat.format(Date())}.mkv"
-            else
+            } else {
                 "${subject}_${dateFormat.format(Date())}.mkv"
+            }
             return FileUtils.getFileStoragePath(fileName).absolutePath
         }
 
@@ -224,9 +240,8 @@ class LinphoneUtils {
                 )
         }
 
-        fun areChatRoomsTheSame(chatRoom1: ChatRoom, chatRoom2: ChatRoom): Boolean {
-            return chatRoom1.localAddress.weakEqual(chatRoom2.localAddress) &&
-                chatRoom1.peerAddress.weakEqual(chatRoom2.peerAddress)
+        fun getChatRoomId(room: ChatRoom): String {
+            return getChatRoomId(room.localAddress, room.peerAddress)
         }
 
         fun getChatRoomId(localAddress: Address, remoteAddress: Address): String {
@@ -257,6 +272,74 @@ class LinphoneUtils {
             }
 
             return true // Legacy behavior
+        }
+
+        fun isPushNotificationAvailable(): Boolean {
+            val core = coreContext.core
+            if (!core.isPushNotificationAvailable) {
+                return false
+            }
+
+            val pushConfig = core.pushNotificationConfig ?: return false
+            if (pushConfig.provider.isNullOrEmpty()) return false
+            if (pushConfig.param.isNullOrEmpty()) return false
+            if (pushConfig.prid.isNullOrEmpty()) return false
+
+            return true
+        }
+
+        fun isFileTransferAvailable(): Boolean {
+            val core = coreContext.core
+            return core.fileTransferServer.orEmpty().isNotEmpty()
+        }
+
+        fun hashPassword(
+            userId: String,
+            password: String,
+            realm: String,
+            algorithm: String = "MD5"
+        ): String? {
+            val input = "$userId:$realm:$password"
+            try {
+                val digestEngine = MessageDigest.getInstance(algorithm)
+                val digest = digestEngine.digest(input.toByteArray())
+                val hexString = StringBuffer()
+                for (i in digest.indices) {
+                    hexString.append(Integer.toHexString(digest[i].and(0xFF)))
+                }
+                return hexString.toString()
+            } catch (nsae: NoSuchAlgorithmException) {
+                Log.e("[Side Menu] Can't compute hash using [$algorithm] algorithm!")
+            }
+
+            return null
+        }
+
+        fun getTextDescribingMessage(message: ChatMessage): String {
+            // If message contains text, then use that
+            var text = message.contents.find { content -> content.isText }?.utf8Text ?: ""
+
+            if (text.isEmpty()) {
+                val firstContent = message.contents.firstOrNull()
+                if (firstContent?.isIcalendar == true) {
+                    text = AppUtils.getString(
+                        R.string.conference_invitation_notification_short_desc
+                    )
+                } else if (firstContent?.isVoiceRecording == true) {
+                    text = AppUtils.getString(
+                        R.string.chat_message_voice_recording_notification_short_desc
+                    )
+                } else {
+                    for (content in message.contents) {
+                        if (text.isNotEmpty()) {
+                            text += ", "
+                        }
+                        text += content.name
+                    }
+                }
+            }
+
+            return text
         }
     }
 }

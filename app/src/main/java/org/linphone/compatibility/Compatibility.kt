@@ -23,6 +23,7 @@ import android.app.Activity
 import android.app.Notification
 import android.app.PendingIntent
 import android.app.Service
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
@@ -49,8 +50,6 @@ import org.linphone.telecom.NativeCallWrapper
 @Suppress("DEPRECATION")
 class Compatibility {
     companion object {
-        const val BLUETOOTH_CONNECT = "android.permission.BLUETOOTH_CONNECT"
-
         fun hasPermission(context: Context, permission: String): Boolean {
             return Api23Compatibility.hasPermission(context, permission)
         }
@@ -71,13 +70,6 @@ class Compatibility {
             } else {
                 Api23Compatibility.requestReadPhoneStatePermission(fragment, code)
             }
-        }
-
-        fun hasBluetoothConnectPermission(context: Context): Boolean {
-            if (Version.sdkAboveOrEqual(Version.API31_ANDROID_12)) {
-                return Api31Compatibility.hasBluetoothConnectPermission(context)
-            }
-            return true
         }
 
         // See https://developer.android.com/about/versions/11/privacy/permissions#phone-numbers
@@ -108,7 +100,9 @@ class Compatibility {
         fun hasPostNotificationsPermission(context: Context): Boolean {
             return if (Version.sdkAboveOrEqual(Version.API33_ANDROID_13_TIRAMISU)) {
                 Api33Compatibility.hasPostNotificationsPermission(context)
-            } else true
+            } else {
+                true
+            }
         }
 
         fun requestReadExternalStorageAndCameraPermissions(fragment: Fragment, code: Int) {
@@ -222,11 +216,29 @@ class Compatibility {
             // Samsung One UI 4.0 (API 31) doesn't (currently) display CallStyle notifications well
             // Tested on Samsung S10 and Z Fold 2
             if (Version.sdkAboveOrEqual(Version.API31_ANDROID_12) && manufacturer != "samsung") {
-                return Api31Compatibility.createIncomingCallNotification(context, call, notifiable, pendingIntent, notificationsManager)
+                return Api31Compatibility.createIncomingCallNotification(
+                    context,
+                    call,
+                    notifiable,
+                    pendingIntent,
+                    notificationsManager
+                )
             } else if (manufacturer == "xiaomi") { // Xiaomi devices don't handle CustomHeadsUpContentView correctly
-                return XiaomiCompatibility.createIncomingCallNotification(context, call, notifiable, pendingIntent, notificationsManager)
+                return XiaomiCompatibility.createIncomingCallNotification(
+                    context,
+                    call,
+                    notifiable,
+                    pendingIntent,
+                    notificationsManager
+                )
             }
-            return Api26Compatibility.createIncomingCallNotification(context, call, notifiable, pendingIntent, notificationsManager)
+            return Api26Compatibility.createIncomingCallNotification(
+                context,
+                call,
+                notifiable,
+                pendingIntent,
+                notificationsManager
+            )
         }
 
         fun createCallNotification(
@@ -241,9 +253,23 @@ class Compatibility {
             // Samsung One UI 4.0 (API 31) doesn't (currently) display CallStyle notifications well
             // Tested on Samsung S10 and Z Fold 2
             if (Version.sdkAboveOrEqual(Version.API31_ANDROID_12) && manufacturer != "samsung") {
-                return Api31Compatibility.createCallNotification(context, call, notifiable, pendingIntent, channel, notificationsManager)
+                return Api31Compatibility.createCallNotification(
+                    context,
+                    call,
+                    notifiable,
+                    pendingIntent,
+                    channel,
+                    notificationsManager
+                )
             }
-            return Api26Compatibility.createCallNotification(context, call, notifiable, pendingIntent, channel, notificationsManager)
+            return Api26Compatibility.createCallNotification(
+                context,
+                call,
+                notifiable,
+                pendingIntent,
+                channel,
+                notificationsManager
+            )
         }
 
         fun startForegroundService(context: Context, intent: Intent) {
@@ -256,11 +282,42 @@ class Compatibility {
             }
         }
 
-        fun startForegroundService(service: Service, notifId: Int, notif: Notification?) {
+        private fun startForegroundService(service: Service, notifId: Int, notif: Notification?) {
             if (Version.sdkAboveOrEqual(Version.API31_ANDROID_12)) {
                 Api31Compatibility.startForegroundService(service, notifId, notif)
             } else {
                 Api23Compatibility.startForegroundService(service, notifId, notif)
+            }
+        }
+
+        fun startCallForegroundService(
+            service: Service,
+            notifId: Int,
+            notif: Notification,
+            isCallActive: Boolean
+        ) {
+            if (Version.sdkAboveOrEqual(Version.API34_ANDROID_14_UPSIDE_DOWN_CAKE)) {
+                Api34Compatibility.startCallForegroundService(service, notifId, notif, isCallActive)
+            } else {
+                startForegroundService(service, notifId, notif)
+            }
+        }
+
+        fun startDataSyncForegroundService(
+            service: Service,
+            notifId: Int,
+            notif: Notification,
+            isCallActive: Boolean
+        ) {
+            if (Version.sdkAboveOrEqual(Version.API34_ANDROID_14_UPSIDE_DOWN_CAKE)) {
+                Api34Compatibility.startDataSyncForegroundService(
+                    service,
+                    notifId,
+                    notif,
+                    isCallActive
+                )
+            } else {
+                startForegroundService(service, notifId, notif)
             }
         }
 
@@ -278,7 +335,10 @@ class Compatibility {
         }
 
         fun enterPipMode(activity: Activity, conference: Boolean) {
-            if (Version.sdkStrictlyBelow(Version.API31_ANDROID_12) && Version.sdkAboveOrEqual(Version.API26_O_80)) {
+            if (Version.sdkStrictlyBelow(Version.API31_ANDROID_12) && Version.sdkAboveOrEqual(
+                    Version.API26_O_80
+                )
+            ) {
                 Api26Compatibility.enterPipMode(activity, conference)
             }
         }
@@ -415,6 +475,27 @@ class Compatibility {
                 return Api33Compatibility.hasTelecomManagerFeature(context)
             } else if (Version.sdkAboveOrEqual(Version.API26_O_80)) {
                 return Api26Compatibility.hasTelecomManagerFeature(context)
+            }
+            return false
+        }
+
+        fun clearClipboard(clipboard: ClipboardManager) {
+            if (Version.sdkAboveOrEqual(Version.API28_PIE_90)) {
+                Api28Compatibility.clearClipboard(clipboard)
+            }
+        }
+
+        fun hasFullScreenIntentPermission(context: Context): Boolean {
+            if (Version.sdkAboveOrEqual(Version.API34_ANDROID_14_UPSIDE_DOWN_CAKE)) {
+                return Api34Compatibility.hasFullScreenIntentPermission(context)
+            }
+            return true
+        }
+
+        fun requestFullScreenIntentPermission(context: Context): Boolean {
+            if (Version.sdkAboveOrEqual(Version.API34_ANDROID_14_UPSIDE_DOWN_CAKE)) {
+                Api34Compatibility.requestFullScreenIntentPermission(context)
+                return true
             }
             return false
         }

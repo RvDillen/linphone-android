@@ -28,7 +28,8 @@ import org.linphone.utils.LinphoneUtils
 class ContactSelectionData(private val searchResult: SearchResult) : ContactDataInterface {
     override val contact: MutableLiveData<Friend> = MutableLiveData<Friend>()
     override val displayName: MutableLiveData<String> = MutableLiveData<String>()
-    override val securityLevel: MutableLiveData<ChatRoomSecurityLevel> = MutableLiveData<ChatRoomSecurityLevel>()
+    override val securityLevel: MutableLiveData<ChatRoom.SecurityLevel> = MutableLiveData<ChatRoom.SecurityLevel>()
+    override val presenceStatus: MutableLiveData<ConsolidatedPresence> = MutableLiveData<ConsolidatedPresence>()
     override val coroutineScope: CoroutineScope = coreContext.coroutineScope
 
     val isDisabled: MutableLiveData<Boolean> by lazy {
@@ -40,7 +41,9 @@ class ContactSelectionData(private val searchResult: SearchResult) : ContactData
     }
 
     val isLinphoneUser: Boolean by lazy {
-        searchResult.friend?.getPresenceModelForUriOrTel(searchResult.phoneNumber ?: searchResult.address?.asStringUriOnly() ?: "")?.basicStatus == PresenceBasicStatus.Open
+        searchResult.friend?.getPresenceModelForUriOrTel(
+            searchResult.phoneNumber ?: searchResult.address?.asStringUriOnly() ?: ""
+        )?.basicStatus == PresenceBasicStatus.Open
     }
 
     val sipUri: String by lazy {
@@ -52,11 +55,14 @@ class ContactSelectionData(private val searchResult: SearchResult) : ContactData
     }
 
     val hasLimeX3DHCapability: Boolean
-        get() = searchResult.hasCapability(FriendCapability.LimeX3Dh)
+        get() = LinphoneUtils.isEndToEndEncryptedChatAvailable() && searchResult.hasCapability(
+            Friend.Capability.LimeX3Dh
+        )
 
     init {
         isDisabled.value = false
         isSelected.value = false
+        presenceStatus.value = ConsolidatedPresence.Offline
         searchMatchingContact()
     }
 
@@ -65,14 +71,33 @@ class ContactSelectionData(private val searchResult: SearchResult) : ContactData
         if (friend != null) {
             contact.value = friend!!
             displayName.value = friend.name
+            presenceStatus.value = friend.consolidatedPresence
+            friend.addListener {
+                presenceStatus.value = it.consolidatedPresence
+            }
         } else {
             val address = searchResult.address
             if (address != null) {
-                contact.value = coreContext.contactsManager.findContactByAddress(address)
+                val found = coreContext.contactsManager.findContactByAddress(address)
+                if (found != null) {
+                    contact.value = found!!
+                    presenceStatus.value = found.consolidatedPresence
+                    found.addListener {
+                        presenceStatus.value = it.consolidatedPresence
+                    }
+                }
                 displayName.value = LinphoneUtils.getDisplayName(address)
             } else if (searchResult.phoneNumber != null) {
-                contact.value =
-                    coreContext.contactsManager.findContactByPhoneNumber(searchResult.phoneNumber.orEmpty())
+                val found = coreContext.contactsManager.findContactByPhoneNumber(
+                    searchResult.phoneNumber.orEmpty()
+                )
+                if (found != null) {
+                    contact.value = found!!
+                    presenceStatus.value = found.consolidatedPresence
+                    found.addListener {
+                        presenceStatus.value = it.consolidatedPresence
+                    }
+                }
                 displayName.value = searchResult.phoneNumber.orEmpty()
             }
         }

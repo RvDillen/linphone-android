@@ -38,7 +38,11 @@ class RemoteProvisioningViewModel : ViewModel() {
     val fetchSuccessfulEvent = MutableLiveData<Event<Boolean>>()
 
     private val listener = object : CoreListenerStub() {
-        override fun onConfiguringStatus(core: Core, status: ConfiguringState, message: String?) {
+        override fun onConfiguringStatus(
+            core: Core,
+            status: ConfiguringState,
+            message: String?
+        ) {
             fetchInProgress.value = false
             when (status) {
                 ConfiguringState.Successful -> {
@@ -73,7 +77,7 @@ class RemoteProvisioningViewModel : ViewModel() {
     fun fetchAndApply() {
         val url = urlToFetch.value.orEmpty()
         coreContext.core.provisioningUri = url
-        Log.w("[Remote Provisioning] Url set to [$url], restarting Core")
+        Log.w("[Assistant] [Remote Provisioning] Url set to [$url], restarting Core")
         fetchInProgress.value = true
         coreContext.core.stop()
         coreContext.core.start()

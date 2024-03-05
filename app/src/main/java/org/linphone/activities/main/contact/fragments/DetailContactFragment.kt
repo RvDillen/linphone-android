@@ -24,7 +24,6 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.view.View
-import androidx.core.view.doOnPreDraw
 import androidx.lifecycle.ViewModelProvider
 import org.linphone.LinphoneApplication.Companion.coreContext
 import org.linphone.R
@@ -48,6 +47,7 @@ class DetailContactFragment : GenericFragment<ContactDetailFragmentBinding>() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        postponeEnterTransition()
 
         binding.lifecycleOwner = viewLifecycleOwner
 
@@ -88,7 +88,9 @@ class DetailContactFragment : GenericFragment<ContactDetailFragmentBinding>() {
         ) {
             it.consume { address ->
                 if (coreContext.core.callsNb > 0) {
-                    Log.i("[Contact] Starting dialer with pre-filled URI ${address.asStringUriOnly()}, is transfer? ${sharedViewModel.pendingCallTransfer}")
+                    Log.i(
+                        "[Contact] Starting dialer with pre-filled URI ${address.asStringUriOnly()}, is transfer? ${sharedViewModel.pendingCallTransfer}"
+                    )
                     sharedViewModel.updateContactsAnimationsBasedOnDestination.value =
                         Event(R.id.dialerFragment)
                     sharedViewModel.updateDialerAnimationsBasedOnDestination.value =
@@ -138,10 +140,7 @@ class DetailContactFragment : GenericFragment<ContactDetailFragmentBinding>() {
         }
         viewModel.updateNumbersAndAddresses()
 
-        view.doOnPreDraw {
-            // Notifies fragment is ready to be drawn
-            sharedViewModel.contactFragmentOpenedEvent.value = Event(true)
-        }
+        startPostponedEnterTransition()
     }
 
     override fun onResume() {
@@ -162,6 +161,8 @@ class DetailContactFragment : GenericFragment<ContactDetailFragmentBinding>() {
 
     private fun confirmContactRemoval() {
         val dialogViewModel = DialogViewModel(getString(R.string.contact_delete_one_dialog))
+        dialogViewModel.showIcon = true
+        dialogViewModel.iconResource = R.drawable.dialog_delete_icon
         val dialog: Dialog = DialogUtils.getDialog(requireContext(), dialogViewModel)
 
         dialogViewModel.showCancelButton {
@@ -184,7 +185,9 @@ class DetailContactFragment : GenericFragment<ContactDetailFragmentBinding>() {
         val smsIntent = Intent(Intent.ACTION_SENDTO)
         smsIntent.putExtra("address", number)
         smsIntent.data = Uri.parse("smsto:$number")
-        val text = getString(R.string.contact_send_sms_invite_text).format(getString(R.string.contact_send_sms_invite_download_link))
+        val text = getString(R.string.contact_send_sms_invite_text).format(
+            getString(R.string.contact_send_sms_invite_download_link)
+        )
         smsIntent.putExtra("sms_body", text)
         startActivity(smsIntent)
     }
