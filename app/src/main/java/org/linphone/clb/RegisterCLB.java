@@ -7,6 +7,7 @@ import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Looper;
 
+import androidx.core.content.ContextCompat;
 import androidx.annotation.Nullable;
 
 import org.linphone.core.tools.Log;
@@ -96,10 +97,10 @@ public class RegisterCLB {
         try {
             ifilter.setPriority(99999999);
             android.util.Log.i(TAG, message);
-            if(handler == null)
-                mContext.registerReceiver(bcReceiver, ifilter);
+            if (handler == null)
+                ContextCompat.registerReceiver(mContext, bcReceiver, ifilter, ContextCompat.RECEIVER_NOT_EXPORTED);
             else
-                mContext.registerReceiver(bcReceiver, ifilter, null, handler);
+                ContextCompat.registerReceiver(mContext, bcReceiver, ifilter, null, handler, ContextCompat.RECEIVER_NOT_EXPORTED);
         } catch (IllegalArgumentException e) {
             android.util.Log.e(TAG, "Failure of " + message + ": " + e.getMessage());
             e.printStackTrace();
