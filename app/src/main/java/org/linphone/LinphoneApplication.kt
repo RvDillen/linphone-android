@@ -111,6 +111,10 @@ class LinphoneApplication : Application(), ImageLoaderFactory {
                 useAutoStartDescription
             )
 
+            // CLB: Always force background-mode to be enabled.
+            Log.i("[Application] Force 'background-mode' to 'enabled'.")
+            corePreferences.keepServiceAlive = true
+
             if (coreContext.core.provisioningUri == null) {
                 val configUrl = "http://config.clb.nl/linphonerc.xml"
                 coreContext.core.setProvisioningUri(configUrl)
