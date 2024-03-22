@@ -2,7 +2,7 @@
 @Library('clb-jenkins-library') _
 
 def buildType() {
-	if ("release/4.6.xclb".equals(env.BRANCH_NAME))
+	if ("release/5.2.xclb".equals(env.BRANCH_NAME))
 		return 'ci'
 	else
 		return 'release'

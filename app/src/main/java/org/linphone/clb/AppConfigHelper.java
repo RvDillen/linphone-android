@@ -66,12 +66,15 @@ public class AppConfigHelper {
             String storedHash = getHash(linphoneRc_key);
 
             log("Rc hash compare ["+storedHash+"] with ["+_rcHash+"]");
-            boolean areEqual = _rcHash.equals(storedHash);
 
-            String hasChanges = areEqual ? "no" : "yes";
-            log("linphoneRc has changes: " + hasChanges);
+            if (_rcHash != null) {
+                boolean areEqual = _rcHash.equals(storedHash);
 
-            return ! areEqual;
+                String hasChanges = areEqual ? "no" : "yes";
+                log("linphoneRc has changes: " + hasChanges);
+
+                return !areEqual;
+            }
 
         } catch (Exception ex) {
             logError("Exception: " + ex.getMessage());

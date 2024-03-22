@@ -50,7 +50,7 @@ class CoreService : CoreService() {
                 service = this,
                 useAutoStartDescription = false
             )
-            if (!contextCreated) {
+            if (!contextCreated && intent != null) {
                 // Only start foreground notification if context already exists, otherwise context will do it itself
                 coreContext.notificationsManager.startForegroundToKeepAppAlive(this, false)
             }
@@ -67,7 +67,9 @@ class CoreService : CoreService() {
                 coreContext.start()
             } else {
                 // Only start foreground notification if context already exists, otherwise context will do it itself
-                coreContext.notificationsManager.startForegroundToKeepAppAlive(this, true)
+                if (intent != null) {
+                    coreContext.notificationsManager.startForegroundToKeepAppAlive(this, true)
+                }
             }
             coreContext.checkIfForegroundServiceNotificationCanBeRemovedAfterDelay(5000)
         } else {
@@ -88,7 +90,7 @@ class CoreService : CoreService() {
         // Done elsewhere
     }
 
-    override fun showForegroundServiceNotification() {
+    override fun showForegroundServiceNotification(isVideoCall: Boolean) {
         Log.i("[Service] Starting service as foreground")
         coreContext.notificationsManager.startCallForeground(this)
     }

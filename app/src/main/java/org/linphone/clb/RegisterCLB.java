@@ -98,7 +98,7 @@ public class RegisterCLB {
             ifilter.setPriority(99999999);
             android.util.Log.i(TAG, message);
             if (handler == null)
-                ContextCompat.registerReceiver(mContext, bcReceiver, ifilter, ContextCompat.RECEIVER_NOT_EXPORTED);
+                ContextCompat.registerReceiver(mContext, bcReceiver, ifilter, ContextCompat.RECEIVER_EXPORTED);
             else
                 ContextCompat.registerReceiver(mContext, bcReceiver, ifilter, null, handler, ContextCompat.RECEIVER_NOT_EXPORTED);
         } catch (IllegalArgumentException e) {
