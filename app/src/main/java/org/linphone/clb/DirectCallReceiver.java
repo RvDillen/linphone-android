@@ -17,7 +17,7 @@ import static org.linphone.LinphoneApplication.coreContext;
  *
  * 04-10-21 rvdillen Linphone 4.5.2
  * 26-03-20 rvdillen Added CallStateCLB
- * 18-12-17 mvdhorst inital version
+ * 18-12-17 mvdhorst initial version
  * 03-01-18 mvdhorst Starts a call without showing the UI.
  */
 
