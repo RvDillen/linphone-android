@@ -101,10 +101,9 @@ class NativeCallWrapper(var callId: String) : Connection() {
                 Log.w(
                     "[Connection] Connection audio state asks for changing in mute: ${state.isMuted}, currently is ${call.microphoneMuted}"
                 )
-                if (state.isMuted) {
-                    Log.w("[Connection] Muting microphone")
-                    call.microphoneMuted = true
-                }
+                Log.i(
+                    "[Connection] CLB: Do not mute microphone in Linphone, we will handle this in the Messenger app."
+                )
             }
 
             when (state.route) {
