@@ -96,13 +96,13 @@ public class RegisterCLB {
 
         try {
             ifilter.setPriority(99999999);
-            android.util.Log.i(TAG, message);
+            android.util.Log.i(TAG, "[Manager] " + message);
             if (handler == null)
                 ContextCompat.registerReceiver(mContext, bcReceiver, ifilter, ContextCompat.RECEIVER_EXPORTED);
             else
-                ContextCompat.registerReceiver(mContext, bcReceiver, ifilter, null, handler, ContextCompat.RECEIVER_NOT_EXPORTED);
+                ContextCompat.registerReceiver(mContext, bcReceiver, ifilter, null, handler, ContextCompat.RECEIVER_EXPORTED);
         } catch (IllegalArgumentException e) {
-            android.util.Log.e(TAG, "Failure of " + message + ": " + e.getMessage());
+            android.util.Log.e(TAG, "[Manager] " + "Failure of " + message + ": " + e.getMessage());
             e.printStackTrace();
         }
     }

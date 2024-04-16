@@ -149,7 +149,9 @@ public class CallStateCLB {
         Core currentCore = mCore;
 
         try {
-            mContext = coreContext.getContext().getApplicationContext();
+            if(coreContext != null && coreContext.getContext() != null) {
+                mContext = coreContext.getContext().getApplicationContext();
+            }
             if (currentContext != mContext || !callStateListenerRegistered) {
                 Log.i("[Manager] Creating CallStateCLB");
                 AddGsmListener();
