@@ -177,7 +177,13 @@ class DialerFragment : SecureFragment<DialerFragmentBinding>() {
             Log.i("[Dialer] Found URI to call: $address")
             val skipAutoCall = arguments?.getBoolean("SkipAutoCallStart") ?: false
 
-            if (corePreferences.skipDialerForNewCallAndTransfer) {
+            // CLB: Always start CLB calls immediately
+            var clbCall = false;
+            if (address.contains("clbinfo") || address.contains("clbsessionid")) {
+                clbCall = true;
+            }
+
+            if (corePreferences.skipDialerForNewCallAndTransfer || clbCall) {
                 if (sharedViewModel.pendingCallTransfer) {
                     Log.i(
                         "[Dialer] We were asked to skip dialer so starting new call to [$address] now"
@@ -189,7 +195,7 @@ class DialerFragment : SecureFragment<DialerFragmentBinding>() {
                     )
                     viewModel.directCall(address)
                 }
-            } else if (corePreferences.callRightAway && !skipAutoCall) {
+            } else if ((corePreferences.callRightAway && !skipAutoCall) || clbCall) {
                 Log.i("[Dialer] Call right away setting is enabled, start the call to [$address]")
                 viewModel.directCall(address)
             } else {
@@ -203,7 +209,8 @@ class DialerFragment : SecureFragment<DialerFragmentBinding>() {
 
         viewModel.autoInitiateVideoCalls.value = coreContext.core.videoActivationPolicy.automaticallyInitiate
 
-        checkForUpdate()
+        // CLB: No check for update
+        // checkForUpdate()
 
         checkPermissions()
     }
