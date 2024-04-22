@@ -6,13 +6,14 @@ plugins {
     id 'org.jetbrains.kotlin.android'
 }
 
+
 // Used to set the package version name and version code
 ext.versionMajor = 5
 ext.versionMinor = 2
-ext.versionRelease = 3
+ext.versionRelease = 5
 
-def appVersionName = "5.2.3"
-def appVersionCode = 52003
+def appVersionName = "5.2.5"
+def appVersionCode = 52005
 
 static def getPackageName() {
     return "nl.clb.linphone"
