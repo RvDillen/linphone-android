@@ -203,7 +203,13 @@ class SingleCallFragment : GenericVideoPreviewFragment<VoipSingleCallFragmentBin
     override fun onPause() {
         super.onPause()
 
-        controlsViewModel.hideExtraButtons(true)
+        // CLB: Make sure etra buttons are displayed/hidden AFTER a pause/resume cycle
+        Log.d("onResume -> Update UI")
+        if (controlsViewModel.showExtras.value == true) {
+            controlsViewModel.showExtraButtons()
+        } else {
+            controlsViewModel.hideExtraButtons(true)
+        }
         cleanUpLocalVideoPreview(binding.localPreviewVideoSurface)
     }
 
