@@ -41,10 +41,10 @@ if (firebaseAvailable) {
     apply plugin: 'com.google.gms.google-services'
 }
 
-// Will return 5030042 for Jenkins build #42
+// Will return 502030042 for Jenkins build #42 MAX: 2100000000
 def computeVersionCode() {
     // Major + minor + Jenkins build number (where available)
-    return (versionMajor * 1000000) + (versionMinor * 100000) + (versionRelease * 10000) + Integer.valueOf(System.env.BUILD_NUMBER ?: 0)
+    return (versionMajor * 100000000) + (versionMinor * 1000000) + (versionRelease * 10000) + Integer.valueOf(System.env.BUILD_NUMBER ?: 0)
 }
 
 
@@ -54,39 +54,6 @@ def gitBranch = new ByteArrayOutputStream()
 task getGitVersion() {
     def versionBuild = Integer.valueOf(System.env.BUILD_NUMBER ?: 0)
     project.version = String.format('%d.%d.%d.%d', versionMajor, versionMinor, versionRelease, versionBuild)
-/*  def gitVersion = "5.2.3"
-    def gitVersionStream = new ByteArrayOutputStream()
-    def gitCommitsCount = new ByteArrayOutputStream()
-    def gitCommitHash = new ByteArrayOutputStream()
-
-    try {
-        exec {
-            executable "git" args "describe", "--abbrev=0"
-            standardOutput = gitVersionStream
-        }
-        exec {
-            executable "git" args "rev-list", gitVersionStream.toString().trim() + "..HEAD", "--count"
-            standardOutput = gitCommitsCount
-        }
-        exec {
-            executable "git" args "rev-parse", "--short", "HEAD"
-            standardOutput = gitCommitHash
-        }
-        exec {
-            executable "git" args "name-rev", "--name-only", "HEAD"
-            standardOutput = gitBranch
-        }
-
-        if (gitCommitsCount.toString().toInteger() == 0) {
-            gitVersion = gitVersionStream.toString().trim()
-        } else {
-            gitVersion = gitVersionStream.toString().trim() + "." + gitCommitsCount.toString().trim() + "+" + gitCommitHash.toString().trim()
-        }
-        println("Git version: " + gitVersion + " (" + appVersionCode + ")")
-    } catch (ignored) {
-        println("Git not found, using " + gitVersion + " (" + appVersionCode + ")")
-    }
-    project.version = gitVersion */
 }
 
 configurations {
