@@ -38,6 +38,7 @@
     <string name="assistant">Assistent</string>
     <string name="recordings">Opnames</string>
     <string name="settings">Instellingen</string>
+    <string name="settings_list_title">Instellingen</string>
     <string name="quit">Afsluiten</string>
     <string name="history_calls_list">Oproepen</string>
     <string name="no_call_history">Geen oproepen in geschiedenis</string>
