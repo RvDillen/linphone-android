@@ -104,10 +104,7 @@
         <item quantity="one">%s is aan het schrijven…</item>
         <item quantity="other">%s zijn aan het schrijven…</item>
     </plurals>
-    <string name="incoming_call_notification_title">Inkomend gesprek</string>
-    <string name="incoming_group_call_notification_title">Inkomend groeps gesprek</string>
-    <string name="incoming_call_notification_hangup_action_label">Ophangen</string>
-    <string name="incoming_call_notification_answer_action_label">Beantwoorden</string>
+
     <string name="call_incoming_title">Inkomende oproep</string>
     <string name="call_outgoing_title">Uitgaande oproep</string>
     <string name="call_notification_paused">Gepauzeerde oproep</string>
@@ -118,17 +115,9 @@
     <string name="call_action_change_conf_layout">Wijzig layout</string>
     <string name="call_action_statistics">Statistieken</string>
     <string name="call_action_add_call">Nieuw gesprek</string>
-    <string name="call_action_transfer_call">Doorverbinden</string>
-    <string name="call_remote_recording">Dit gesprek wordt opgenomen.</string>
-    <string name="call_remotely_paused_title">Het gesprek is gepauzeerd.</string>
-    <string name="call_locally_paused_title">U heeft het gesprek gepauzeerd.</string>
-    <string name="call_locally_paused_subtitle">Klik op de play knop om te hervatten.</string>
+
     <string name="call_screenshot_taken">Screenshot gemaakt: %s</string>
-    <string name="call_context_action_resume">Gesprek hervatten</string>
-    <string name="call_context_action_pause">Gesprek pauzeren</string>
-    <string name="call_context_action_transfer">Doorverbinden</string>
-    <string name="call_context_action_answer">Gesprek beantwoorden</string>
-    <string name="call_context_action_hangup">Gesprek beëindigen</string>
+
     <string name="call_notification_active">In gesprek</string>
     <string name="call_error_declined">Oproep werd geweigerd</string>
     <string name="call_error_user_busy">Gebruiker is bezet</string>

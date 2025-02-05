@@ -178,9 +178,9 @@ class DialerFragment : SecureFragment<DialerFragmentBinding>() {
             val skipAutoCall = arguments?.getBoolean("SkipAutoCallStart") ?: false
 
             // CLB: Always start CLB calls immediately
-            var clbCall = false;
+            var clbCall = false
             if (address.contains("clbinfo") || address.contains("clbsessionid")) {
-                clbCall = true;
+                clbCall = true
             }
 
             if (corePreferences.skipDialerForNewCallAndTransfer || clbCall) {

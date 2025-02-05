@@ -82,11 +82,14 @@ android {
         sourceCompatibility = 17
         targetCompatibility = 17
     }
+    kotlinOptions {
+        jvmTarget = "17"
+    }
 
     compileSdkVersion 34
     defaultConfig {
         minSdkVersion 23
-        targetSdkVersion 34
+        targetSdkVersion 35
         versionCode computeVersionCode()
         versionName "${project.version}"
         applicationId getPackageName()
@@ -306,7 +309,7 @@ dependencies {
         implementation 'com.google.firebase:firebase-messaging'
     }
 
-    implementation 'org.linphone:linphone-sdk-android:5.3+'
+    implementation 'org.linphone:linphone-sdk-android:5.3.47'
 
     // Only enable leak canary prior to release
     // debugImplementation 'com.squareup.leakcanary:leakcanary-android:2.10'
