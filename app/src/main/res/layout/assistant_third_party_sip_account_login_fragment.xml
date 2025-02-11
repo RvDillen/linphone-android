@@ -57,7 +57,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="100dp"
                 android:paddingBottom="27dp"
-                android:text="@string/assistant_login_third_party_sip_account"
+                android:text="@string/assistant_login_third_party_sip_account_title"
                 app:layout_constraintTop_toTopOf="parent"
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintEnd_toEndOf="parent"/>

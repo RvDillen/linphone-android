@@ -134,22 +134,36 @@ class ConferenceViewModel
         @WorkerThread
         override fun onActiveSpeakerParticipantDevice(
             conference: Conference,
-            participantDevice: ParticipantDevice
+            participantDevice: ParticipantDevice?
         ) {
             activeSpeaker.value?.isActiveSpeaker?.postValue(false)
 
-            val found = participantDevices.value.orEmpty().find {
-                it.device.address.equal(participantDevice.address)
-            }
-            if (found != null) {
-                Log.i("$TAG Newly active speaker participant is [${found.name}]")
-                found.isActiveSpeaker.postValue(true)
-                activeSpeaker.postValue(found!!)
+            if (participantDevice != null) {
+                val found = participantDevices.value.orEmpty().find {
+                    it.device.address.equal(participantDevice.address)
+                }
+                if (found != null) {
+                    Log.i("$TAG Newly active speaker participant is [${found.name}]")
+                    found.isActiveSpeaker.postValue(true)
+                    activeSpeaker.postValue(found!!)
+                } else {
+                    Log.i("$TAG Failed to find actively speaking participant...")
+                    val model = ConferenceParticipantDeviceModel(participantDevice)
+                    model.isActiveSpeaker.postValue(true)
+                    activeSpeaker.postValue(model)
+                }
             } else {
-                Log.i("$TAG Failed to find actively speaking participant...")
-                val model = ConferenceParticipantDeviceModel(participantDevice)
-                model.isActiveSpeaker.postValue(true)
-                activeSpeaker.postValue(model)
+                Log.w("$TAG Notified active speaker participant device is null, using first one that's not us")
+                val firstNotUs = participantDevices.value.orEmpty().find {
+                    it.isMe == false
+                }
+                if (firstNotUs != null) {
+                    Log.i("$TAG Newly active speaker participant is [${firstNotUs.name}]")
+                    firstNotUs.isActiveSpeaker.postValue(true)
+                    activeSpeaker.postValue(firstNotUs!!)
+                } else {
+                    Log.i("$TAG No participant device that's not us found, expected if we're alone")
+                }
             }
         }
 
@@ -396,14 +410,7 @@ class ConferenceViewModel
                     Log.e(
                         "$TAG Failed to parse SIP URI [$uri] into address, can't add it to the conference!"
                     )
-                    showRedToastEvent.postValue(
-                        Event(
-                            Pair(
-                                R.string.conference_failed_to_add_participant_invalid_address_toast,
-                                R.drawable.warning_circle
-                            )
-                        )
-                    )
+                    showRedToast(R.string.conference_failed_to_add_participant_invalid_address_toast, R.drawable.warning_circle)
                 }
             }
             val addressesArray = arrayOfNulls<Address>(addresses.size)
@@ -796,14 +803,7 @@ class ConferenceViewModel
                 "$TAG Too many participant devices for grid layout, switching to active speaker layout"
             )
             setNewLayout(ACTIVE_SPEAKER_LAYOUT)
-            showRedToastEvent.postValue(
-                Event(
-                    Pair(
-                        R.string.conference_too_many_participants_for_mosaic_layout_toast,
-                        R.drawable.warning_circle
-                    )
-                )
-            )
+            showRedToast(R.string.conference_too_many_participants_for_mosaic_layout_toast, R.drawable.warning_circle)
         }
     }
 }

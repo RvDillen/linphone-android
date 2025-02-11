@@ -187,6 +187,7 @@ class SettingsViewModel
     val mediaEncryptionLabels = arrayListOf<String>()
     private val mediaEncryptionValues = arrayListOf<MediaEncryption>()
     val mediaEncryptionMandatory = MutableLiveData<Boolean>()
+    val createEndToEndEncryptedConferences = MutableLiveData<Boolean>()
     val acceptEarlyMedia = MutableLiveData<Boolean>()
     val allowOutgoingEarlyMedia = MutableLiveData<Boolean>()
 
@@ -332,7 +333,7 @@ class SettingsViewModel
                 Log.i("$TAG VFS has been enabled")
             }
         } else {
-            showRedToastEvent.postValue(Event(Pair(R.string.settings_security_enable_vfs_failure_toast, R.drawable.warning_circle)))
+            showRedToast(R.string.settings_security_enable_vfs_failure_toast, R.drawable.warning_circle)
             isVfsEnabled.postValue(false)
             Log.e("$TAG Failed to enable VFS!")
         }
@@ -675,6 +676,7 @@ class SettingsViewModel
         }
 
         mediaEncryptionMandatory.postValue(core.isMediaEncryptionMandatory)
+        createEndToEndEncryptedConferences.postValue(corePreferences.createEndToEndEncryptedMeetingsAndGroupCalls)
         acceptEarlyMedia.postValue(corePreferences.acceptEarlyMedia)
         allowOutgoingEarlyMedia.postValue(corePreferences.allowOutgoingEarlyMedia)
     }
@@ -699,6 +701,16 @@ class SettingsViewModel
         coreContext.postOnCoreThread { core ->
             core.isMediaEncryptionMandatory = newValue
             mediaEncryptionMandatory.postValue(newValue)
+        }
+    }
+
+    @UiThread
+    fun toggleConferencesEndToEndEncryption() {
+        val newValue = createEndToEndEncryptedConferences.value == false
+
+        coreContext.postOnCoreThread { core ->
+            corePreferences.createEndToEndEncryptedMeetingsAndGroupCalls = newValue
+            createEndToEndEncryptedConferences.postValue(newValue)
         }
     }
 
