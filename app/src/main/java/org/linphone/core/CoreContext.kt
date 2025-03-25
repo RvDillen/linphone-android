@@ -1187,7 +1187,7 @@ class CoreContext(
 
     /* Start call related activities */
 
-    private fun onIncomingReceived() {
+    public fun onIncomingReceived() {
         if (corePreferences.preventInterfaceFromShowingUp) {
             Log.w("[Context] We were asked to not show the incoming call screen")
             return

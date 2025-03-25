@@ -129,7 +129,12 @@ class NotificationsManager(private val context: Context) {
                         Log.i(
                             "[Notifications Manager] Service isn't null, show incoming call notification"
                         )
-                        displayIncomingCallNotification(call, false)
+                        // CLB: Suppress IncomingCall-Notification cause, wil be blocked by SOTI
+                        // Instead just show Incoming call view in App
+                        coreContext.onIncomingReceived()
+
+                        // displayIncomingCallNotification(call, false)
+                        // End CLB
                     } else {
                         Log.w("[Notifications Manager] No service found, waiting for it to start")
                     }
