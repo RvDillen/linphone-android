@@ -10,6 +10,10 @@ Group changes to describe their impact on the project, as follows:
     Fixed for any bug fixes.
     Security to invite users to upgrade in case of vulnerabilities.
 
+## [5.2.6] - 2025-03-26
+- Suppress IncomingCall-Notification cause wil be blocked by SOTI Inst…
+- Instead activate Incomming Call screen (AS-1225). 
+
 ## [5.2.5] - 2024-05-03
 
 ## Changed
