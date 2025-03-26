@@ -10,10 +10,10 @@ plugins {
 // Used to set the package version name and version code
 ext.versionMajor = 5
 ext.versionMinor = 2
-ext.versionRelease = 5
+ext.versionRelease = 6
 
-def appVersionName = "5.2.5"
-def appVersionCode = 52005
+def appVersionName = "5.2.6"
+def appVersionCode = 52006
 
 static def getPackageName() {
     return "nl.clb.linphone"
