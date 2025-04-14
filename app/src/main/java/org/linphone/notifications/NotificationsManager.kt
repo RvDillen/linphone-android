@@ -132,20 +132,9 @@ class NotificationsManager(private val context: Context) {
                         )
                         // CLB: Suppress IncomingCall-Notification because, it will be blocked by SOTI Kiosk mode.
                         // Instead just show full-screen Incoming call view in App
+                        coreContext.onIncomingReceived()
 
-                        // When Linphone is already in the foreground, use 'normal' Linphone handling.
-                        // When in background, use full-screen CLB fix.
-                        if (isAppInBackground()) {
-                            Log.i(
-                                "[Notifications Manager] Incoming call. App is in background. Use CLB full-screen overlay fix."
-                            )
-                            coreContext.onIncomingReceived()
-                        } else {
-                            Log.i(
-                                "[Notifications Manager] Incoming call. App is in foreground. Use normal Linphone handling."
-                            )
-                            displayIncomingCallNotification(call, false)
-                        }
+                        //displayIncomingCallNotification(call, false)
                         // End CLB
                     } else {
                         Log.w("[Notifications Manager] No service found, waiting for it to start")
