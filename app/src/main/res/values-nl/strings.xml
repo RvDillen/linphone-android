@@ -196,7 +196,7 @@
     <string name="call_context_action_hangup">Beëindigen gesprek</string>
     <string name="advanced_settings_device_name_title">Toestel naam</string>
     <string name="settings_contacts_title">Contacten</string>
-    <string name="call_action_attended_transfer_call">aangekondigd doorverbinden</string>
+    <string name="call_action_attended_transfer_call">Aangekondigd doorverbinden</string>
     <string name="advanced_settings_dark_mode_label_no">nee</string>
     <string name="call_action_transfer_call">Doorverbinden</string>
     <string name="call_context_action_resume">Hervatten gesprek</string>
