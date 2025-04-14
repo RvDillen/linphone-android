@@ -20,6 +20,7 @@
 package org.linphone.notifications
 
 import android.annotation.SuppressLint
+import android.app.ActivityManager
 import android.app.Notification
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -129,16 +130,28 @@ class NotificationsManager(private val context: Context) {
                         Log.i(
                             "[Notifications Manager] Service isn't null, show incoming call notification"
                         )
-                        // CLB: Suppress IncomingCall-Notification cause, wil be blocked by SOTI
-                        // Instead just show Incoming call view in App
-                        coreContext.onIncomingReceived()
+                        // CLB: Suppress IncomingCall-Notification because, it will be blocked by SOTI Kiosk mode.
+                        // Instead just show full-screen Incoming call view in App
 
-                        // displayIncomingCallNotification(call, false)
+                        // When Linphone is already in the foreground, use 'normal' Linphone handling.
+                        // When in background, use full-screen CLB fix.
+                        if (isAppInBackground()) {
+                            Log.i(
+                                "[Notifications Manager] Incoming call. App is in background. Use CLB full-screen overlay fix."
+                            )
+                            coreContext.onIncomingReceived()
+                        } else {
+                            Log.i(
+                                "[Notifications Manager] Incoming call. App is in foreground. Use normal Linphone handling."
+                            )
+                            displayIncomingCallNotification(call, false)
+                        }
                         // End CLB
                     } else {
                         Log.w("[Notifications Manager] No service found, waiting for it to start")
                     }
                 }
+
                 Call.State.End, Call.State.Error -> dismissCallNotification(call)
                 Call.State.Released -> {
                     if (LinphoneUtils.isCallLogMissed(call.callLog)) {
@@ -152,6 +165,16 @@ class NotificationsManager(private val context: Context) {
                 }
                 else -> displayCallNotification(call, true)
             }
+        }
+
+        fun isAppInBackground(): Boolean {
+            val myProcessInfo = ActivityManager.RunningAppProcessInfo()
+            ActivityManager.getMyMemoryState(myProcessInfo)
+            val isInBackground =
+                myProcessInfo.importance != ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND
+
+            Log.i("[Notifications Manager] isAppInBackground [$isInBackground].")
+            return isInBackground
         }
 
         override fun onMessagesReceived(

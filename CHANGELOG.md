@@ -11,8 +11,8 @@ Group changes to describe their impact on the project, as follows:
     Security to invite users to upgrade in case of vulnerabilities.
 
 ## [5.2.6] - 2025-03-26
-- Suppress IncomingCall-Notification cause wil be blocked by SOTI Inst…
-- Instead activate Incomming Call screen (AS-1225). 
+- Suppress IncomingCall-Notification because it wil be blocked by SOTI Inst… (Kiosk mode)
+- Instead activate Incomming Call screen when Linphone is NOT in the foreground. (AS-1225)
 
 ## [5.2.5] - 2024-05-03
 
