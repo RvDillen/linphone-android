@@ -235,6 +235,7 @@ class MainActivity : GenericActivity(), SnackBarActivity, NavController.OnDestin
         coreContext.contactsManager.addListener(listener)
         coreContext.core.addListener(coreListener)
 
+        // CLB: Extra check to force 'incoming call' in Kiosk mode of MDM
         if (corePreferences.showCallOverlay &&
             coreContext.core.currentCall != null &&
             (
@@ -242,7 +243,6 @@ class MainActivity : GenericActivity(), SnackBarActivity, NavController.OnDestin
                     coreContext.core.currentCall!!.state == org.linphone.core.Call.State.IncomingEarlyMedia
                 )
         ) {
-            // CLB:
             // When there is an 'incoming call' && 'Overlay call notification' setting is 'on'
             // Kick app to 'full screen call overlay' again.
 
@@ -250,16 +250,10 @@ class MainActivity : GenericActivity(), SnackBarActivity, NavController.OnDestin
             incomingCallNotificationIntent.addFlags(
                 Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_USER_ACTION or Intent.FLAG_FROM_BACKGROUND
             )
-            val pendingIntent = PendingIntent.getActivity(
-                this,
-                0,
-                incomingCallNotificationIntent,
-                PendingIntent.FLAG_CANCEL_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
 
             startActivity(incomingCallNotificationIntent)
-            // End CLB
         }
+        // End CLB
     }
 
     override fun onPause() {
