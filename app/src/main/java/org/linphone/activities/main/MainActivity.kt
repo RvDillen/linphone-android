@@ -22,6 +22,7 @@ package org.linphone.activities.main
 import android.annotation.SuppressLint
 import android.annotation.TargetApi
 import android.app.Dialog
+import android.app.PendingIntent
 import android.app.role.RoleManager
 import android.content.ComponentCallbacks2
 import android.content.Context
@@ -64,6 +65,7 @@ import org.linphone.activities.main.viewmodels.CallOverlayViewModel
 import org.linphone.activities.main.viewmodels.DialogViewModel
 import org.linphone.activities.main.viewmodels.SharedMainViewModel
 import org.linphone.activities.navigateToDialer
+import org.linphone.activities.voip.CallActivity
 import org.linphone.compatibility.Compatibility
 import org.linphone.contact.ContactsUpdatedListenerStub
 import org.linphone.core.AuthInfo
@@ -232,6 +234,26 @@ class MainActivity : GenericActivity(), SnackBarActivity, NavController.OnDestin
         super.onResume()
         coreContext.contactsManager.addListener(listener)
         coreContext.core.addListener(coreListener)
+
+        // CLB: Extra check to force 'incoming call' in Kiosk mode of MDM
+        if (corePreferences.showCallOverlay &&
+            coreContext.core.currentCall != null &&
+            (
+                coreContext.core.currentCall!!.state == org.linphone.core.Call.State.IncomingReceived ||
+                    coreContext.core.currentCall!!.state == org.linphone.core.Call.State.IncomingEarlyMedia
+                )
+        ) {
+            // When there is an 'incoming call' && 'Overlay call notification' setting is 'on'
+            // Kick app to 'full screen call overlay' again.
+
+            val incomingCallNotificationIntent = Intent(this, CallActivity::class.java)
+            incomingCallNotificationIntent.addFlags(
+                Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_USER_ACTION or Intent.FLAG_FROM_BACKGROUND
+            )
+
+            startActivity(incomingCallNotificationIntent)
+        }
+        // End CLB
     }
 
     override fun onPause() {
