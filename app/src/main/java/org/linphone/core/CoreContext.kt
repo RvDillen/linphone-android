@@ -433,6 +433,7 @@ class CoreContext(
     fun stop() {
         Log.i("[Context] Stopping")
         coroutineScope.cancel()
+        core.terminateAllCalls()
 
         if (::phoneStateListener.isInitialized) {
             phoneStateListener.destroy()
