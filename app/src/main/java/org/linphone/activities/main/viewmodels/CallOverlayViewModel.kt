@@ -38,7 +38,14 @@ class CallOverlayViewModel : ViewModel() {
             state: Call.State?,
             message: String
         ) {
-            if (core.callsNb == 1 && call.state == Call.State.Connected) {
+            if (core.callsNb == 1 &&
+                (
+                        //CLB change
+                    call.state == Call.State.OutgoingRinging ||
+                        call.state == Call.State.IncomingReceived
+                        //End CLB change
+                    )
+            ) {
                 Log.i("[Call Overlay] First call connected, creating it")
                 createCallOverlay()
             }
