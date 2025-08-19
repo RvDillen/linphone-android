@@ -19,9 +19,12 @@
  */
 package org.linphone.ui.main.settings.viewmodel
 
+import android.media.RingtoneManager
+import android.net.Uri
 import android.os.Vibrator
 import androidx.annotation.UiThread
 import androidx.annotation.WorkerThread
+import androidx.core.net.toUri
 import androidx.lifecycle.MutableLiveData
 import org.linphone.LinphoneApplication.Companion.coreContext
 import org.linphone.LinphoneApplication.Companion.corePreferences
@@ -64,6 +67,10 @@ class SettingsViewModel
         MutableLiveData<Event<Boolean>>()
     }
 
+    val keepAliveServiceSettingChangedEvent: MutableLiveData<Event<Boolean>> by lazy {
+        MutableLiveData<Event<Boolean>>()
+    }
+
     // Security settings
     val isVfsEnabled = MutableLiveData<Boolean>()
 
@@ -83,12 +90,14 @@ class SettingsViewModel
 
     val autoRecordCalls = MutableLiveData<Boolean>()
 
-    val goToIncomingCallNotificationChannelSettingsEvent = MutableLiveData<Event<Boolean>>()
+    val goToIncomingCallNotificationChannelSettingsEvent = MutableLiveData<Event<Uri?>>()
 
     // Conversations settings
     val showConversationsSettings = MutableLiveData<Boolean>()
 
     val autoDownloadEnabled = MutableLiveData<Boolean>()
+
+    val autoExportMediaToNativeGallery = MutableLiveData<Boolean>()
 
     val markAsReadWhenDismissingNotification = MutableLiveData<Boolean>()
 
@@ -133,6 +142,8 @@ class SettingsViewModel
     val allowIpv6 = MutableLiveData<Boolean>()
 
     // User Interface settings
+    val autoShowDialpad = MutableLiveData<Boolean>()
+
     val showThemeSelector = MutableLiveData<Boolean>()
     val theme = MutableLiveData<Int>()
     val availableThemesNames = arrayListOf(
@@ -177,19 +188,28 @@ class SettingsViewModel
     )
 
     // Advanced settings
+    val showAdvancedSettings = MutableLiveData<Boolean>()
+
+    val sendLogsToCrashlytics = MutableLiveData<Boolean>()
+    val isCrashlyticsAvailable = MutableLiveData<Boolean>()
+    val startAtBoot = MutableLiveData<Boolean>()
     val keepAliveThirdPartyAccountsService = MutableLiveData<Boolean>()
+    val useSmffForCallRecording = MutableLiveData<Boolean>()
 
     val deviceName = MutableLiveData<String>()
-    val fileSharingServerUrl = MutableLiveData<String>()
     val remoteProvisioningUrl = MutableLiveData<String>()
+
+    val expandAdvancedCalls = MutableLiveData<Boolean>()
 
     val mediaEncryptionIndex = MutableLiveData<Int>()
     val mediaEncryptionLabels = arrayListOf<String>()
     private val mediaEncryptionValues = arrayListOf<MediaEncryption>()
     val mediaEncryptionMandatory = MutableLiveData<Boolean>()
-    val createEndToEndEncryptedConferences = MutableLiveData<Boolean>()
     val acceptEarlyMedia = MutableLiveData<Boolean>()
+    val ringDuringEarlyMedia = MutableLiveData<Boolean>()
     val allowOutgoingEarlyMedia = MutableLiveData<Boolean>()
+    val autoAnswerIncomingCalls = MutableLiveData<Boolean>()
+    val autoAnswerIncomingCallsDelay = MutableLiveData<Int>()
 
     val expandAudioDevices = MutableLiveData<Boolean>()
     val inputAudioDeviceIndex = MutableLiveData<Int>()
@@ -204,6 +224,14 @@ class SettingsViewModel
 
     val expandVideoCodecs = MutableLiveData<Boolean>()
     val videoCodecs = MutableLiveData<List<CodecModel>>()
+
+    // Developer settings
+    val showDeveloperSettings = MutableLiveData<Boolean>()
+
+    val logcat = MutableLiveData<Boolean>()
+    val fileSharingServerUrl = MutableLiveData<String>()
+    val logsSharingServerUrl = MutableLiveData<String>()
+    val createEndToEndEncryptedConferences = MutableLiveData<Boolean>()
 
     private val coreListener = object : CoreListenerStub() {
         @WorkerThread
@@ -226,11 +254,15 @@ class SettingsViewModel
             core.addListener(coreListener)
 
             isTunnelAvailable.postValue(core.tunnelAvailable())
+            isCrashlyticsAvailable.postValue(coreContext.isCrashlyticsAvailable())
+
             showConversationsSettings.postValue(!corePreferences.disableChat)
             showMeetingsSettings.postValue(!corePreferences.disableMeetings)
             ldapAvailable.postValue(core.ldapAvailable())
             showThemeSelector.postValue(corePreferences.darkModeAllowed)
             showColorSelector.postValue(corePreferences.changeMainColorAllowed)
+            showAdvancedSettings.postValue(!corePreferences.hideAdvancedSettings)
+            showDeveloperSettings.postValue(corePreferences.showDeveloperSettings)
         }
         showContactsSettings.value = true
 
@@ -242,11 +274,13 @@ class SettingsViewModel
         expandNetwork.value = false
         expandUserInterface.value = false
         expandTunnel.value = false
+        expandAdvancedCalls.value = false
         expandAudioDevices.value = false
         expandAudioCodecs.value = false
         expandVideoCodecs.value = false
 
-        isVfsEnabled.value = VFS.isEnabled(coreContext.context)
+        val vfsEnabled = VFS.isEnabled(coreContext.context)
+        isVfsEnabled.value = vfsEnabled
 
         val vibrator = coreContext.context.getSystemService(Vibrator::class.java)
         isVibrationAvailable.value = vibrator.hasVibrator()
@@ -280,17 +314,20 @@ class SettingsViewModel
             videoFecEnabled.postValue(core.isFecEnabled)
             vibrateDuringIncomingCall.postValue(core.isVibrationOnIncomingCallEnabled)
             autoRecordCalls.postValue(corePreferences.automaticallyStartCallRecording)
+            useSmffForCallRecording.postValue(corePreferences.callRecordingUseSmffFormat)
 
             useWifiOnly.postValue(core.isWifiOnlyEnabled)
             allowIpv6.postValue(core.isIpv6Enabled)
 
             autoDownloadEnabled.postValue(core.maxSizeForAutoDownloadIncomingFiles == 0)
+            autoExportMediaToNativeGallery.postValue(corePreferences.makePublicMediaFilesDownloaded && !vfsEnabled)
             markAsReadWhenDismissingNotification.postValue(
                 corePreferences.markConversationAsReadWhenDismissingMessageNotification
             )
 
             defaultLayout.postValue(core.defaultConferenceLayout.toInt())
 
+            autoShowDialpad.postValue(corePreferences.automaticallyShowDialpad)
             theme.postValue(corePreferences.darkMode)
             color.postValue(corePreferences.themeMainColor)
 
@@ -298,15 +335,27 @@ class SettingsViewModel
                 setupTunnel()
             }
 
+            sendLogsToCrashlytics.postValue(corePreferences.sendLogsToCrashlytics)
+            startAtBoot.postValue(corePreferences.autoStart)
             keepAliveThirdPartyAccountsService.postValue(corePreferences.keepServiceAlive)
 
             deviceName.postValue(corePreferences.deviceName)
-            fileSharingServerUrl.postValue(core.fileTransferServer)
             remoteProvisioningUrl.postValue(core.provisioningUri)
+
+            acceptEarlyMedia.postValue(corePreferences.acceptEarlyMedia)
+            ringDuringEarlyMedia.postValue(core.ringDuringIncomingEarlyMedia)
+            allowOutgoingEarlyMedia.postValue(corePreferences.allowOutgoingEarlyMedia)
+            autoAnswerIncomingCalls.postValue(corePreferences.autoAnswerEnabled)
+            autoAnswerIncomingCallsDelay.postValue(corePreferences.autoAnswerDelay)
 
             setupMediaEncryption()
             setupAudioDevices()
             setupCodecs()
+
+            logcat.postValue(corePreferences.printLogsInLogcat)
+            fileSharingServerUrl.postValue(core.fileTransferServer)
+            logsSharingServerUrl.postValue(core.logCollectionUploadServerUrl)
+            createEndToEndEncryptedConferences.postValue(corePreferences.createEndToEndEncryptedMeetingsAndGroupCalls)
         }
     }
 
@@ -331,11 +380,12 @@ class SettingsViewModel
             isVfsEnabled.postValue(enabled)
             if (enabled) {
                 Log.i("$TAG VFS has been enabled")
+                showGreenToast(R.string.settings_security_enable_vfs_success_toast, R.drawable.lock_key)
             }
         } else {
-            showRedToast(R.string.settings_security_enable_vfs_failure_toast, R.drawable.warning_circle)
-            isVfsEnabled.postValue(false)
             Log.e("$TAG Failed to enable VFS!")
+            isVfsEnabled.postValue(false)
+            showRedToast(R.string.settings_security_enable_vfs_failure_toast, R.drawable.warning_circle)
         }
     }
 
@@ -403,6 +453,15 @@ class SettingsViewModel
     }
 
     @UiThread
+    fun toggleUseSmffForCallRecording() {
+        val newValue = useSmffForCallRecording.value == false
+        coreContext.postOnCoreThread { core ->
+            corePreferences.callRecordingUseSmffFormat = newValue
+            useSmffForCallRecording.postValue(newValue)
+        }
+    }
+
+    @UiThread
     fun toggleVibrateOnIncomingCalls() {
         val newValue = vibrateDuringIncomingCall.value == false
         coreContext.postOnCoreThread { core ->
@@ -422,7 +481,28 @@ class SettingsViewModel
 
     @UiThread
     fun changeRingtone() {
-        goToIncomingCallNotificationChannelSettingsEvent.value = Event(true)
+        coreContext.postOnCoreThread { core ->
+            try {
+                val defaultDeviceRingtone = RingtoneManager.getActualDefaultRingtoneUri(
+                    coreContext.context,
+                    RingtoneManager.TYPE_RINGTONE
+                )
+                val coreRingtone = core.ring?.toUri()
+                Log.i("$TAG Currently set ringtone in Core is [$coreRingtone], device default ringtone is [$defaultDeviceRingtone]")
+                val currentRingtone = coreRingtone ?: defaultDeviceRingtone
+                goToIncomingCallNotificationChannelSettingsEvent.postValue(Event(currentRingtone))
+            } catch (e: Exception) {
+                Log.e("$TAG Failed to get current ringtone: $e")
+            }
+        }
+    }
+
+    @UiThread
+    fun setRingtoneUri(ringtone: Uri) {
+        coreContext.postOnCoreThread { core ->
+            core.ring = ringtone.toString()
+            Log.i("$TAG Newly set ringtone is [${core.ring}]")
+        }
     }
 
     @UiThread
@@ -436,6 +516,15 @@ class SettingsViewModel
         coreContext.postOnCoreThread { core ->
             core.maxSizeForAutoDownloadIncomingFiles = if (newValue) 0 else -1
             autoDownloadEnabled.postValue(newValue)
+        }
+    }
+
+    @UiThread
+    fun toggleAutoExportMediaFilesToNativeGallery() {
+        val newValue = autoExportMediaToNativeGallery.value == false
+        coreContext.postOnCoreThread { core ->
+            corePreferences.makePublicMediaFilesDownloaded = newValue
+            autoExportMediaToNativeGallery.postValue(newValue)
         }
     }
 
@@ -549,6 +638,15 @@ class SettingsViewModel
     }
 
     @UiThread
+    fun toggleAutoShowDialpad() {
+        val newValue = autoShowDialpad.value == false
+        coreContext.postOnCoreThread { core ->
+            corePreferences.automaticallyShowDialpad = newValue
+            autoShowDialpad.postValue(newValue)
+        }
+    }
+
+    @UiThread
     fun setTheme(themeValue: Int) {
         coreContext.postOnCoreThread {
             corePreferences.darkMode = themeValue
@@ -624,6 +722,27 @@ class SettingsViewModel
     }
 
     @UiThread
+    fun toggleSendLogsToCrashlytics() {
+        val newValue = sendLogsToCrashlytics.value == false
+
+        coreContext.postOnCoreThread {
+            corePreferences.sendLogsToCrashlytics = newValue
+            sendLogsToCrashlytics.postValue(newValue)
+            coreContext.updateCrashlyticsEnabledSetting(newValue)
+        }
+    }
+
+    @UiThread
+    fun toggleStartAtBoot() {
+        val newValue = startAtBoot.value == false
+
+        coreContext.postOnCoreThread {
+            corePreferences.autoStart = newValue
+            startAtBoot.postValue(newValue)
+        }
+    }
+
+    @UiThread
     fun toggleKeepAliveThirdPartyAccountService() {
         val newValue = keepAliveThirdPartyAccountsService.value == false
 
@@ -635,6 +754,7 @@ class SettingsViewModel
             } else {
                 coreContext.stopKeepAliveService()
             }
+            keepAliveServiceSettingChangedEvent.postValue(Event(true))
         }
     }
 
@@ -676,9 +796,6 @@ class SettingsViewModel
         }
 
         mediaEncryptionMandatory.postValue(core.isMediaEncryptionMandatory)
-        createEndToEndEncryptedConferences.postValue(corePreferences.createEndToEndEncryptedMeetingsAndGroupCalls)
-        acceptEarlyMedia.postValue(corePreferences.acceptEarlyMedia)
-        allowOutgoingEarlyMedia.postValue(corePreferences.allowOutgoingEarlyMedia)
     }
 
     @UiThread
@@ -705,16 +822,6 @@ class SettingsViewModel
     }
 
     @UiThread
-    fun toggleConferencesEndToEndEncryption() {
-        val newValue = createEndToEndEncryptedConferences.value == false
-
-        coreContext.postOnCoreThread { core ->
-            corePreferences.createEndToEndEncryptedMeetingsAndGroupCalls = newValue
-            createEndToEndEncryptedConferences.postValue(newValue)
-        }
-    }
-
-    @UiThread
     fun toggleAcceptEarlyMedia() {
         val newValue = acceptEarlyMedia.value == false
 
@@ -725,12 +832,44 @@ class SettingsViewModel
     }
 
     @UiThread
+    fun toggleRingDuringEarlyMedia() {
+        val newValue = ringDuringEarlyMedia.value == false
+
+        coreContext.postOnCoreThread { core ->
+            core.ringDuringIncomingEarlyMedia = newValue
+            ringDuringEarlyMedia.postValue(newValue)
+        }
+    }
+
+    @UiThread
     fun toggleAllowOutgoingEarlyMedia() {
         val newValue = allowOutgoingEarlyMedia.value == false
 
         coreContext.postOnCoreThread { core ->
             corePreferences.allowOutgoingEarlyMedia = newValue
             allowOutgoingEarlyMedia.postValue(newValue)
+        }
+    }
+
+    @UiThread
+    fun toggleEnableAutoAnswerIncomingCalls() {
+        val newValue = autoAnswerIncomingCalls.value == false
+
+        coreContext.postOnCoreThread { core ->
+            corePreferences.autoAnswerEnabled = newValue
+            autoAnswerIncomingCalls.postValue(newValue)
+        }
+    }
+
+    @UiThread
+    fun updateAutoAnswerIncomingCallsDelay(newValue: String) {
+        if (newValue.isNotEmpty()) {
+            try {
+                val delay = newValue.toInt()
+                corePreferences.autoAnswerDelay = delay
+            } catch (nfe: NumberFormatException) {
+                Log.e("$TAG Ignoring new auto answer incoming calls delay as it can't be converted to int: $nfe")
+            }
         }
     }
 
@@ -749,12 +888,18 @@ class SettingsViewModel
     }
 
     @UiThread
-    fun updateFileSharingServerUrl() {
+    fun updateSharingServersUrl() {
         coreContext.postOnCoreThread { core ->
             val newFileSharingServerUrl = fileSharingServerUrl.value.orEmpty().trim()
             if (newFileSharingServerUrl.isNotEmpty()) {
                 Log.i("$TAG Updated file sharing server URL to [$newFileSharingServerUrl]")
                 core.fileTransferServer = newFileSharingServerUrl
+            }
+
+            val newLogsSharingServerUrl = logsSharingServerUrl.value.orEmpty().trim()
+            if (newLogsSharingServerUrl.isNotEmpty()) {
+                Log.i("$TAG Updated logs upload server URL to [$newLogsSharingServerUrl]")
+                core.logCollectionUploadServerUrl = newLogsSharingServerUrl
             }
         }
     }
@@ -785,6 +930,11 @@ class SettingsViewModel
             coreContext.core.start()
             Log.i("$TAG Core has been restarted")
         }
+    }
+
+    @UiThread
+    fun toggleAdvancedCallsExpand() {
+        expandAdvancedCalls.value = expandAdvancedCalls.value == false
     }
 
     @UiThread
@@ -905,5 +1055,43 @@ class SettingsViewModel
             else -> ""
         }
         calibratedEchoCancellerValue.postValue(value)
+    }
+
+    @UiThread
+    fun toggleDeveloperSettings() {
+        val newValue = showDeveloperSettings.value == false
+
+        coreContext.postOnCoreThread { core ->
+            corePreferences.showDeveloperSettings = newValue
+            showDeveloperSettings.postValue(newValue)
+        }
+    }
+
+    @UiThread
+    fun reloadShowDeveloperSettings() {
+        coreContext.postOnCoreThread {
+            showDeveloperSettings.postValue(corePreferences.showDeveloperSettings)
+        }
+    }
+
+    @UiThread
+    fun toggleLogcat() {
+        val newValue = logcat.value == false
+        coreContext.postOnCoreThread {
+            corePreferences.printLogsInLogcat = newValue
+            coreContext.updateLogcatEnabledSetting(newValue)
+            Factory.instance().enableLogcatLogs(newValue)
+            logcat.postValue(newValue)
+        }
+    }
+
+    @UiThread
+    fun toggleConferencesEndToEndEncryption() {
+        val newValue = createEndToEndEncryptedConferences.value == false
+
+        coreContext.postOnCoreThread { core ->
+            corePreferences.createEndToEndEncryptedMeetingsAndGroupCalls = newValue
+            createEndToEndEncryptedConferences.postValue(newValue)
+        }
     }
 }

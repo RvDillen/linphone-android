@@ -51,6 +51,11 @@ class AudioUtils {
         }
 
         @WorkerThread
+        fun routeAudioToHearingAid(call: Call? = null) {
+            routeAudioTo(call, arrayListOf(AudioDevice.Type.HearingAid))
+        }
+
+        @WorkerThread
         fun routeAudioToHeadset(call: Call? = null) {
             routeAudioTo(
                 call,
@@ -87,16 +92,19 @@ class AudioUtils {
 
             if (!skipTelecom) {
                 val callId = currentCall?.callLog?.callId.orEmpty()
+                Log.i("$TAG Trying to change audio endpoint using Telecom Manager APIs")
                 val success = coreContext.telecomManager.applyAudioRouteToCallWithId(types, callId)
                 if (!success) {
                     Log.w("$TAG Failed to change audio endpoint to [$types] for call ID [$callId]")
                     applyAudioRouteChange(currentCall, types, output, skipTelecom = true)
                 } else {
+                    Log.i("$TAG It seems audio endpoint update using Telecom Manager was successful")
                     return
                 }
+            } else {
+                Log.i("$TAG Trying to change audio endpoint directly in Linphone SDK")
+                applyAudioRouteChangeInLinphone(currentCall, types, output)
             }
-
-            applyAudioRouteChangeInLinphone(currentCall, types, output)
         }
 
         fun applyAudioRouteChangeInLinphone(
@@ -230,7 +238,7 @@ class AudioUtils {
                 }
             }
             Log.i(
-                "$TAG Found headset/headphones/hearingAid sound card [$headsetCard], bluetooth sound card [$bluetoothCard] and microphone card [$microphoneCard]"
+                "$TAG Found headset/headphones sound card [$headsetCard], bluetooth/hearingAid sound card [$bluetoothCard] and microphone card [$microphoneCard]"
             )
             return headsetCard ?: bluetoothCard ?: microphoneCard
         }

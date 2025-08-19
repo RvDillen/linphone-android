@@ -48,6 +48,7 @@ import org.linphone.utils.AppUtils
 import org.linphone.utils.Event
 import org.linphone.utils.FileUtils
 import org.linphone.utils.LinphoneUtils
+import androidx.core.net.toUri
 
 class ConversationViewModel
     @UiThread
@@ -71,6 +72,8 @@ class ConversationViewModel
     val isMuted = MutableLiveData<Boolean>()
 
     val isEndToEndEncrypted = MutableLiveData<Boolean>()
+
+    val isEndToEndEncryptionAvailable = MutableLiveData<Boolean>()
 
     val isGroup = MutableLiveData<Boolean>()
 
@@ -106,6 +109,10 @@ class ConversationViewModel
 
     val fileToDisplayEvent: MutableLiveData<Event<FileModel>> by lazy {
         MutableLiveData<Event<FileModel>>()
+    }
+
+    val sipUriToCallEvent: MutableLiveData<Event<String>> by lazy {
+        MutableLiveData<Event<String>>()
     }
 
     val conferenceToJoinEvent: MutableLiveData<Event<String>> by lazy {
@@ -146,7 +153,9 @@ class ConversationViewModel
         @WorkerThread
         override fun onConferenceJoined(chatRoom: ChatRoom, eventLog: EventLog) {
             Log.i("$TAG Conversation was joined")
-            addEvents(arrayOf(eventLog))
+            if (LinphoneUtils.isChatRoomAGroup(chatRoom)) {
+                addEvents(arrayOf(eventLog))
+            }
             computeConversationInfo()
 
             val messageToForward = pendingForwardMessage
@@ -160,8 +169,10 @@ class ConversationViewModel
         @WorkerThread
         override fun onConferenceLeft(chatRoom: ChatRoom, eventLog: EventLog) {
             Log.w("$TAG Conversation was left")
-            addEvents(arrayOf(eventLog))
-            isReadOnly.postValue(true)
+            if (LinphoneUtils.isChatRoomAGroup(chatRoom)) {
+                addEvents(arrayOf(eventLog))
+            }
+            isReadOnly.postValue(chatRoom.isReadOnly)
         }
 
         @WorkerThread
@@ -288,7 +299,7 @@ class ConversationViewModel
                 list.remove(found)
                 eventsList = list
                 updateEvents.postValue(Event(true))
-                isEmpty.postValue(eventsList.isEmpty)
+                isEmpty.postValue(eventsList.isEmpty())
             } else {
                 Log.e("$TAG Failed to find matching message in conversation events list")
             }
@@ -313,7 +324,8 @@ class ConversationViewModel
     }
 
     init {
-        coreContext.postOnCoreThread {
+        coreContext.postOnCoreThread { core ->
+            isEndToEndEncryptionAvailable.postValue(LinphoneUtils.isEndToEndEncryptedChatAvailable(core))
             coreContext.contactsManager.addListener(contactsListener)
         }
 
@@ -398,6 +410,7 @@ class ConversationViewModel
 
     @UiThread
     fun updateUnreadMessageCount() {
+        if (!isChatRoomInitialized()) return
         coreContext.postOnCoreThread {
             unreadMessagesCount.postValue(chatRoom.unreadMessagesCount)
         }
@@ -428,7 +441,7 @@ class ConversationViewModel
                 list.remove(found)
                 eventsList = list
                 updateEvents.postValue(Event(true))
-                isEmpty.postValue(eventsList.isEmpty)
+                isEmpty.postValue(eventsList.isEmpty())
             } else {
                 Log.e(
                     "$TAG Failed to find chat message id [${chatMessageModel.id}] in events list!"
@@ -443,6 +456,7 @@ class ConversationViewModel
 
     @UiThread
     fun markAsRead() {
+        if (!isChatRoomInitialized()) return
         coreContext.postOnCoreThread {
             if (chatRoom.unreadMessagesCount == 0) return@postOnCoreThread
             Log.i("$TAG Marking chat room as read")
@@ -452,6 +466,7 @@ class ConversationViewModel
 
     @UiThread
     fun mute() {
+        if (!isChatRoomInitialized()) return
         coreContext.postOnCoreThread {
             chatRoom.muted = true
             isMuted.postValue(chatRoom.muted)
@@ -460,6 +475,7 @@ class ConversationViewModel
 
     @UiThread
     fun unMute() {
+        if (!isChatRoomInitialized()) return
         coreContext.postOnCoreThread {
             chatRoom.muted = false
             isMuted.postValue(chatRoom.muted)
@@ -470,7 +486,7 @@ class ConversationViewModel
     fun updateCurrentlyDisplayedConversation() {
         coreContext.postOnCoreThread {
             if (isChatRoomInitialized()) {
-                val id = LinphoneUtils.getChatRoomId(chatRoom)
+                val id = LinphoneUtils.getConversationId(chatRoom)
                 Log.i(
                     "$TAG Asking notifications manager not to notify messages for conversation [$id]"
                 )
@@ -483,6 +499,7 @@ class ConversationViewModel
 
     @UiThread
     fun updateEphemeralLifetime(lifetime: Long) {
+        if (!isChatRoomInitialized()) return
         coreContext.postOnCoreThread {
             LinphoneUtils.chatRoomConfigureEphemeralMessagesLifetime(chatRoom, lifetime)
             ephemeralLifetime.postValue(
@@ -496,6 +513,7 @@ class ConversationViewModel
 
     @UiThread
     fun loadMoreData(totalItemsCount: Int) {
+        if (!isChatRoomInitialized()) return
         coreContext.postOnCoreThread {
             val maxSize: Int = chatRoom.historyEventsSize
             Log.i("$TAG Loading more data, current total is $totalItemsCount, max size is $maxSize")
@@ -524,13 +542,14 @@ class ConversationViewModel
                 list.addAll(eventsList)
                 eventsList = list
                 updateEvents.postValue(Event(true))
-                isEmpty.postValue(eventsList.isEmpty)
+                isEmpty.postValue(eventsList.isEmpty())
             }
         }
     }
 
     @WorkerThread
     fun checkIfConversationShouldBeDisabledForSecurityReasons() {
+        if (!isChatRoomInitialized()) return
         if (!chatRoom.hasCapability(ChatRoom.Capabilities.Encrypted.toInt())) {
             if (LinphoneUtils.getAccountForAddress(chatRoom.localAddress)?.params?.instantMessagingEncryptionMandatory == true) {
                 Log.w(
@@ -566,6 +585,8 @@ class ConversationViewModel
 
     @WorkerThread
     private fun configureChatRoom() {
+        if (!isChatRoomInitialized()) return
+
         computeComposingLabel()
 
         isEndToEndEncrypted.postValue(
@@ -581,6 +602,8 @@ class ConversationViewModel
 
     @WorkerThread
     private fun computeConversationInfo() {
+        if (!isChatRoomInitialized()) return
+
         val group = LinphoneUtils.isChatRoomAGroup(chatRoom)
         isGroup.postValue(group)
 
@@ -611,6 +634,8 @@ class ConversationViewModel
 
     @WorkerThread
     private fun computeParticipantsInfo() {
+        if (!isChatRoomInitialized()) return
+
         val friends = arrayListOf<Friend>()
         val address = if (chatRoom.hasCapability(ChatRoom.Capabilities.Basic.toInt())) {
             chatRoom.peerAddress
@@ -640,6 +665,8 @@ class ConversationViewModel
 
     @WorkerThread
     private fun computeEvents() {
+        if (!isChatRoomInitialized()) return
+
         eventsList.forEach(EventLogModel::destroy)
 
         val history = chatRoom.getHistoryEvents(MESSAGES_PER_PAGE)
@@ -647,7 +674,7 @@ class ConversationViewModel
         Log.i("$TAG Extracted [${list.size}] events from conversation history in database")
         eventsList = list
         updateEvents.postValue(Event(true))
-        isEmpty.postValue(eventsList.isEmpty)
+        isEmpty.postValue(eventsList.isEmpty())
     }
 
     @WorkerThread
@@ -694,7 +721,7 @@ class ConversationViewModel
         list.addAll(newList)
         eventsList = list
         updateEvents.postValue(Event(true))
-        isEmpty.postValue(eventsList.isEmpty)
+        isEmpty.postValue(eventsList.isEmpty())
     }
 
     @WorkerThread
@@ -726,7 +753,7 @@ class ConversationViewModel
         list.addAll(eventsList)
         eventsList = list
         updateEvents.postValue(Event(true))
-        isEmpty.postValue(eventsList.isEmpty)
+        isEmpty.postValue(eventsList.isEmpty())
     }
 
     @WorkerThread
@@ -744,23 +771,39 @@ class ConversationViewModel
                 index > 0,
                 index != groupedEventLogs.size - 1,
                 searchFilter.value.orEmpty(),
-                { fileModel ->
+                { fileModel -> // onContentClicked
                     fileToDisplayEvent.postValue(Event(fileModel))
                 },
-                { conferenceUri ->
+                { sipUri -> // onSipUriClicked
+                    sipUriToCallEvent.postValue(Event(sipUri))
+                },
+                { conferenceUri -> // onJoinConferenceClicked
                     conferenceToJoinEvent.postValue(Event(conferenceUri))
                 },
-                { url ->
+                { url -> // onWebUrlClicked
                     openWebBrowserEvent.postValue(Event(url))
                 },
-                { friendRefKey ->
+                { friendRefKey -> // onContactClicked
                     contactToDisplayEvent.postValue(Event(friendRefKey))
                 },
-                { redToast ->
+                { redToast -> // onRedToastToShow
                     showRedToastEvent.postValue(Event(redToast))
                 },
-                { id ->
+                { id -> // onVoiceRecordingPlaybackEnded
                     voiceRecordPlaybackEndedEvent.postValue(Event(id))
+                },
+                { filePath -> // onFileToExportToNativeGallery
+                    viewModelScope.launch {
+                        withContext(Dispatchers.IO) {
+                            Log.i("$TAG Export file [$filePath] to Android's MediaStore")
+                            val mediaStorePath = FileUtils.addContentToMediaStore(filePath)
+                            if (mediaStorePath.isNotEmpty()) {
+                                Log.i("$TAG File [$filePath] has been successfully exported to MediaStore")
+                            } else {
+                                Log.e("$TAG Failed to export file [$filePath] to MediaStore!")
+                            }
+                        }
+                    }
                 }
             )
             eventsList.add(model)
@@ -784,7 +827,7 @@ class ConversationViewModel
             eventsList.addAll(processGroupedEvents(arrayListOf(event)))
         } else {
             for (event in history) {
-                if (groupedEventLogs.isEmpty) {
+                if (groupedEventLogs.isEmpty()) {
                     groupedEventLogs.add(event)
                     continue
                 }
@@ -862,6 +905,7 @@ class ConversationViewModel
 
     @WorkerThread
     private fun computeComposingLabel() {
+        if (!isChatRoomInitialized()) return
         val composingFriends = arrayListOf<String>()
         var label = ""
         for (address in chatRoom.composingAddresses) {
@@ -911,6 +955,7 @@ class ConversationViewModel
 
     @WorkerThread
     private fun searchChatMessage(direction: SearchDirection) {
+        if (!isChatRoomInitialized()) return
         searchInProgress.postValue(true)
 
         val textToSearch = searchFilter.value.orEmpty().trim()
@@ -923,6 +968,14 @@ class ConversationViewModel
             val message = if (latestMatch == null) {
                 R.string.conversation_search_no_match_found
             } else {
+                // Scroll to last matching event anyway, user may have scrolled away
+                val found = eventsList.find {
+                    it.eventLog == latestMatch
+                }
+                if (found != null) { // This should always be true
+                    val index = eventsList.indexOf(found)
+                    itemToScrollTo.postValue(index)
+                }
                 R.string.conversation_search_no_more_match
             }
             showRedToast(message, R.drawable.magnifying_glass)
@@ -942,13 +995,7 @@ class ConversationViewModel
                 Log.i("$TAG Found result is already in history, no need to load more history")
                 (found.model as? MessageModel)?.highlightText(textToSearch)
                 val index = eventsList.indexOf(found)
-                if (direction == SearchDirection.Down && index < eventsList.size - 1) {
-                    // Go to next message to prevent the message we are looking for to be behind the scroll to bottom button
-                    itemToScrollTo.postValue(index + 1)
-                } else {
-                    // Go to previous message so target message won't be displayed stuck to the top
-                    itemToScrollTo.postValue(index - 1)
-                }
+                itemToScrollTo.postValue(index)
                 searchInProgress.postValue(false)
             }
 
@@ -958,7 +1005,7 @@ class ConversationViewModel
 
     @UiThread
     fun copyFileToUri(filePath: String, dest: Uri) {
-        val source = Uri.parse(FileUtils.getProperFilePath(filePath))
+        val source = FileUtils.getProperFilePath(filePath).toUri()
         Log.i("$TAG Copying file URI [$source] to [$dest]")
         viewModelScope.launch {
             withContext(Dispatchers.IO) {

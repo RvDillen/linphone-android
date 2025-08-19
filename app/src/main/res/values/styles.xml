@@ -149,15 +149,7 @@
         <item name="android:drawableTint">?attr/color_danger_500</item>
         <item name="android:drawablePadding">8dp</item>
     </style>
-    <style name="call_start_numpad_digits_style">
-        <item name="android:fontFamily">@font/noto_sans</item>
-        <item name="android:textColor">@color/gray_main2_600</item>
-        <item name="android:textSize">32sp</item>
-        <item name="android:gravity">center</item>
-        <item name="android:elevation">3dp</item>
-        <item name="android:paddingBottom">5dp</item>
-        <item name="android:background">@drawable/circle_white_button_background</item>
-    </style>
+
     <style name="message_reaction_style">
         <item name="android:fontFamily">@font/noto_sans</item>
         <item name="android:textColor">?attr/color_text</item>
@@ -194,5 +186,17 @@
         <item name="android:background">@drawable/shape_circle_contact_avatar_background</item>
         <item name="android:adjustViewBounds">true</item>
         <item name="android:scaleType">centerCrop</item>
+    </style>
+    <style name="unread_count_text_style">
+        <item name="android:fontFamily">@font/noto_sans</item>
+        <item name="android:textColor">?attr/color_on_main</item>
+        <item name="android:textColorHint">?attr/color_hint_text</item>
+        <item name="android:gravity">center</item>
+        <item name="android:background">@drawable/shape_red_round</item>
+        <item name="android:textSize">13sp</item>
+        <item name="android:paddingBottom">2dp</item>
+        <item name="android:autoSizeTextType">uniform</item>
+        <item name="android:autoSizeMinTextSize">8sp</item>
+        <item name="android:autoSizeStepGranularity">1sp</item>
     </style>
 </resources>

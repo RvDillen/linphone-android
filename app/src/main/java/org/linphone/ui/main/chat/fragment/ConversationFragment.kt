@@ -93,6 +93,7 @@ import org.linphone.utils.addCharacterAtPosition
 import org.linphone.utils.hideKeyboard
 import org.linphone.utils.setKeyboardInsetListener
 import org.linphone.utils.showKeyboard
+import androidx.core.net.toUri
 
 @UiThread
 open class ConversationFragment : SlidingPaneChildFragment() {
@@ -126,22 +127,20 @@ open class ConversationFragment : SlidingPaneChildFragment() {
         )
     ) { list ->
         sendMessageViewModel.closeFilePickerBottomSheet()
-        if (list.isNotEmpty()) {
+        val filesToAttach = arrayListOf<String>()
+        lifecycleScope.launch {
             for (uri in list) {
-                lifecycleScope.launch {
-                    withContext(Dispatchers.IO) {
-                        val path = FileUtils.getFilePath(requireContext(), uri, false)
-                        Log.i("$TAG Picked file [$uri] matching path is [$path]")
-                        if (path != null) {
-                            withContext(Dispatchers.Main) {
-                                sendMessageViewModel.addAttachment(path)
-                            }
-                        }
+                withContext(Dispatchers.IO) {
+                    val path = FileUtils.getFilePath(requireContext(), uri, false)
+                    Log.i("$TAG Picked file [$uri] matching path is [$path]")
+                    if (path != null) {
+                        filesToAttach.add(path)
                     }
                 }
             }
-        } else {
-            Log.w("$TAG No file picked")
+            withContext(Dispatchers.Main) {
+                sendMessageViewModel.addAttachments(filesToAttach)
+            }
         }
     }
 
@@ -151,15 +150,19 @@ open class ConversationFragment : SlidingPaneChildFragment() {
         ActivityResultContracts.OpenMultipleDocuments()
     ) { files ->
         sendMessageViewModel.closeFilePickerBottomSheet()
-        for (fileUri in files) {
-            lifecycleScope.launch {
+        val filesToAttach = arrayListOf<String>()
+        lifecycleScope.launch {
+            for (fileUri in files) {
                 val path = FileUtils.getFilePath(requireContext(), fileUri, false).orEmpty()
                 if (path.isNotEmpty()) {
                     Log.i("$TAG Picked file [$path]")
-                    sendMessageViewModel.addAttachment(path)
+                    filesToAttach.add(path)
                 } else {
                     Log.e("$TAG Failed to pick file [$fileUri]")
                 }
+            }
+            withContext(Dispatchers.Main) {
+                sendMessageViewModel.addAttachments(filesToAttach)
             }
         }
     }
@@ -172,7 +175,7 @@ open class ConversationFragment : SlidingPaneChildFragment() {
         if (path != null) {
             if (captured) {
                 Log.i("$TAG Image was captured and saved in [$path]")
-                sendMessageViewModel.addAttachment(path)
+                sendMessageViewModel.addAttachments(arrayListOf(path))
             } else {
                 Log.w("$TAG Image capture was aborted")
                 lifecycleScope.launch {
@@ -212,8 +215,11 @@ open class ConversationFragment : SlidingPaneChildFragment() {
                 .viewTreeObserver
                 .removeOnGlobalLayoutListener(this)
 
-            if (::scrollListener.isInitialized) {
-                binding.eventsList.addOnScrollListener(scrollListener)
+            binding.root.setKeyboardInsetListener { keyboardVisible ->
+                sendMessageViewModel.isKeyboardOpen.value = keyboardVisible
+                if (keyboardVisible) {
+                    sendMessageViewModel.isEmojiPickerOpen.value = false
+                }
             }
 
             val unreadCount = viewModel.unreadMessagesCount.value ?: 0
@@ -307,7 +313,9 @@ open class ConversationFragment : SlidingPaneChildFragment() {
                 if (e.action == MotionEvent.ACTION_UP) {
                     if ((rv.layoutManager as LinearLayoutManager).findFirstCompletelyVisibleItemPosition() == 0) {
                         if (e.y >= 0 && e.y <= headerItemDecoration.getDecorationHeight(0)) {
-                            showEndToEndEncryptionDetailsBottomSheet()
+                            if (viewModel.isEndToEndEncrypted.value == true) {
+                                showEndToEndEncryptionDetailsBottomSheet()
+                            }
                             return true
                         }
                     }
@@ -477,14 +485,11 @@ open class ConversationFragment : SlidingPaneChildFragment() {
         }
         RecyclerViewSwipeUtils(callbacks).attachToRecyclerView(binding.eventsList)
 
-        val localSipUri = args.localSipUri
-        val remoteSipUri = args.remoteSipUri
-        Log.i(
-            "$TAG Looking up for conversation with local SIP URI [$localSipUri] and remote SIP URI [$remoteSipUri]"
-        )
+        val conversationId = args.conversationId
+        Log.i("$TAG Looking up for conversation with conversation ID [$conversationId]")
         val chatRoom = sharedViewModel.displayedChatRoom
-        viewModel.findChatRoom(chatRoom, localSipUri, remoteSipUri)
-        Compatibility.setLocusIdInContentCaptureSession(binding.root, localSipUri, remoteSipUri)
+        viewModel.findChatRoom(chatRoom, conversationId)
+        Compatibility.setLocusIdInContentCaptureSession(binding.root, conversationId)
 
         viewModel.chatRoomFoundEvent.observe(viewLifecycleOwner) {
             it.consume { found ->
@@ -500,6 +505,7 @@ open class ConversationFragment : SlidingPaneChildFragment() {
                     }
                 } else {
                     sendMessageViewModel.configureChatRoom(viewModel.chatRoom)
+                    adapter.setIsConversationSecured(viewModel.isEndToEndEncrypted.value == true)
 
                     // Wait for chat room to be ready before trying to forward a message in it
                     sharedViewModel.messageToForwardEvent.observe(viewLifecycleOwner) { event ->
@@ -581,6 +587,8 @@ open class ConversationFragment : SlidingPaneChildFragment() {
         }
 
         viewModel.isEndToEndEncrypted.observe(viewLifecycleOwner) { encrypted ->
+            adapter.setIsConversationSecured(encrypted)
+
             if (encrypted) {
                 binding.eventsList.addItemDecoration(headerItemDecoration)
                 binding.eventsList.addOnItemTouchListener(listItemTouchListener)
@@ -696,7 +704,7 @@ open class ConversationFragment : SlidingPaneChildFragment() {
         }
 
         binding.setWarningConversationDisabledClickListener {
-            showUnsafeConversationDetailsBottomSheet()
+            showUnsafeConversationDisabledDetailsBottomSheet()
         }
 
         binding.searchField.setOnEditorActionListener { view, actionId, _ ->
@@ -760,6 +768,19 @@ open class ConversationFragment : SlidingPaneChildFragment() {
             }
         }
 
+        viewModel.sipUriToCallEvent.observe(viewLifecycleOwner) {
+            it.consume { sipUri ->
+                if (messageLongPressViewModel.visible.value == true) return@consume
+                val address = coreContext.core.interpretUrl(sipUri, false)
+                if (address != null) {
+                    Log.i("$TAG Starting audio call to parsed SIP URI [${address.asStringUriOnly()}]")
+                    coreContext.startAudioCall(address)
+                } else {
+                    Log.w("$TAG Failed to parse [$sipUri] as SIP URI")
+                }
+            }
+        }
+
         viewModel.conferenceToJoinEvent.observe(viewLifecycleOwner) {
             it.consume { conferenceUri ->
                 if (messageLongPressViewModel.visible.value == true) return@consume
@@ -773,8 +794,16 @@ open class ConversationFragment : SlidingPaneChildFragment() {
                 if (messageLongPressViewModel.visible.value == true) return@consume
                 Log.i("$TAG Requesting to open web browser on page [$url]")
                 try {
-                    val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                    val browserIntent = Intent(Intent.ACTION_VIEW, url.toUri())
                     startActivity(browserIntent)
+                } catch (ise: IllegalStateException) {
+                    Log.e(
+                        "$TAG Can't start ACTION_VIEW intent for URL [$url], IllegalStateException: $ise"
+                    )
+                } catch (anfe: ActivityNotFoundException) {
+                    Log.e(
+                        "$TAG Can't start ACTION_VIEW intent for URL [$url], ActivityNotFoundException: $anfe"
+                    )
                 } catch (e: Exception) {
                     Log.e(
                         "$TAG Can't start ACTION_VIEW intent for URL [$url]: $e"
@@ -797,15 +826,27 @@ open class ConversationFragment : SlidingPaneChildFragment() {
                 val message = getString(R.string.conversation_message_deleted_toast)
                 val icon = R.drawable.trash_simple
                 (requireActivity() as GenericActivity).showGreenToast(message, icon)
-                sharedViewModel.forceRefreshConversations.value = Event(true)
+                sharedViewModel.updateConversationLastMessageEvent.value = Event(viewModel.conversationId)
             }
         }
 
         viewModel.itemToScrollTo.observe(viewLifecycleOwner) { position ->
             if (position >= 0) {
-                Log.i("$TAG Scrolling to message/event at position [$position]")
                 val recyclerView = binding.eventsList
-                recyclerView.scrollToPosition(position)
+                val layoutManager = recyclerView.layoutManager as LinearLayoutManager
+                val firstDisplayedItemPosition = layoutManager.findFirstVisibleItemPosition()
+                val lastDisplayedItemPosition = layoutManager.findLastVisibleItemPosition()
+                Log.i(
+                    "$TAG Scrolling to message/event at position [$position], " +
+                        "display show events between positions [$firstDisplayedItemPosition] and [$lastDisplayedItemPosition]"
+                )
+                if (firstDisplayedItemPosition > position && position > 0) {
+                    recyclerView.scrollToPosition(position - 1)
+                } else if (lastDisplayedItemPosition < position && position < layoutManager.itemCount - 1) {
+                    recyclerView.scrollToPosition(position + 1)
+                } else {
+                    recyclerView.scrollToPosition(position)
+                }
             }
         }
 
@@ -872,7 +913,7 @@ open class ConversationFragment : SlidingPaneChildFragment() {
                         Log.i("$TAG Rich content URI [$uri] matching path is [$path]")
                         if (path != null) {
                             withContext(Dispatchers.Main) {
-                                sendMessageViewModel.addAttachment(path)
+                                sendMessageViewModel.addAttachments(arrayListOf(path))
                             }
                         }
                     }
@@ -900,14 +941,14 @@ open class ConversationFragment : SlidingPaneChildFragment() {
             if (files.isNotEmpty()) {
                 Log.i("$TAG Found [${files.size}] files to share from intent")
                 for (path in files) {
-                    sendMessageViewModel.addAttachment(path)
+                    sendMessageViewModel.addAttachments(arrayListOf(path))
                 }
 
                 sharedViewModel.filesToShareFromIntent.value = arrayListOf()
             }
         }
 
-        sharedViewModel.forceRefreshConversationInfo.observe(viewLifecycleOwner) {
+        sharedViewModel.forceRefreshConversationInfoEvent.observe(viewLifecycleOwner) {
             it.consume {
                 Log.i("$TAG Force refreshing conversation info")
                 viewModel.refresh()
@@ -921,7 +962,7 @@ open class ConversationFragment : SlidingPaneChildFragment() {
             }
         }
 
-        sharedViewModel.newChatMessageEphemeralLifetimeToSet.observe(viewLifecycleOwner) {
+        sharedViewModel.newChatMessageEphemeralLifetimeToSetEvent.observe(viewLifecycleOwner) {
             it.consume { ephemeralLifetime ->
                 Log.i(
                     "$TAG Setting [$ephemeralLifetime] as new ephemeral lifetime for messages"
@@ -937,13 +978,6 @@ open class ConversationFragment : SlidingPaneChildFragment() {
                     sendMessageViewModel.sendMessage()
                 }
             })
-
-        binding.root.setKeyboardInsetListener { keyboardVisible ->
-            sendMessageViewModel.isKeyboardOpen.value = keyboardVisible
-            if (keyboardVisible) {
-                sendMessageViewModel.isEmojiPickerOpen.value = false
-            }
-        }
 
         binding.sendArea.messageToSend.addTextChangedListener(textObserver)
 
@@ -985,6 +1019,10 @@ open class ConversationFragment : SlidingPaneChildFragment() {
         binding.eventsList
             .viewTreeObserver
             .addOnGlobalLayoutListener(globalLayoutObserver)
+
+        if (::scrollListener.isInitialized) {
+            binding.eventsList.addOnScrollListener(scrollListener)
+        }
 
         try {
             adapter.registerAdapterDataObserver(dataObserver)
@@ -1092,8 +1130,7 @@ open class ConversationFragment : SlidingPaneChildFragment() {
         if (findNavController().currentDestination?.id == R.id.conversationFragment) {
             val action =
                 ConversationFragmentDirections.actionConversationFragmentToConversationInfoFragment(
-                    viewModel.localSipUri,
-                    viewModel.remoteSipUri
+                    viewModel.conversationId,
                 )
             findNavController().navigate(action)
         }
@@ -1113,12 +1150,12 @@ open class ConversationFragment : SlidingPaneChildFragment() {
 
         val bundle = Bundle()
         bundle.apply {
-            putString("localSipUri", viewModel.localSipUri)
-            putString("remoteSipUri", viewModel.remoteSipUri)
+            putString("conversationId", viewModel.conversationId)
             putString("path", path)
             putBoolean("isEncrypted", fileModel.isEncrypted)
             putLong("timestamp", fileModel.fileCreationTimestamp)
             putString("originalPath", fileModel.originalPath)
+            putBoolean("isFromEphemeralMessage", fileModel.isFromEphemeralMessage)
         }
         when (mimeType) {
             FileUtils.MimeType.Image, FileUtils.MimeType.Video, FileUtils.MimeType.Audio -> {
@@ -1172,14 +1209,14 @@ open class ConversationFragment : SlidingPaneChildFragment() {
             Log.i("$TAG Muting conversation")
             viewModel.mute()
             popupWindow.dismiss()
-            sharedViewModel.forceRefreshDisplayedConversation.value = Event(true)
+            sharedViewModel.forceRefreshDisplayedConversationEvent.value = Event(true)
         }
 
         popupView.setUnmuteClickListener {
             Log.i("$TAG Un-muting conversation")
             viewModel.unMute()
             popupWindow.dismiss()
-            sharedViewModel.forceRefreshDisplayedConversation.value = Event(true)
+            sharedViewModel.forceRefreshDisplayedConversationEvent.value = Event(true)
         }
 
         popupView.setConfigureEphemeralMessagesClickListener {
@@ -1199,8 +1236,7 @@ open class ConversationFragment : SlidingPaneChildFragment() {
             if (findNavController().currentDestination?.id == R.id.conversationFragment) {
                 val action =
                     ConversationFragmentDirections.actionConversationFragmentToConversationMediaListFragment(
-                        localSipUri = viewModel.localSipUri,
-                        remoteSipUri = viewModel.remoteSipUri
+                        viewModel.conversationId
                     )
                 findNavController().navigate(action)
             }
@@ -1211,8 +1247,7 @@ open class ConversationFragment : SlidingPaneChildFragment() {
             if (findNavController().currentDestination?.id == R.id.conversationFragment) {
                 val action =
                     ConversationFragmentDirections.actionConversationFragmentToConversationDocumentsListFragment(
-                        localSipUri = viewModel.localSipUri,
-                        remoteSipUri = viewModel.remoteSipUri
+                        viewModel.conversationId
                     )
                 findNavController().navigate(action)
             }
@@ -1301,7 +1336,7 @@ open class ConversationFragment : SlidingPaneChildFragment() {
 
             val model = MessageReactionsModel(chatMessageModel.chatMessage) { reactionsModel ->
                 coreContext.postOnMainThread {
-                    if (reactionsModel.allReactions.isEmpty) {
+                    if (reactionsModel.allReactions.value.orEmpty().isEmpty()) {
                         Log.i("$TAG No reaction to display, closing bottom sheet")
                         val bottomSheetBehavior = BottomSheetBehavior.from(
                             binding.messageBottomSheet.root
@@ -1367,7 +1402,7 @@ open class ConversationFragment : SlidingPaneChildFragment() {
 
     @UiThread
     private fun displayReactions(model: MessageReactionsModel) {
-        val totalCount = model.allReactions.size
+        val totalCount = model.allReactions.value.orEmpty().size
         val label = getString(R.string.message_reactions_info_all_title, totalCount.toString())
 
         val tabs = binding.messageBottomSheet.tabs
@@ -1377,7 +1412,7 @@ open class ConversationFragment : SlidingPaneChildFragment() {
         )
 
         var index = 1
-        for (reaction in model.differentReactions.value.orEmpty()) {
+        for (reaction in model.differentReactions) {
             val count = model.reactionsMap[reaction]
             val tabLabel = getString(
                 R.string.message_reactions_info_emoji_title,
@@ -1394,7 +1429,7 @@ open class ConversationFragment : SlidingPaneChildFragment() {
             override fun onTabSelected(tab: TabLayout.Tab?) {
                 val filter = tab?.tag.toString()
                 if (filter.isEmpty()) {
-                    bottomSheetAdapter.submitList(model.allReactions)
+                    bottomSheetAdapter.submitList(model.allReactions.value.orEmpty())
                 } else {
                     bottomSheetAdapter.submitList(model.filterReactions(filter))
                 }
@@ -1407,7 +1442,7 @@ open class ConversationFragment : SlidingPaneChildFragment() {
             }
         })
 
-        val initialList = model.allReactions
+        val initialList = model.allReactions.value.orEmpty()
         bottomSheetAdapter.submitList(initialList)
         Log.i("$TAG Submitted [${initialList.size}] items for default reactions list")
     }
@@ -1421,13 +1456,13 @@ open class ConversationFragment : SlidingPaneChildFragment() {
         bottomSheetDialog = e2eEncryptionDetailsBottomSheet
     }
 
-    private fun showUnsafeConversationDetailsBottomSheet() {
-        val unsafeConversationDetailsBottomSheet = UnsafeConversationDetailsDialogFragment()
-        unsafeConversationDetailsBottomSheet.show(
+    private fun showUnsafeConversationDisabledDetailsBottomSheet() {
+        val unsafeConversationDisabledDetailsBottomSheet = UnsafeConversationDisabledDetailsDialogFragment()
+        unsafeConversationDisabledDetailsBottomSheet.show(
             requireActivity().supportFragmentManager,
-            UnsafeConversationDetailsDialogFragment.TAG
+            UnsafeConversationDisabledDetailsDialogFragment.TAG
         )
-        bottomSheetDialog = unsafeConversationDetailsBottomSheet
+        bottomSheetDialog = unsafeConversationDisabledDetailsBottomSheet
     }
 
     private fun showOpenOrExportFileDialog(path: String, mime: String, bundle: Bundle) {
@@ -1537,6 +1572,10 @@ open class ConversationFragment : SlidingPaneChildFragment() {
             type = mime
             putExtra(Intent.EXTRA_TITLE, name)
         }
-        startActivityForResult(intent, EXPORT_FILE_AS_DOCUMENT)
+        try {
+            startActivityForResult(intent, EXPORT_FILE_AS_DOCUMENT)
+        } catch (exception: ActivityNotFoundException) {
+            Log.e("$TAG No activity found to handle intent ACTION_CREATE_DOCUMENT: $exception")
+        }
     }
 }

@@ -19,7 +19,6 @@
  */
 package org.linphone.ui.fileviewer.viewmodel
 
-import android.graphics.Bitmap
 import android.graphics.pdf.PdfRenderer
 import android.net.Uri
 import android.os.ParcelFileDescriptor
@@ -31,7 +30,6 @@ import java.io.BufferedReader
 import java.io.File
 import java.io.FileReader
 import java.lang.IllegalStateException
-import java.lang.StringBuilder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -41,6 +39,8 @@ import org.linphone.ui.GenericViewModel
 import org.linphone.utils.Event
 import org.linphone.utils.FileUtils
 import org.linphone.utils.TimestampUtils
+import androidx.core.net.toUri
+import androidx.core.graphics.createBitmap
 
 class FileViewModel
     @UiThread
@@ -68,6 +68,8 @@ class FileViewModel
     val fileReadyEvent = MutableLiveData<Event<Boolean>>()
 
     val dateTime = MutableLiveData<String>()
+
+    val isFromEphemeralMessage = MutableLiveData<Boolean>()
 
     val exportPlainTextFileEvent: MutableLiveData<Event<String>> by lazy {
         MutableLiveData<Event<String>>()
@@ -178,11 +180,7 @@ class FileViewModel
                     Log.d(
                         "$TAG Page size is ${page.width}/${page.height}, screen size is $screenWidth/$screenHeight"
                     )
-                    val bm = Bitmap.createBitmap(
-                        page.width,
-                        page.height,
-                        Bitmap.Config.ARGB_8888
-                    )
+                    val bm = createBitmap(page.width, page.height)
                     page.render(bm, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
                     page.close()
 
@@ -230,7 +228,7 @@ class FileViewModel
 
     @UiThread
     fun copyFileToUri(dest: Uri) {
-        val source = Uri.parse(FileUtils.getProperFilePath(getFilePath()))
+        val source = FileUtils.getProperFilePath(getFilePath()).toUri()
         Log.i("$TAG Copying file URI [$source] to [$dest]")
         viewModelScope.launch {
             withContext(Dispatchers.IO) {
@@ -280,13 +278,21 @@ class FileViewModel
                     File(filePath),
                     ParcelFileDescriptor.MODE_READ_ONLY
                 )
-                pdfRenderer = PdfRenderer(input)
-                val count = pdfRenderer.pageCount
-                Log.i("$TAG $count pages in file $filePath")
-                pdfPages.postValue(count.toString())
-                pdfCurrentPage.postValue("1")
-                pdfRendererReadyEvent.postValue(Event(true))
-                fileReadyEvent.postValue(Event(true))
+                try {
+                    pdfRenderer = PdfRenderer(input)
+                    val count = pdfRenderer.pageCount
+                    Log.i("$TAG $count pages in file $filePath")
+                    pdfPages.postValue(count.toString())
+                    pdfCurrentPage.postValue("1")
+                    pdfRendererReadyEvent.postValue(Event(true))
+                    fileReadyEvent.postValue(Event(true))
+                } catch (se: SecurityException) {
+                    // TODO FIXME: add support for password protected PDFs
+                    Log.e("$TAG Can't open PDF, probably protected by a password: $se")
+                    pdfCurrentPage.postValue("0")
+                    pdfPages.postValue("0")
+                    showRedToast(R.string.conversation_pdf_file_cant_be_opened_error_toast, R.drawable.warning_circle)
+                }
             }
         }
     }

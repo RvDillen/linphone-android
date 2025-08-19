@@ -42,6 +42,7 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import org.linphone.LinphoneApplication.Companion.coreContext
+import org.linphone.LinphoneApplication.Companion.corePreferences
 import org.linphone.R
 import org.linphone.core.Address
 import org.linphone.core.ChatMessage
@@ -69,20 +70,17 @@ class MessageModel
     constructor(
     val chatMessage: ChatMessage,
     val isFromGroup: Boolean,
-    val isReply: Boolean,
-    val replyTo: String,
-    val replyText: String,
-    val replyToMessageId: String?,
-    val isForward: Boolean,
     isGroupedWithPreviousOne: Boolean,
     isGroupedWithNextOne: Boolean,
     private val currentFilter: String = "",
     private val onContentClicked: ((fileModel: FileModel) -> Unit)? = null,
+    private val onSipUriClicked: ((uri: String) -> Unit)? = null,
     private val onJoinConferenceClicked: ((uri: String) -> Unit)? = null,
     private val onWebUrlClicked: ((url: String) -> Unit)? = null,
     private val onContactClicked: ((friendRefKey: String) -> Unit)? = null,
     private val onRedToastToShow: ((pair: Pair<Int, Int>) -> Unit)? = null,
-    private val onVoiceRecordingPlaybackEnded: ((id: String) -> Unit)? = null
+    private val onVoiceRecordingPlaybackEnded: ((id: String) -> Unit)? = null,
+    private val onFileToExportToNativeGallery: ((path: String) -> Unit)? = null
 ) {
     companion object {
         private const val TAG = "[Message Model]"
@@ -98,11 +96,13 @@ class MessageModel
 
     val isOutgoing = chatMessage.isOutgoing
 
-    val isInError = chatMessage.state == ChatMessage.State.NotDelivered
+    val isInError = MutableLiveData<Boolean>()
 
     val timestamp = chatMessage.time
 
     val time = TimestampUtils.toString(timestamp)
+
+    val hideDeliveryStatus = !isOutgoing && coreContext.core.imdnToEverybodyThreshold == 1
 
     val chatRoomIsReadOnly = chatMessage.chatRoom.isReadOnly ||
         (
@@ -110,6 +110,16 @@ class MessageModel
                 chatMessage.chatRoom.localAddress
             )?.params?.instantMessagingEncryptionMandatory == true
             )
+
+    val isReply = chatMessage.isReply
+
+    val replyToMessageId = chatMessage.replyMessageId
+
+    val isForward = chatMessage.isForward
+
+    val replyTo = MutableLiveData<String>()
+
+    val replyText = MutableLiveData<Spannable>()
 
     val avatarModel = MutableLiveData<ContactAvatarModel>()
 
@@ -212,14 +222,36 @@ class MessageModel
                 transferringFileModel = null
                 if (!allFilesDownloaded) {
                     computeContentsList()
-                }
-
-                for (content in message.contents) {
-                    if (content.isVoiceRecording) {
-                        Log.i("$TAG File transfer done, updating voice record info")
-                        computeVoiceRecordContent(content)
-                        break
+                } else {
+                    for (content in message.contents) {
+                        if (content.isVoiceRecording) {
+                            Log.i("$TAG File transfer done, updating voice record info")
+                            computeVoiceRecordContent(content)
+                            break
+                        }
                     }
+                }
+            }
+            isInError.postValue(messageState == ChatMessage.State.NotDelivered)
+        }
+
+        @WorkerThread
+        override fun onFileTransferTerminated(message: ChatMessage, content: Content) {
+            Log.i("$TAG File [${content.name}] from message [${message.messageId}] transfer terminated")
+
+            // Never do auto media export for ephemeral messages!
+            if (corePreferences.makePublicMediaFilesDownloaded && !message.isEphemeral) {
+                val path = content.filePath
+                if (path.isNullOrEmpty()) return
+
+                val mime = "${content.type}/${content.subtype}"
+                val mimeType = FileUtils.getMimeType(mime)
+                when (mimeType) {
+                    FileUtils.MimeType.Image, FileUtils.MimeType.Video, FileUtils.MimeType.Audio -> {
+                        Log.i("$TAG Exporting file path [$path] to the native media gallery")
+                        onFileToExportToNativeGallery?.invoke(path)
+                    }
+                    else -> {}
                 }
             }
         }
@@ -274,6 +306,8 @@ class MessageModel
     init {
         updateAvatarModel()
 
+        isInError.postValue(chatMessage.state == ChatMessage.State.NotDelivered)
+
         groupedWithNextMessage.postValue(isGroupedWithNextOne)
         groupedWithPreviousMessage.postValue(isGroupedWithPreviousOne)
         isPlayingVoiceRecord.postValue(false)
@@ -285,6 +319,9 @@ class MessageModel
         updateReactionsList()
 
         computeContentsList()
+        if (isReply) {
+            computeReplyInfo()
+        }
 
         coreContext.postOnMainThread {
             firstFileModel.addSource(filesList) {
@@ -377,19 +414,14 @@ class MessageModel
     private fun computeContentsList() {
         Log.d("$TAG Computing message contents list")
         text.postValue(Spannable.Factory.getInstance().newSpannable(""))
-        filesList.postValue(arrayListOf())
+        filesList.value.orEmpty().forEach(FileModel::destroy)
 
         var displayableContentFound = false
-        var filesContentCount = 0
+        var contentIndex = 0
         val filesPath = arrayListOf<FileModel>()
 
         val contents = chatMessage.contents
         allFilesDownloaded = true
-
-        val notMediaContent = contents.find {
-            it.isIcalendar || it.isVoiceRecording || (it.isText && !it.isFile) || it.isFileTransfer || (it.isFile && !(it.type == "video" || it.type == "image"))
-        }
-        val allContentsAreMedia = notMediaContent == null
         val exactly4Contents = contents.size == 4
 
         for (content in contents) {
@@ -412,9 +444,14 @@ class MessageModel
 
                 displayableContentFound = true
             } else {
+                val wrapBefore = if (exactly4Contents) {
+                    contentIndex == 2 // To have a 2x2 grid
+                } else {
+                    contentIndex % 3 == 0 // To have at most 3 columns
+                }
                 if (content.isFile) {
                     Log.d("$TAG Found file content with type [${content.type}/${content.subtype}]")
-                    filesContentCount += 1
+                    contentIndex += 1
 
                     checkAndRepairFilePathIfNeeded(content)
 
@@ -432,9 +469,11 @@ class MessageModel
                         Log.d(
                             "$TAG Found file ready to be displayed [$path] with MIME [${content.type}/${content.subtype}] for message [${chatMessage.messageId}]"
                         )
-
-                        val wrapBefore = allContentsAreMedia && exactly4Contents && filesContentCount == 3
-                        val fileSize = content.fileSize.toLong()
+                        val fileSize = if (content.fileSize.toLong() > 0) {
+                            content.fileSize.toLong()
+                        } else {
+                            FileUtils.getFileSize(path)
+                        }
                         val timestamp = content.creationTimestamp
                         val fileModel = FileModel(
                             path,
@@ -443,6 +482,7 @@ class MessageModel
                             timestamp,
                             isFileEncrypted,
                             originalPath,
+                            chatMessage.isEphemeral,
                             flexboxLayoutWrapBefore = wrapBefore
                         ) { model ->
                             onContentClicked?.invoke(model)
@@ -458,19 +498,26 @@ class MessageModel
                         "$TAG Found file content (not downloaded yet) with type [${content.type}/${content.subtype}] and name [${content.name}]"
                     )
                     allFilesDownloaded = false
-                    filesContentCount += 1
+                    contentIndex += 1
                     val name = content.name ?: ""
                     val timestamp = content.creationTimestamp
                     if (name.isNotEmpty()) {
                         val fileModel = if (isOutgoing && chatMessage.isFileTransferInProgress) {
                             val path = content.filePath.orEmpty()
+                            val fileSize = if (content.fileSize.toLong() > 0) {
+                                content.fileSize.toLong()
+                            } else {
+                                FileUtils.getFileSize(path)
+                            }
                             FileModel(
                                 path,
                                 name,
-                                content.fileSize.toLong(),
+                                fileSize,
                                 timestamp,
                                 isFileEncrypted,
-                                path
+                                path,
+                                chatMessage.isEphemeral,
+                                flexboxLayoutWrapBefore = wrapBefore
                             ) { model ->
                                 onContentClicked?.invoke(model)
                             }
@@ -482,7 +529,9 @@ class MessageModel
                                 timestamp,
                                 isFileEncrypted,
                                 name,
-                                isWaitingToBeDownloaded = true
+                                chatMessage.isEphemeral,
+                                isWaitingToBeDownloaded = true,
+                                flexboxLayoutWrapBefore = wrapBefore
                             ) { model ->
                                 downloadContent(model, content)
                             }
@@ -589,6 +638,19 @@ class MessageModel
     }
 
     @WorkerThread
+    fun computeReplyInfo() {
+        val replyMessage = chatMessage.replyMessage
+        if (replyMessage != null) {
+            val from = replyMessage.fromAddress
+            val avatarModel = coreContext.contactsManager.getContactAvatarModelForAddress(from)
+            replyTo.postValue(avatarModel.contactName ?: LinphoneUtils.getDisplayName(from))
+            replyText.postValue(LinphoneUtils.getFormattedTextDescribingMessage(replyMessage))
+        } else {
+            Log.e("$TAG Failed to find the reply message from ID [${chatMessage.replyMessageId}]")
+        }
+    }
+
+    @WorkerThread
     private fun computeTextContent(content: Content, highlight: String) {
         val textContent = content.utf8Text.orEmpty().trim()
         val spannableBuilder = SpannableStringBuilder(textContent)
@@ -611,6 +673,7 @@ class MessageModel
         // Check for mentions
         val chatRoom = chatMessage.chatRoom
         val matcher = Pattern.compile(MENTION_REGEXP).matcher(textContent)
+        var offset = 0
         while (matcher.find()) {
             val start = matcher.start()
             val end = matcher.end()
@@ -636,14 +699,14 @@ class MessageModel
                 )
                 val friend = avatarModel.friend
                 val displayName = friend.name ?: LinphoneUtils.getDisplayName(address)
-                Log.d(
-                    "$TAG Using display name [$displayName] instead of username [$source]"
+                Log.i(
+                    "$TAG Using display name [$displayName] instead of mention username [$source]"
                 )
 
-                spannableBuilder.replace(start, end, "@$displayName")
+                spannableBuilder.replace(start + offset, end + offset, "@$displayName")
                 val span = PatternClickableSpan.StyledClickableSpan(
-                    object :
-                        SpannableClickedListener {
+                    object : SpannableClickedListener {
+                        @UiThread
                         override fun onSpanClicked(text: String) {
                             val friendRefKey = friend.refKey ?: ""
                             Log.i(
@@ -657,10 +720,11 @@ class MessageModel
                 )
                 spannableBuilder.setSpan(
                     span,
-                    start,
-                    start + displayName.length + 1,
+                    start + offset,
+                    start + offset + displayName.length + 1,
                     Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
                 )
+                offset += displayName.length - source.length
             }
         }
 
@@ -676,12 +740,7 @@ class MessageModel
                         override fun onSpanClicked(text: String) {
                             coreContext.postOnCoreThread {
                                 Log.i("$TAG Clicked on SIP URI: $text")
-                                val address = coreContext.core.interpretUrl(text, false)
-                                if (address != null) {
-                                    coreContext.startAudioCall(address)
-                                } else {
-                                    Log.w("$TAG Failed to parse [$text] as SIP URI")
-                                }
+                                onSipUriClicked?.invoke(text)
                             }
                         }
                     }
@@ -691,6 +750,7 @@ class MessageModel
                         HTTP_LINK_REGEXP
                     ),
                     object : SpannableClickedListener {
+                        @UiThread
                         override fun onSpanClicked(text: String) {
                             Log.i("$TAG Clicked on web URL: $text")
                             onWebUrlClicked?.invoke(text)

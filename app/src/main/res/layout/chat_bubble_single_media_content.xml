@@ -25,8 +25,8 @@
         <ImageView
             android:id="@+id/broken_media_icon"
             android:onClick="@{() -> model.onClick()}"
-            android:layout_width="@dimen/chat_bubble_grid_image_size"
-            android:layout_height="@dimen/chat_bubble_grid_image_size"
+            android:layout_width="@dimen/chat_bubble_grid_file_size"
+            android:layout_height="@dimen/chat_bubble_grid_file_size"
             android:adjustViewBounds="true"
             android:padding="18dp"
             android:background="@drawable/shape_squircle_file_background_5dp"
@@ -85,8 +85,8 @@
 
         <com.google.android.material.progressindicator.CircularProgressIndicator
             android:id="@+id/transfer_progress"
-            android:layout_width="@dimen/chat_bubble_grid_image_size"
-            android:layout_height="@dimen/chat_bubble_grid_image_size"
+            android:layout_width="@dimen/chat_bubble_grid_file_size"
+            android:layout_height="@dimen/chat_bubble_grid_file_size"
             android:indeterminate="false"
             android:progress="@{model.transferProgress}"
             android:max="100"

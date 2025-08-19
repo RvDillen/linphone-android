@@ -32,13 +32,10 @@ import org.linphone.databinding.SettingsAdvancedFragmentBinding
 import org.linphone.ui.GenericActivity
 import org.linphone.ui.main.fragment.GenericMainFragment
 import org.linphone.ui.main.settings.viewmodel.SettingsViewModel
+import org.linphone.utils.Event
 
 @UiThread
 class SettingsAdvancedFragment : GenericMainFragment() {
-    companion object {
-        private const val TAG = "[Advanced Settings Fragment]"
-    }
-
     private lateinit var binding: SettingsAdvancedFragmentBinding
 
     private lateinit var viewModel: SettingsViewModel
@@ -109,12 +106,17 @@ class SettingsAdvancedFragment : GenericMainFragment() {
             setupOutputAudioDevicePicker()
         }
 
+        viewModel.keepAliveServiceSettingChangedEvent.observe(viewLifecycleOwner) {
+            it.consume {
+                sharedViewModel.refreshDrawerMenuQuitButtonEvent.postValue(Event(true))
+            }
+        }
+
         startPostponedEnterTransition()
     }
 
     override fun onPause() {
         viewModel.updateDeviceName()
-        viewModel.updateFileSharingServerUrl()
         viewModel.updateRemoteProvisioningUrl()
 
         super.onPause()
@@ -128,9 +130,9 @@ class SettingsAdvancedFragment : GenericMainFragment() {
             viewModel.mediaEncryptionLabels
         )
         adapter.setDropDownViewResource(R.layout.generic_dropdown_cell)
-        binding.mediaEncryption.adapter = adapter
-        binding.mediaEncryption.onItemSelectedListener = mediaEncryptionDropdownListener
-        binding.mediaEncryption.setSelection(index)
+        binding.advancedCallsSettings.mediaEncryption.adapter = adapter
+        binding.advancedCallsSettings.mediaEncryption.onItemSelectedListener = mediaEncryptionDropdownListener
+        binding.advancedCallsSettings.mediaEncryption.setSelection(index)
     }
 
     private fun setupInputAudioDevicePicker() {

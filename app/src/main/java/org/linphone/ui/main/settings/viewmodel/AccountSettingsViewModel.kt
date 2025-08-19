@@ -24,6 +24,7 @@ import androidx.lifecycle.MediatorLiveData
 import androidx.lifecycle.MutableLiveData
 import java.util.Locale
 import org.linphone.LinphoneApplication.Companion.coreContext
+import org.linphone.LinphoneApplication.Companion.corePreferences
 import org.linphone.core.AVPFMode
 import org.linphone.core.Account
 import org.linphone.core.AuthInfo
@@ -44,6 +45,8 @@ class AccountSettingsViewModel
     val expandAdvancedSettings = MutableLiveData<Boolean>()
 
     val expandNatPolicySettings = MutableLiveData<Boolean>()
+
+    val isDomainInPushNotificationCompatibleList = MutableLiveData<Boolean>()
 
     val pushNotificationsAvailable = MutableLiveData<Boolean>()
 
@@ -90,6 +93,9 @@ class AccountSettingsViewModel
     val mwiUri = MutableLiveData<String>()
     val voicemailUri = MutableLiveData<String>()
 
+    val applyPrefix = MutableLiveData<Boolean>()
+    val replacePlusBy00 = MutableLiveData<Boolean>()
+
     val cpimInBasicChatRooms = MutableLiveData<Boolean>()
 
     val accountFoundEvent = MutableLiveData<Event<Boolean>>()
@@ -126,11 +132,16 @@ class AccountSettingsViewModel
                 account = found
 
                 val params = account.params
-
-                pushNotificationsAvailable.postValue(core.isPushNotificationAvailable)
-                pushNotificationsEnabled.postValue(
-                    core.isPushNotificationAvailable && params.pushNotificationAllowed
-                )
+                val pushAvailableForDomain = params.identityAddress?.domain in corePreferences.pushNotificationCompatibleDomains
+                isDomainInPushNotificationCompatibleList.postValue(pushAvailableForDomain)
+                if (pushAvailableForDomain) {
+                    pushNotificationsAvailable.postValue(core.isPushNotificationAvailable)
+                    pushNotificationsEnabled.postValue(
+                        core.isPushNotificationAvailable && params.pushNotificationAllowed
+                    )
+                } else {
+                    Log.w("$TAG Account isn't on default domain [${corePreferences.defaultDomain}], do not show push notification settings")
+                }
 
                 imEncryptionMandatory.postValue(params.instantMessagingEncryptionMandatory)
 
@@ -166,6 +177,9 @@ class AccountSettingsViewModel
                 mwiUri.postValue(params.mwiServerAddress?.asStringUriOnly().orEmpty())
                 voicemailUri.postValue(params.voicemailAddress?.asStringUriOnly().orEmpty())
 
+                applyPrefix.postValue(params.useInternationalPrefixForCallsAndChats)
+                replacePlusBy00.postValue(params.isDialEscapePlusEnabled)
+
                 expire.postValue(params.expires.toString())
 
                 conferenceFactoryUri.postValue(params.conferenceFactoryAddress?.asStringUriOnly())
@@ -193,7 +207,8 @@ class AccountSettingsViewModel
 
             if (::account.isInitialized) {
                 val newParams = account.params.clone()
-                newParams.pushNotificationAllowed = pushNotificationsEnabled.value == true
+
+                newParams.pushNotificationAllowed = core.isPushNotificationAvailable && pushNotificationsEnabled.value == true
 
                 newParams.instantMessagingEncryptionMandatory = imEncryptionMandatory.value == true
 
@@ -298,6 +313,9 @@ class AccountSettingsViewModel
 
                 newParams.ccmpServerUrl = ccmpServerUrl.value
                 newParams.limeServerUrl = limeServerUrl.value
+
+                newParams.useInternationalPrefixForCallsAndChats = applyPrefix.value == true
+                newParams.isDialEscapePlusEnabled = replacePlusBy00.value == true
 
                 account.params = newParams
                 Log.i("$TAG Changes have been saved")

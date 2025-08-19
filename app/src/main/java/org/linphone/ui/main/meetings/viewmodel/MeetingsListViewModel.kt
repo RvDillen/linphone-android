@@ -23,6 +23,8 @@ import androidx.annotation.UiThread
 import androidx.annotation.WorkerThread
 import androidx.lifecycle.MutableLiveData
 import org.linphone.LinphoneApplication.Companion.coreContext
+import org.linphone.core.Account
+import org.linphone.core.AccountListenerStub
 import org.linphone.core.Address
 import org.linphone.core.ConferenceInfo
 import org.linphone.core.ConferenceScheduler
@@ -58,7 +60,20 @@ class MeetingsListViewModel
         @WorkerThread
         override fun onConferenceInfoReceived(core: Core, conferenceInfo: ConferenceInfo) {
             Log.i("$TAG Conference info received [${conferenceInfo.uri?.asStringUriOnly()}]")
-            computeMeetingsList(currentFilter)
+            computeMeetingsListFromLocallyStoredInfo()
+        }
+    }
+
+    private val accountListener = object : AccountListenerStub() {
+        @WorkerThread
+        override fun onConferenceInformationUpdated(
+            account: Account,
+            infos: Array<ConferenceInfo>
+        ) {
+            Log.i(
+                "$TAG Conference information updated with [${infos.size}] items for current account, reloading list"
+            )
+            computeMeetingsList(currentFilter, infos)
         }
     }
 
@@ -111,8 +126,9 @@ class MeetingsListViewModel
 
         coreContext.postOnCoreThread { core ->
             core.addListener(coreListener)
+            core.defaultAccount?.addListener(accountListener)
 
-            computeMeetingsList(currentFilter)
+            computeMeetingsListFromLocallyStoredInfo()
         }
     }
 
@@ -121,6 +137,7 @@ class MeetingsListViewModel
         super.onCleared()
 
         coreContext.postOnCoreThread { core ->
+            core.defaultAccount?.removeListener(accountListener)
             core.removeListener(coreListener)
         }
     }
@@ -128,7 +145,7 @@ class MeetingsListViewModel
     @UiThread
     override fun filter() {
         coreContext.postOnCoreThread {
-            computeMeetingsList(currentFilter)
+            computeMeetingsListFromLocallyStoredInfo()
         }
     }
 
@@ -146,13 +163,7 @@ class MeetingsListViewModel
     }
 
     @WorkerThread
-    private fun computeMeetingsList(filter: String) {
-        if (meetings.value.orEmpty().isEmpty()) {
-            fetchInProgress.postValue(true)
-        }
-
-        val list = arrayListOf<MeetingListItemModel>()
-
+    private fun computeMeetingsListFromLocallyStoredInfo() {
         var source = coreContext.core.defaultAccount?.conferenceInformationList
         if (source == null) {
             Log.e(
@@ -160,13 +171,30 @@ class MeetingsListViewModel
             )
             source = coreContext.core.conferenceInformationList
         }
+        computeMeetingsList(currentFilter, source)
+    }
 
+    @WorkerThread
+    private fun computeMeetingsList(filter: String, source: Array<ConferenceInfo>) {
+        if (meetings.value.orEmpty().isEmpty()) {
+            fetchInProgress.postValue(true)
+        }
+
+        val sortedSource = source.toList().sortedBy {
+            it.dateTime
+        }
+
+        val list = arrayListOf<MeetingListItemModel>()
         var previousModel: MeetingModel? = null
         var previousModelWeekLabel = ""
         var meetingForTodayFound = false
-        Log.d("$TAG There are [${source.size}] conference info in DB")
+        val todayWeekLabel = TimestampUtils.firstAndLastDayOfWeek(
+            System.currentTimeMillis(),
+            false
+        )
+        Log.d("$TAG There are [${sortedSource.size}] conference info in DB")
 
-        for (info: ConferenceInfo in source) {
+        for (info: ConferenceInfo in sortedSource) {
             if (info.duration == 0) {
                 Log.d(
                     "$TAG Skipping conference info [${info.subject}] with uri [${info.uri?.asStringUriOnly()}] because it has no duration"
@@ -210,17 +238,12 @@ class MeetingsListViewModel
                 // but only add that fake meeting if filter is empty
                 if (!meetingForTodayFound && model.isAfterToday) {
                     if (filter.isEmpty()) {
-                        val todayWeekLabel = TimestampUtils.firstAndLastDayOfWeek(
-                            System.currentTimeMillis(),
-                            false
-                        )
                         val first = previousModelWeekLabel != todayWeekLabel
                         list.add(MeetingListItemModel(null, first))
                         meetingForTodayFound = true
 
-                        // Consider next meeting is first of the week (do not count "no meeting today" as first)
                         previousModelWeekLabel = model.weekLabel
-                        firstMeetingOfTheWeek = true
+                        firstMeetingOfTheWeek = false
                     }
                 } else {
                     previousModelWeekLabel = model.weekLabel
@@ -234,10 +257,6 @@ class MeetingsListViewModel
         // If no meeting was found after today, insert "Today" fake model at the end,
         // but only add that fake meeting if filter is empty
         if (!meetingForTodayFound && filter.isEmpty()) {
-            val todayWeekLabel = TimestampUtils.firstAndLastDayOfWeek(
-                System.currentTimeMillis(),
-                false
-            )
             val firstMeetingOfTheWeek = previousModelWeekLabel != todayWeekLabel
             list.add(MeetingListItemModel(null, firstMeetingOfTheWeek))
         }

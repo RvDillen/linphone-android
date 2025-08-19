@@ -19,9 +19,9 @@
  */
 package org.linphone.ui.assistant.fragment
 
+import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import android.os.Bundle
 import android.telephony.TelephonyManager
 import android.view.LayoutInflater
@@ -44,6 +44,7 @@ import org.linphone.ui.assistant.model.AcceptConditionsAndPolicyDialogModel
 import org.linphone.ui.assistant.viewmodel.AccountLoginViewModel
 import org.linphone.utils.DialogUtils
 import org.linphone.utils.PhoneNumberUtils
+import androidx.core.net.toUri
 
 @UiThread
 class LandingFragment : GenericFragment() {
@@ -102,14 +103,10 @@ class LandingFragment : GenericFragment() {
         }
 
         binding.setForgottenPasswordClickListener {
-            val url = getString(R.string.web_platform_forgotten_password_url)
-            try {
-                val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-                startActivity(browserIntent)
-            } catch (ise: IllegalStateException) {
-                Log.e(
-                    "$TAG Can't start ACTION_VIEW intent for URL [$url], IllegalStateException: $ise"
-                )
+            if (findNavController().currentDestination?.id == R.id.landingFragment) {
+                val action =
+                    LandingFragmentDirections.actionLandingFragmentToRecoverAccountFragment()
+                findNavController().navigate(action)
             }
         }
 
@@ -206,31 +203,36 @@ class LandingFragment : GenericFragment() {
         model.privacyPolicyClickedEvent.observe(viewLifecycleOwner) {
             it.consume {
                 val url = getString(R.string.website_privacy_policy_url)
-                try {
-                    val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-                    startActivity(browserIntent)
-                } catch (ise: IllegalStateException) {
-                    Log.e(
-                        "$TAG Can't start ACTION_VIEW intent for URL [$url], IllegalStateException: $ise"
-                    )
-                }
+                openUrlInBrowser(url)
             }
         }
 
         model.generalTermsClickedEvent.observe(viewLifecycleOwner) {
             it.consume {
                 val url = getString(R.string.website_terms_and_conditions_url)
-                try {
-                    val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-                    startActivity(browserIntent)
-                } catch (ise: IllegalStateException) {
-                    Log.e(
-                        "$TAG Can't start ACTION_VIEW intent for URL [$url], IllegalStateException: $ise"
-                    )
-                }
+                openUrlInBrowser(url)
             }
         }
 
         dialog.show()
+    }
+
+    private fun openUrlInBrowser(url: String) {
+        try {
+            val browserIntent = Intent(Intent.ACTION_VIEW, url.toUri())
+            startActivity(browserIntent)
+        } catch (ise: IllegalStateException) {
+            Log.e(
+                "$TAG Can't start ACTION_VIEW intent for URL [$url], IllegalStateException: $ise"
+            )
+        } catch (anfe: ActivityNotFoundException) {
+            Log.e(
+                "$TAG Can't start ACTION_VIEW intent for URL [$url], ActivityNotFoundException: $anfe"
+            )
+        } catch (e: Exception) {
+            Log.e(
+                "$TAG Can't start ACTION_VIEW intent for URL [$url]: $e"
+            )
+        }
     }
 }

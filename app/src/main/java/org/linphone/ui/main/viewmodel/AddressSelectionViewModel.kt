@@ -38,7 +38,6 @@ import org.linphone.mediastream.Log
 import org.linphone.ui.main.contacts.model.ContactAvatarModel
 import org.linphone.ui.main.model.ConversationContactOrSuggestionModel
 import org.linphone.ui.main.model.SelectedAddressModel
-import org.linphone.ui.main.model.isEndToEndEncryptionMandatory
 import org.linphone.utils.AppUtils
 import org.linphone.utils.LinphoneUtils
 
@@ -57,6 +56,8 @@ abstract class AddressSelectionViewModel
 
     val searchFilter = MutableLiveData<String>()
 
+    val searchInProgress = MutableLiveData<Boolean>()
+
     val modelsList = MutableLiveData<ArrayList<ConversationContactOrSuggestionModel>>()
 
     val isEmpty = MutableLiveData<Boolean>()
@@ -68,9 +69,9 @@ abstract class AddressSelectionViewModel
     private var currentFilter = ""
     private var previousFilter = "NotSet"
 
-    private var limitSearchToLinphoneAccounts = true
-
     private lateinit var magicSearch: MagicSearch
+
+    private lateinit var favouritesMagicSearch: MagicSearch
 
     private val magicSearchListener = object : MagicSearchListenerStub() {
         @WorkerThread
@@ -84,9 +85,11 @@ abstract class AddressSelectionViewModel
         @WorkerThread
         override fun onContactsLoaded() {
             Log.i("$TAG Contacts have been (re)loaded, updating list")
+            magicSearch.resetSearchCache()
+            favouritesMagicSearch.resetSearchCache()
+
             applyFilter(
                 currentFilter,
-                if (limitSearchToLinphoneAccounts) corePreferences.defaultDomain else "",
                 magicSearchSourceFlags
             )
         }
@@ -100,12 +103,14 @@ abstract class AddressSelectionViewModel
         isEmpty.value = true
 
         coreContext.postOnCoreThread { core ->
-            limitSearchToLinphoneAccounts = isEndToEndEncryptionMandatory()
-
             coreContext.contactsManager.addListener(contactsListener)
             magicSearch = core.createMagicSearch()
-            magicSearch.limitedSearch = false
+            magicSearch.limitedSearch = true
+            magicSearch.searchLimit = corePreferences.magicSearchResultsLimit
             magicSearch.addListener(magicSearchListener)
+
+            favouritesMagicSearch = core.createMagicSearch()
+            favouritesMagicSearch.limitedSearch = false
         }
 
         applyFilter(currentFilter)
@@ -219,7 +224,6 @@ abstract class AddressSelectionViewModel
         coreContext.postOnCoreThread {
             applyFilter(
                 filter,
-                if (limitSearchToLinphoneAccounts) corePreferences.defaultDomain else "",
                 magicSearchSourceFlags
             )
         }
@@ -228,7 +232,6 @@ abstract class AddressSelectionViewModel
     @WorkerThread
     private fun applyFilter(
         filter: String,
-        domain: String,
         sources: Int
     ) {
         if (previousFilter.isNotEmpty() && (
@@ -241,9 +244,11 @@ abstract class AddressSelectionViewModel
         currentFilter = filter
         previousFilter = filter
 
+        val domain = corePreferences.contactsFilter
         Log.i(
             "$TAG Asking Magic search for contacts matching filter [$filter], domain [$domain] and in sources [$sources]"
         )
+        searchInProgress.postValue(filter.isNotEmpty())
         magicSearch.getContactsListAsync(
             filter,
             domain,
@@ -263,12 +268,55 @@ abstract class AddressSelectionViewModel
         }
 
         val favoritesList = arrayListOf<ConversationContactOrSuggestionModel>()
+        val domain = corePreferences.contactsFilter
+        // Make a quick synchronous search for favorites (in case of total results exceed magic search limit to prevent missing ones)
+        // TODO FIXME: to improve like it's done in ContactsListViewModel but will require UI changes
+        val favorites = favouritesMagicSearch.getContactsList(currentFilter, domain, MagicSearch.Source.FavoriteFriends.toInt(), MagicSearch.Aggregation.Friend)
+        for (result in favorites) {
+            val address = result.address
+            val friend = result.friend ?: continue
+
+            val found = favoritesList.find { it.friend == friend }
+            if (found != null) continue
+
+            val mainAddress = address ?: LinphoneUtils.getFirstAvailableAddressForFriend(friend)
+            if (mainAddress != null) {
+                val model = ConversationContactOrSuggestionModel(mainAddress, friend = friend)
+                val avatarModel = coreContext.contactsManager.getContactAvatarModelForFriend(
+                    friend
+                )
+                model.avatarModel.postValue(avatarModel)
+                favoritesList.add(model)
+            } else {
+                Log.w("$TAG Found favorite friend [${friend.name}] in search results but no Address could be found, skipping it")
+            }
+        }
+
         val contactsList = arrayListOf<ConversationContactOrSuggestionModel>()
         val suggestionsList = arrayListOf<ConversationContactOrSuggestionModel>()
 
         for (result in results) {
             val address = result.address
-            if (address != null) {
+            val friend = result.friend
+            if (friend != null) {
+                // Starred friends are processed separately to prevent missing some due to magic search limit
+                if (friend.starred) continue
+
+                val found = contactsList.find { it.friend == friend }
+                if (found != null) continue
+
+                val mainAddress = address ?: LinphoneUtils.getFirstAvailableAddressForFriend(friend)
+                if (mainAddress != null) {
+                    val model = ConversationContactOrSuggestionModel(mainAddress, friend = friend)
+                    val avatarModel = coreContext.contactsManager.getContactAvatarModelForFriend(
+                        friend
+                    )
+                    model.avatarModel.postValue(avatarModel)
+                    contactsList.add(model)
+                } else {
+                    Log.w("$TAG Found friend [${friend.name}] in search results but no Address could be found, skipping it")
+                }
+            } else if (address != null) {
                 if (result.sourceFlags == MagicSearch.Source.Request.toInt()) {
                     val model = ConversationContactOrSuggestionModel(address) {
                         coreContext.startAudioCall(address)
@@ -277,37 +325,17 @@ abstract class AddressSelectionViewModel
                     continue
                 }
 
-                val friend = result.friend ?: coreContext.contactsManager.findContactByAddress(
-                    address
-                )
-                if (friend != null) {
-                    val found = contactsList.find { it.friend == friend }
-                    if (found != null) continue
-
-                    val model = ConversationContactOrSuggestionModel(address, friend = friend)
-                    val avatarModel = coreContext.contactsManager.getContactAvatarModelForFriend(
-                        friend
-                    )
-                    model.avatarModel.postValue(avatarModel)
-
-                    if (friend.starred) {
-                        favoritesList.add(model)
-                    } else {
-                        contactsList.add(model)
-                    }
-                } else {
-                    val defaultAccountAddress = coreContext.core.defaultAccount?.params?.identityAddress
-                    if (defaultAccountAddress != null && address.weakEqual(defaultAccountAddress)) {
-                        Log.i("$TAG Removing from suggestions current default account address")
-                        continue
-                    }
-
-                    val model = ConversationContactOrSuggestionModel(address) {
-                        coreContext.startAudioCall(address)
-                    }
-
-                    suggestionsList.add(model)
+                val defaultAccountAddress = coreContext.core.defaultAccount?.params?.identityAddress
+                if (defaultAccountAddress != null && address.weakEqual(defaultAccountAddress)) {
+                    Log.i("$TAG Removing from suggestions current default account address")
+                    continue
                 }
+
+                val model = ConversationContactOrSuggestionModel(address) {
+                    coreContext.startAudioCall(address)
+                }
+
+                suggestionsList.add(model)
             }
         }
 
@@ -327,8 +355,10 @@ abstract class AddressSelectionViewModel
         list.addAll(favoritesList)
         list.addAll(contactsList)
         list.addAll(suggestionsList)
+
+        searchInProgress.postValue(false)
         modelsList.postValue(list)
-        isEmpty.postValue(list.isEmpty)
+        isEmpty.postValue(list.isEmpty())
         Log.i(
             "$TAG Processed [${results.size}] results: [${conversationsList.size}] conversations, [${favoritesList.size}] favorites, [${contactsList.size}] contacts and [${suggestionsList.size}] suggestions"
         )
@@ -343,6 +373,7 @@ abstract class AddressSelectionViewModel
             if (chatRoom.isReadOnly || (!isBasic && chatRoom.participants.isEmpty())) continue
 
             val isOneToOne = chatRoom.hasCapability(ChatRoom.Capabilities.OneToOne.toInt())
+            val conversationId = LinphoneUtils.getConversationId(chatRoom)
             val remoteAddress = chatRoom.peerAddress
             val matchesFilter: Any? = if (filter.isEmpty()) {
                 null
@@ -383,7 +414,6 @@ abstract class AddressSelectionViewModel
                 }
             }
             if (filter.isEmpty() || matchesFilter != null) {
-                val localAddress = chatRoom.localAddress
                 val friend = if (isBasic) {
                     coreContext.contactsManager.findContactByAddress(remoteAddress)
                 } else {
@@ -410,7 +440,7 @@ abstract class AddressSelectionViewModel
                 }
                 val model = ConversationContactOrSuggestionModel(
                     remoteAddress,
-                    localAddress,
+                    conversationId,
                     subject,
                     friend
                 )

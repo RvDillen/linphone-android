@@ -32,7 +32,6 @@ import org.linphone.R
 import org.linphone.contacts.ContactLoader.Companion.NATIVE_ADDRESS_BOOK_FRIEND_LIST
 import org.linphone.core.Core
 import org.linphone.core.CoreListenerStub
-import org.linphone.core.Factory
 import org.linphone.core.VersionUpdateCheckResult
 import org.linphone.core.tools.Log
 import org.linphone.ui.GenericViewModel
@@ -47,8 +46,6 @@ class HelpViewModel
         private const val TAG = "[Help ViewModel]"
     }
 
-    val logcat = MutableLiveData<Boolean>()
-
     val version = MutableLiveData<String>()
 
     val appVersion = MutableLiveData<String>()
@@ -62,6 +59,8 @@ class HelpViewModel
     val uploadLogsAvailable = MutableLiveData<Boolean>()
 
     val logsUploadInProgress = MutableLiveData<Boolean>()
+
+    val versionClickCount = MutableLiveData<Int>()
 
     val newVersionAvailableEvent: MutableLiveData<Event<Pair<String, String>>> by lazy {
         MutableLiveData<Event<Pair<String, String>>>()
@@ -137,6 +136,7 @@ class HelpViewModel
     init {
         val currentVersion = BuildConfig.VERSION_NAME
         version.value = currentVersion
+        versionClickCount.value = 0
 
         val versionCode = BuildConfig.VERSION_CODE
         val appGitDescribe = AppUtils.getString(R.string.linphone_app_version)
@@ -146,12 +146,16 @@ class HelpViewModel
         sdkVersion.value = coreContext.sdkVersion
         logsUploadInProgress.value = false
 
-        firebaseProjectId.value = FirebaseApp.getInstance().options.projectId
+        try {
+            firebaseProjectId.value = FirebaseApp.getInstance().options.projectId
+        } catch (e: Exception) {
+            Log.e("$TAG Failed to get FirebaseApp instance: $e")
+            firebaseProjectId.value = "unknown"
+        }
 
         coreContext.postOnCoreThread { core ->
             core.addListener(coreListener)
 
-            logcat.postValue(corePreferences.printLogsInLogcat)
             checkUpdateAvailable.postValue(corePreferences.checkForUpdateServerUrl.isNotEmpty())
             uploadLogsAvailable.postValue(!core.logCollectionUploadServerUrl.isNullOrEmpty())
         }
@@ -167,13 +171,20 @@ class HelpViewModel
     }
 
     @UiThread
-    fun toggleLogcat() {
-        val newValue = logcat.value == false
-        coreContext.postOnCoreThread {
-            corePreferences.printLogsInLogcat = newValue
-            coreContext.enableLogcat(newValue)
-            Factory.instance().enableLogcatLogs(newValue)
-            logcat.postValue(newValue)
+    fun versionClicked() {
+        if (corePreferences.showDeveloperSettings == true) {
+            showRedToast(R.string.settings_developer_already_enabled_toast, R.drawable.warning_circle)
+            return
+        }
+
+        versionClickCount.value = (versionClickCount.value ?: 0) + 1
+        if (versionClickCount.value == 7) {
+            coreContext.postOnCoreThread {
+                Log.w("$TAG Version was clicked seven times, enabling developer settings")
+                corePreferences.showDeveloperSettings = true
+
+                showGreenToast(R.string.settings_developer_enabled_toast, R.drawable.gear)
+            }
         }
     }
 

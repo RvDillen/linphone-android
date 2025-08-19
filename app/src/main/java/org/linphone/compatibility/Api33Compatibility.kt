@@ -20,14 +20,14 @@
 package org.linphone.compatibility
 
 import android.Manifest
+import android.content.Context
+import android.content.pm.PackageManager
 import android.os.Build
 import androidx.annotation.RequiresApi
 
 @RequiresApi(Build.VERSION_CODES.TIRAMISU)
 class Api33Compatibility {
     companion object {
-        private const val TAG = "[API 33 Compatibility]"
-
         fun getAllRequiredPermissionsArray(): Array<String> {
             return arrayOf(
                 Manifest.permission.POST_NOTIFICATIONS,
@@ -35,6 +35,12 @@ class Api33Compatibility {
                 Manifest.permission.RECORD_AUDIO,
                 Manifest.permission.CAMERA
             )
+        }
+
+        fun isPostNotificationsPermissionGranted(context: Context): Boolean {
+            return context.checkSelfPermission(
+                Manifest.permission.POST_NOTIFICATIONS
+            ) == PackageManager.PERMISSION_GRANTED
         }
     }
 }

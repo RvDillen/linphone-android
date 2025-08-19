@@ -103,6 +103,7 @@ class HistoryListFragment : AbstractMainFragment() {
 
         binding.lifecycleOwner = viewLifecycleOwner
         binding.viewModel = listViewModel
+        observeToastEvents(listViewModel)
 
         binding.historyList.setHasFixedSize(true)
         binding.historyList.layoutManager = LinearLayoutManager(requireContext())
@@ -274,6 +275,11 @@ class HistoryListFragment : AbstractMainFragment() {
         Log.i("$TAG Fragment is resumed, resetting missed calls count")
         sharedViewModel.resetMissedCallsCountEvent.value = Event(true)
         sharedViewModel.refreshDrawerMenuAccountsListEvent.value = Event(false)
+
+        if (shouldRefreshDataInOnResume()) {
+            Log.i("$TAG Keep app alive setting is enabled, refreshing view just in case")
+            listViewModel.filter()
+        }
     }
 
     private fun copyNumberOrAddressToClipboard(value: String) {

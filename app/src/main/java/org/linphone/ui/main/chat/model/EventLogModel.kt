@@ -20,10 +20,7 @@
 package org.linphone.ui.main.chat.model
 
 import androidx.annotation.WorkerThread
-import org.linphone.LinphoneApplication.Companion.coreContext
 import org.linphone.core.EventLog
-import org.linphone.core.tools.Log
-import org.linphone.utils.LinphoneUtils
 
 class EventLogModel
     @WorkerThread
@@ -34,11 +31,13 @@ class EventLogModel
     isGroupedWithNextOne: Boolean = false,
     currentFilter: String = "",
     onContentClicked: ((fileModel: FileModel) -> Unit)? = null,
+    onSipUriClicked: ((uri: String) -> Unit)? = null,
     onJoinConferenceClicked: ((uri: String) -> Unit)? = null,
     onWebUrlClicked: ((url: String) -> Unit)? = null,
     onContactClicked: ((friendRefKey: String) -> Unit)? = null,
     onRedToastToShow: ((pair: Pair<Int, Int>) -> Unit)? = null,
-    onVoiceRecordingPlaybackEnded: ((id: String) -> Unit)? = null
+    onVoiceRecordingPlaybackEnded: ((id: String) -> Unit)? = null,
+    onFileToExportToNativeGallery: ((path: String) -> Unit)? = null
 ) {
     companion object {
         private const val TAG = "[Event Log Model]"
@@ -52,44 +51,21 @@ class EventLogModel
         EventModel(eventLog)
     } else {
         val chatMessage = eventLog.chatMessage!!
-        var replyTo = ""
-        var isReply = chatMessage.isReply
-        val replyText = if (chatMessage.isReply) {
-            val replyMessage = chatMessage.replyMessage
-            if (replyMessage != null) {
-                val from = replyMessage.fromAddress
-                val avatarModel = coreContext.contactsManager.getContactAvatarModelForAddress(from)
-                replyTo = avatarModel.contactName ?: LinphoneUtils.getDisplayName(from)
-
-                LinphoneUtils.getPlainTextDescribingMessage(replyMessage)
-            } else {
-                Log.e(
-                    "$TAG Failed to find the reply message from ID [${chatMessage.replyMessageId}]"
-                )
-                isReply = false
-                ""
-            }
-        } else {
-            ""
-        }
 
         MessageModel(
             chatMessage,
             isFromGroup,
-            isReply,
-            replyTo,
-            replyText,
-            chatMessage.replyMessageId,
-            chatMessage.isForward,
             isGroupedWithPreviousOne,
             isGroupedWithNextOne,
             currentFilter,
             onContentClicked,
+            onSipUriClicked,
             onJoinConferenceClicked,
             onWebUrlClicked,
             onContactClicked,
             onRedToastToShow,
-            onVoiceRecordingPlaybackEnded
+            onVoiceRecordingPlaybackEnded,
+            onFileToExportToNativeGallery
         )
     }
 

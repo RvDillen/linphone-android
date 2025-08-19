@@ -19,13 +19,10 @@
  */
 package org.linphone.ui.main.viewmodel
 
-import android.Manifest
-import android.content.pm.PackageManager
 import android.os.Build
 import androidx.annotation.RequiresApi
 import androidx.annotation.UiThread
 import androidx.annotation.WorkerThread
-import androidx.core.content.ContextCompat
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -33,6 +30,7 @@ import kotlinx.coroutines.launch
 import org.linphone.LinphoneApplication.Companion.coreContext
 import org.linphone.LinphoneApplication.Companion.corePreferences
 import org.linphone.R
+import org.linphone.compatibility.Compatibility
 import org.linphone.core.Account
 import org.linphone.core.Call
 import org.linphone.core.ChatMessage
@@ -43,6 +41,7 @@ import org.linphone.core.GlobalState
 import org.linphone.core.MessageWaitingIndication
 import org.linphone.core.RegistrationState
 import org.linphone.core.VFS
+import org.linphone.core.tools.AndroidPlatformHelper
 import org.linphone.core.tools.Log
 import org.linphone.utils.AppUtils
 import org.linphone.utils.Event
@@ -59,10 +58,10 @@ class MainViewModel
         const val MWI_MESSAGES_WAITING = 4
         const val NON_DEFAULT_ACCOUNT_NOTIFICATIONS = 5
         const val NON_DEFAULT_ACCOUNT_NOT_CONNECTED = 10
-        const val SEND_NOTIFICATIONS_PERMISSION_NOT_GRANTED = 17
+        const val FULL_SCREEN_INTENTS_PERMISSION_NOT_GRANTED = 14
+        const val SEND_NOTIFICATIONS_PERMISSION_NOT_GRANTED = 15
+        const val DEFAULT_ACCOUNT_DISABLED = 18
         const val NETWORK_NOT_REACHABLE = 19
-        const val SINGLE_CALL = 20
-        const val MULTIPLE_CALLS = 21
     }
 
     val showAlert = MutableLiveData<Boolean>()
@@ -75,11 +74,13 @@ class MainViewModel
 
     val atLeastOneCall = MutableLiveData<Boolean>()
 
+    val callLabel = MutableLiveData<String>()
+
     val callsStatus = MutableLiveData<String>()
 
-    val defaultAccountRegistrationErrorEvent: MutableLiveData<Event<Boolean>> by lazy {
-        MutableLiveData<Event<Boolean>>()
-    }
+    val pendingFilesOrTextSharing = MutableLiveData<Boolean>()
+
+    val filesOrTextPendingSharingLabel = MutableLiveData<String>()
 
     val goBackToCallEvent: MutableLiveData<Event<Boolean>> by lazy {
         MutableLiveData<Event<Boolean>>()
@@ -90,6 +91,10 @@ class MainViewModel
     }
 
     val askPostNotificationsPermissionEvent: MutableLiveData<Event<Boolean>> by lazy {
+        MutableLiveData<Event<Boolean>>()
+    }
+
+    val askFullScreenIntentPermissionEvent: MutableLiveData<Event<Boolean>> by lazy {
         MutableLiveData<Event<Boolean>>()
     }
 
@@ -105,11 +110,13 @@ class MainViewModel
         MutableLiveData<Event<Boolean>>()
     }
 
+    val clearFilesOrTextPendingSharingEvent: MutableLiveData<Event<Boolean>> by lazy {
+        MutableLiveData<Event<Boolean>>()
+    }
+
     private var accountsFound = -1
 
     var mainIntentHandled = false
-
-    private var defaultAccountRegistrationFailed = false
 
     private val alertsList = arrayListOf<Pair<Int, String>>()
 
@@ -131,7 +138,6 @@ class MainViewModel
         @WorkerThread
         override fun onLastCallEnded(core: Core) {
             Log.i("$TAG Last call ended, removing in-call 'alert'")
-            removeAlert(SINGLE_CALL)
             atLeastOneCall.postValue(false)
             computeNonDefaultAccountNotificationsCount()
         }
@@ -157,7 +163,7 @@ class MainViewModel
             state: Call.State?,
             message: String
         ) {
-            Log.i("$TAG A call's state changed, updating 'alerts' if needed")
+            Log.i("$TAG Call [${call.remoteAddress.asStringUriOnly()}] state changed to [$state], updating 'alerts' if needed")
             if (
                 core.callsNb > 1 && (
                     LinphoneUtils.isCallEnding(call.state) ||
@@ -167,10 +173,14 @@ class MainViewModel
             ) {
                 updateCallAlert()
             } else if (core.callsNb == 1) {
-                if (LinphoneUtils.isCallEnding(call.state)) {
-                    removeAlert(MULTIPLE_CALLS)
+                if (callsStatus.value.orEmpty().isEmpty()) {
+                    // In case there was more than one call and now there is only one left
+                    updateCallAlert()
+                } else if (call.state != Call.State.Released) {
+                    // When you have two calls, when the one is ended core.callsNb will become 1
+                    // but the ended one will still go to Released state after that
+                    callsStatus.postValue(LinphoneUtils.callStateToString(call.state))
                 }
-                callsStatus.postValue(LinphoneUtils.callStateToString(call.state))
             }
         }
 
@@ -208,8 +218,10 @@ class MainViewModel
                 RegistrationState.Failed -> {
                     if (account == core.defaultAccount) {
                         Log.e("$TAG Default account registration failed!")
-                        defaultAccountRegistrationFailed = true
-                        defaultAccountRegistrationErrorEvent.postValue(Event(true))
+                        val label = AppUtils.getString(
+                            R.string.connection_error_for_non_default_account
+                        )
+                        addAlert(DEFAULT_ACCOUNT_DISABLED, label)
                     } else if (core.isNetworkReachable) {
                         Log.e("$TAG Non-default account registration failed!")
                         val label = AppUtils.getString(
@@ -226,11 +238,8 @@ class MainViewModel
                     }
 
                     if (account == core.defaultAccount) {
-                        if (defaultAccountRegistrationFailed) {
-                            Log.i("$TAG Default account is now registered")
-                            defaultAccountRegistrationFailed = false
-                            defaultAccountRegistrationErrorEvent.postValue(Event(false))
-                        }
+                        Log.i("$TAG Default account is now registered")
+                        removeAlert(DEFAULT_ACCOUNT_DISABLED)
                     } else {
                         // If no call and no account is in Failed state, hide top bar
                         val found = core.accountList.find {
@@ -242,12 +251,20 @@ class MainViewModel
                     }
                 }
                 RegistrationState.Progress, RegistrationState.Refreshing -> {
-                    if (defaultAccountRegistrationFailed) {
+                    if (account == core.defaultAccount) {
                         Log.i(
-                            "$TAG Default account is registering, removing registration failed toast for now"
+                            "$TAG Default account is registering, removing registration failed alert for now"
                         )
-                        defaultAccountRegistrationFailed = false
-                        defaultAccountRegistrationErrorEvent.postValue(Event(false))
+                        removeAlert(DEFAULT_ACCOUNT_DISABLED)
+                    }
+                }
+                RegistrationState.Cleared -> {
+                    if (account == core.defaultAccount) {
+                        Log.w("$TAG Default account is now disabled")
+                        val label = AppUtils.getString(
+                            R.string.default_account_disabled
+                        )
+                        addAlert(DEFAULT_ACCOUNT_DISABLED, label)
                     }
                 }
                 else -> {}
@@ -267,9 +284,17 @@ class MainViewModel
                 )
                 coreContext.updateFriendListsSubscriptionDependingOnDefaultAccount()
 
+                removeAlert(DEFAULT_ACCOUNT_DISABLED)
                 removeAlert(NON_DEFAULT_ACCOUNT_NOT_CONNECTED)
                 // Refresh REGISTER to re-compute alerts regarding accounts registration state
                 core.refreshRegisters()
+
+                if (!account.params.isRegisterEnabled) {
+                    val label = AppUtils.getString(
+                        R.string.default_account_disabled
+                    )
+                    addAlert(DEFAULT_ACCOUNT_DISABLED, label)
+                }
             }
 
             computeNonDefaultAccountNotificationsCount()
@@ -283,8 +308,11 @@ class MainViewModel
             Log.w(
                 "$TAG Account [${account.params.identityAddress?.asStringUriOnly()}] has been removed!"
             )
+            removeAlert(DEFAULT_ACCOUNT_DISABLED)
             removeAlert(NON_DEFAULT_ACCOUNT_NOT_CONNECTED)
+            // Refresh REGISTER to re-compute alerts regarding accounts registration state
             core.refreshRegisters()
+
             computeNonDefaultAccountNotificationsCount()
 
             if (core.accountList.isEmpty()) {
@@ -321,11 +349,14 @@ class MainViewModel
     }
 
     init {
-        defaultAccountRegistrationFailed = false
         showAlert.value = false
         atLeastOneCall.value = false
         maxAlertLevel.value = NONE
         nonDefaultAccountNotificationsCount = 0
+
+        pendingFilesOrTextSharing.value = false
+        filesOrTextPendingSharingLabel.value = ""
+
         enableAccountMonitoring(true)
 
         coreContext.postOnCoreThread { core ->
@@ -344,12 +375,22 @@ class MainViewModel
                 atLeastOneCall.postValue(true)
             }
 
-            if (core.defaultAccount?.state == RegistrationState.Ok && !firstAccountRegistered) {
-                triggerNativeAddressBookImport()
+            val defaultAccount = core.defaultAccount
+            if (defaultAccount != null) {
+                if (!defaultAccount.params.isRegisterEnabled) {
+                    val label = AppUtils.getString(
+                        R.string.default_account_disabled
+                    )
+                    addAlert(DEFAULT_ACCOUNT_DISABLED, label)
+                }
+
+                if (defaultAccount.state == RegistrationState.Ok && !firstAccountRegistered) {
+                    triggerNativeAddressBookImport()
+                }
             }
         }
 
-        updatePostNotificationsPermission()
+        updateMissingPermissionAlert()
 
         if (VFS.isEnabled(coreContext.context)) {
             val cache = corePreferences.vfsCachePath
@@ -382,8 +423,13 @@ class MainViewModel
     }
 
     @UiThread
-    fun updatePostNotificationsPermission() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+    fun updateMissingPermissionAlert() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            coreContext.postOnCoreThread {
+                checkFullScreenIntentNotificationPermission()
+                checkPostNotificationsPermission()
+            }
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             coreContext.postOnCoreThread {
                 checkPostNotificationsPermission()
             }
@@ -417,11 +463,53 @@ class MainViewModel
     fun onTopBarClicked() {
         if (atLeastOneCall.value == true) {
             goBackToCallEvent.value = Event(true)
-        } else if (!isPostNotificationsPermissionGranted()) {
+        } else if (!Compatibility.hasFullScreenIntentPermission(coreContext.context)) {
+            askFullScreenIntentPermissionEvent.value = Event(true)
+        } else if (!Compatibility.isPostNotificationsPermissionGranted(coreContext.context)) {
             askPostNotificationsPermissionEvent.value = Event(true)
         } else {
             openDrawerEvent.value = Event(true)
         }
+    }
+
+    @UiThread
+    fun onCallTopBarClicked() {
+        if (atLeastOneCall.value == true) {
+            goBackToCallEvent.value = Event(true)
+        }
+    }
+
+    @UiThread
+    fun addFilesPendingSharing(list: ArrayList<String>) {
+        val count = list.size
+        Log.i("$TAG Adding [$count] files to pending sharing files list")
+        if (count > 0) {
+            filesOrTextPendingSharingLabel.value = AppUtils.getStringWithPlural(
+                R.plurals.conversations_files_waiting_to_be_shared_toast,
+                count,
+                "$count"
+            )
+            pendingFilesOrTextSharing.value = true
+        }
+    }
+
+    @UiThread
+    fun addTextPendingSharing() {
+        filesOrTextPendingSharingLabel.value = AppUtils.getString(R.string.conversations_text_waiting_to_be_shared_toast)
+        pendingFilesOrTextSharing.value = true
+    }
+
+    @UiThread
+    fun filesOrTextPendingSharingListCleared() {
+        pendingFilesOrTextSharing.value = false
+        filesOrTextPendingSharingLabel.value = ""
+        Log.i("$TAG List of files pending sharing has been cleared")
+    }
+
+    @UiThread
+    fun cancelFileOrTextSharing() {
+        Log.i("$TAG Clearing list of files pending sharing")
+        clearFilesOrTextPendingSharingEvent.value = Event(true)
     }
 
     @UiThread
@@ -467,8 +555,6 @@ class MainViewModel
         val core = coreContext.core
         val callsNb = core.callsNb
         if (callsNb == 1) {
-            removeAlert(MULTIPLE_CALLS)
-
             val currentCall = core.currentCall ?: core.calls.firstOrNull()
             if (currentCall != null) {
                 val address = currentCall.callLog.remoteAddress
@@ -480,17 +566,12 @@ class MainViewModel
                     contact?.name ?: LinphoneUtils.getDisplayName(address)
                 }
                 Log.i("$TAG Showing single call alert with label [$label]")
-                addAlert(SINGLE_CALL, label)
+                callLabel.postValue(label)
                 callsStatus.postValue(LinphoneUtils.callStateToString(currentCall.state))
             }
         } else if (callsNb > 1) {
-            removeAlert(SINGLE_CALL)
-
-            addAlert(
-                MULTIPLE_CALLS,
-                AppUtils.getFormattedString(R.string.calls_count_label, callsNb)
-            )
-            callsStatus.postValue("") // TODO: improve ?
+            callLabel.postValue(AppUtils.getFormattedString(R.string.calls_count_label, callsNb))
+            callsStatus.postValue("")
         }
     }
 
@@ -546,27 +627,25 @@ class MainViewModel
             val label = maxedPriorityAlert.second
             Log.i("$TAG Max priority alert right now is [$type]")
             maxAlertLevel.postValue(type)
-            when (type) {
-                NON_DEFAULT_ACCOUNT_NOTIFICATIONS, NON_DEFAULT_ACCOUNT_NOT_CONNECTED -> {
-                    alertIcon.postValue(R.drawable.bell_simple)
+            val icon = when (type) {
+                DEFAULT_ACCOUNT_DISABLED -> {
+                    R.drawable.warning_circle
                 }
                 NETWORK_NOT_REACHABLE -> {
-                    alertIcon.postValue(R.drawable.wifi_slash)
+                    R.drawable.wifi_slash
                 }
-                SEND_NOTIFICATIONS_PERMISSION_NOT_GRANTED -> {
-                    alertIcon.postValue(R.drawable.bell_simple_slash)
+                SEND_NOTIFICATIONS_PERMISSION_NOT_GRANTED, FULL_SCREEN_INTENTS_PERMISSION_NOT_GRANTED -> {
+                    R.drawable.bell_slash
                 }
-                SINGLE_CALL, MULTIPLE_CALLS -> {
-                    alertIcon.postValue(R.drawable.phone)
+                else -> {
+                    R.drawable.bell
                 }
             }
+            alertIcon.postValue(icon)
             alertLabel.postValue(label)
 
-            if (type < SINGLE_CALL) {
-                // Call alert is displayed using atLeastOnCall mutable, not showAlert
-                Log.i("$TAG Alert top-bar is currently invisible, display it now")
-                showAlert.postValue(true)
-            }
+            Log.i("$TAG Alert top-bar is currently invisible, display it now")
+            showAlert.postValue(true)
         }
     }
 
@@ -582,28 +661,39 @@ class MainViewModel
         val reachable = coreContext.core.isNetworkReachable
         Log.i("$TAG Network is ${if (reachable) "reachable" else "not reachable"}")
         if (!reachable && coreContext.core.globalState == GlobalState.On) {
-            val label = AppUtils.getString(R.string.network_not_reachable)
+            val label = if (coreContext.core.isWifiOnlyEnabled) {
+                if (AndroidPlatformHelper.isReady() && AndroidPlatformHelper.instance().isActiveNetworkWifiOnlyCompliant) {
+                    AppUtils.getString(R.string.network_not_reachable)
+                } else {
+                    AppUtils.getString(R.string.network_is_not_wifi)
+                }
+            } else {
+                AppUtils.getString(R.string.network_not_reachable)
+            }
             addAlert(NETWORK_NOT_REACHABLE, label)
         } else {
             removeAlert(NETWORK_NOT_REACHABLE)
         }
     }
 
-    private fun isPostNotificationsPermissionGranted(): Boolean {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            ContextCompat.checkSelfPermission(
-                coreContext.context,
-                Manifest.permission.POST_NOTIFICATIONS
-            ) == PackageManager.PERMISSION_GRANTED
+    @RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
+    @WorkerThread
+    private fun checkFullScreenIntentNotificationPermission() {
+        if (!Compatibility.hasFullScreenIntentPermission(coreContext.context)) {
+            Log.w("$TAG USE_FULL_SCREEN_INTENT seems to be not granted!")
+            val label = AppUtils.getString(R.string.full_screen_intent_permission_not_granted)
+            coreContext.postOnCoreThread {
+                addAlert(FULL_SCREEN_INTENTS_PERMISSION_NOT_GRANTED, label)
+            }
         } else {
-            true
+            removeAlert(FULL_SCREEN_INTENTS_PERMISSION_NOT_GRANTED)
         }
     }
 
     @RequiresApi(Build.VERSION_CODES.TIRAMISU)
     @WorkerThread
     private fun checkPostNotificationsPermission() {
-        if (!isPostNotificationsPermissionGranted()) {
+        if (!Compatibility.isPostNotificationsPermissionGranted(coreContext.context)) {
             Log.w("$TAG POST_NOTIFICATIONS seems to be not granted!")
             val label = AppUtils.getString(R.string.post_notifications_permission_not_granted)
             coreContext.postOnCoreThread {

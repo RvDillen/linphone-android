@@ -54,7 +54,7 @@ class ConversationsListViewModel
             state: ChatRoom.State?
         ) {
             Log.i(
-                "$TAG Conversation [${LinphoneUtils.getChatRoomId(chatRoom)}] state changed [$state]"
+                "$TAG Conversation [${LinphoneUtils.getConversationId(chatRoom)}] state changed [$state]"
             )
 
             when (state) {
@@ -66,7 +66,7 @@ class ConversationsListViewModel
 
         @WorkerThread
         override fun onMessageSent(core: Core, chatRoom: ChatRoom, message: ChatMessage) {
-            val id = LinphoneUtils.getChatRoomId(chatRoom)
+            val id = LinphoneUtils.getConversationId(chatRoom)
             val found = conversations.value.orEmpty().find {
                 it.id == id
             }
@@ -85,7 +85,7 @@ class ConversationsListViewModel
             chatRoom: ChatRoom,
             messages: Array<out ChatMessage>
         ) {
-            val id = LinphoneUtils.getChatRoomId(chatRoom)
+            val id = LinphoneUtils.getConversationId(chatRoom)
             val found = conversations.value.orEmpty().find {
                 it.id == id
             }
@@ -174,16 +174,12 @@ class ConversationsListViewModel
 
     @WorkerThread
     private fun addChatRoom(chatRoom: ChatRoom) {
-        val localAddress = chatRoom.localAddress
-        val peerAddress = chatRoom.peerAddress
-
+        val identifier = chatRoom.identifier
+        val chatRoomAccount = chatRoom.account
         val defaultAccount = LinphoneUtils.getDefaultAccount()
-        if (defaultAccount == null ||
-            defaultAccount.params.identityAddress?.weakEqual(localAddress) == false
-        )
-        {
+        if (defaultAccount == null || chatRoomAccount == null || chatRoomAccount != defaultAccount) {
             Log.w(
-                "$TAG Chat room with local address [${localAddress.asStringUriOnly()}] and peer address [${peerAddress.asStringUriOnly()}] was created but not displaying it because it doesn't belong to currently default account"
+                "$TAG Chat room with identifier [$identifier] was created but not displaying it because it doesn't belong to currently default account"
             )
             return
         }
@@ -191,16 +187,16 @@ class ConversationsListViewModel
         val hideEmptyChatRooms = coreContext.core.config.getBool("misc", "hide_empty_chat_rooms", true)
         // Hide empty chat rooms only applies to 1-1 conversations
         if (hideEmptyChatRooms && !LinphoneUtils.isChatRoomAGroup(chatRoom) && chatRoom.lastMessageInHistory == null) {
-            Log.w("$TAG Chat room with local address [${localAddress.asStringUriOnly()}] and peer address [${peerAddress.asStringUriOnly()}] is empty, not adding it to match Core setting")
+            Log.w("$TAG Chat room with identifier [$identifier] is empty, not adding it to match Core setting")
             return
         }
 
         val currentList = conversations.value.orEmpty()
         val found = currentList.find {
-            it.chatRoom.peerAddress.weakEqual(peerAddress)
+            it.chatRoom.identifier == identifier
         }
         if (found != null) {
-            Log.w("$TAG Created chat room with local address [${localAddress.asStringUriOnly()}] and peer address [${peerAddress.asStringUriOnly()}] is already in the list, skipping")
+            Log.w("$TAG Created chat room with identifier [$identifier] is already in the list, skipping")
             return
         }
 
@@ -216,27 +212,27 @@ class ConversationsListViewModel
         val model = ConversationModel(chatRoom)
         newList.add(model)
         newList.addAll(currentList)
-        Log.i("$TAG Adding chat room with local address [${localAddress.asStringUriOnly()}] and peer address [${peerAddress.asStringUriOnly()}] to list")
+        Log.i("$TAG Adding chat room with identifier [$identifier] to list")
         conversations.postValue(newList)
     }
 
     @WorkerThread
     private fun removeChatRoom(chatRoom: ChatRoom) {
         val currentList = conversations.value.orEmpty()
-        val peerAddress = chatRoom.peerAddress
+        val identifier = chatRoom.identifier
         val found = currentList.find {
-            it.chatRoom.peerAddress.weakEqual(peerAddress)
+            it.chatRoom.identifier == identifier
         }
         if (found != null) {
             val newList = arrayListOf<ConversationModel>()
             newList.addAll(currentList)
             newList.remove(found)
             found.destroy()
-            Log.i("$TAG Removing chat room [${peerAddress.asStringUriOnly()}] from list")
+            Log.i("$TAG Removing chat room with identifier [$identifier] from list")
             conversations.postValue(newList)
         } else {
             Log.w(
-                "$TAG Failed to find item in list matching deleted chat room peer address [${peerAddress.asStringUriOnly()}]"
+                "$TAG Failed to find item in list matching deleted chat room identifier [$identifier]"
             )
         }
 

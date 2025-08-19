@@ -19,8 +19,8 @@
  */
 package org.linphone.ui.assistant.fragment
 
+import android.content.ActivityNotFoundException
 import android.content.Intent
-import android.net.Uri
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -31,6 +31,7 @@ import org.linphone.R
 import org.linphone.core.tools.Log
 import org.linphone.databinding.AssistantThirdPartySipAccountWarningFragmentBinding
 import org.linphone.ui.GenericFragment
+import androidx.core.net.toUri
 
 @UiThread
 class ThirdPartySipAccountWarningFragment : GenericFragment() {
@@ -61,11 +62,19 @@ class ThirdPartySipAccountWarningFragment : GenericFragment() {
         binding.setContactClickListener {
             val url = getString(R.string.website_contact_url)
             try {
-                val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                val browserIntent = Intent(Intent.ACTION_VIEW, url.toUri())
                 startActivity(browserIntent)
             } catch (ise: IllegalStateException) {
                 Log.e(
                     "$TAG Can't start ACTION_VIEW intent for URL [$url], IllegalStateException: $ise"
+                )
+            } catch (anfe: ActivityNotFoundException) {
+                Log.e(
+                    "$TAG Can't start ACTION_VIEW intent for URL [$url], ActivityNotFoundException: $anfe"
+                )
+            } catch (e: Exception) {
+                Log.e(
+                    "$TAG Can't start ACTION_VIEW intent for URL [$url]: $e"
                 )
             }
         }

@@ -10,8 +10,238 @@ Group changes to describe their impact on the project, as follows:
     Fixed for any bug fixes.
     Security to invite users to upgrade in case of vulnerabilities.
 
+## [6.0.15] - 2025-08-11
 
-## [6.0.0] - 2025-02-??
+### Fixed
+- Crash due to changes in SDK triggering fatal error if linphone_core_stop() is called from linphone_core_iterate() loop (which was done when scanning QR code)
+
+### Changed
+- Prevent leaving assistant after doing a remote provisioning if there is still no account after it (if there was no account before and no account was provided in downloaded config)
+
+## [6.0.14] - 2025-08-06
+
+### Fixed
+- Fixed ANR due to deadlock caused by method being called from wrong thread
+- Fixed microphone not always recording audio while app in background or if screen is turned off
+- Fixed missing favorites in start call / create conversation views
+- Fixed outgoing call view in full screen
+- Fixed generated avatar for SIP URIs without username
+
+## [6.0.13] - 2025-07-31
+
+### Fixed
+- Missing favourites if contacts list size exceeds magic search max results setting
+- Muted call on some devices due to Telecom Manager quickly muting/unmuting call
+- Full screen without video during outgoing early media call if video has been declined by remote end
+- Removed duplicated week label if "no meeting today" is the first entry for current week
+- Prevent crash during file export if no app on the device can handle it
+- Prevent crash that could happen with chat message notification if sender name (or group chat room subject) is empty
+
+### Changed
+- Back gesture / navigation button will close the numpad bottom sheet if it's open instead of leaving the page directly
+- Updated bell and bell_slash icons
+
+## [6.0.12] - 2025-07-18
+
+### Fixed
+- Reactions list in bottom sheet update while opened
+- Crashes due to late init properties being used before initialized
+
+## [6.0.11] - 2025-07-11
+
+### Added
+- Added toggle in LDAP configuration to allow to quickly enable/disable it
+
+### Changed
+- Reduced maximum number of contacts displayed in contacts list, new call/conversation, meeting participant selection etc...
+- Updated translations
+
+### Fixed
+- Calls top bar wrong notification label when going from two calls to one.
+
+## [6.0.10] - 2025-06-27
+
+### Added
+- Added a new top bar alert area for pending file/text sharing.
+
+### Changed
+- Reworked in-app top bar alerts, now can show both an account alert and an active call alert.
+- Hide SIP address/phone number picker dialog if contact has exactly one SIP address matching the default domain and currently default account domain.
+
+### Fixed
+- Bluetooth not being used automatically when device is connected during a call.
+- Call encryption status label stuck in "Waiting for encryption".
+- Group chat room creation if LIME server URL isn't set.
+- Participant mention if more than one in the same chat message.
+- Force default account in call params when starting one.
+
+## [6.0.9] - 2025-06-06
+
+### Added
+- German translation (88% complete)
+- Link to user guide in Help section
+- Missing scroll views for help & debug layouts
+
+### Changed
+- Prevent port from being set in the SIP identity address in third party account login + remove port (if any) from SIP identity for existing accounts
+- Show last message timestamp instead of conversation last updated timestamp in conversations list
+
+### Fixed
+- Prevent blinking in conversations list when removing message from chat room
+- Prevent empty (can even lead to crash) display name in call notification (using all identification fields from vCard)
+
+## [6.0.8] - 2025-05-23
+
+### Added
+- Ukrainian & simplified Chinese translations from Weblate
+- Sliding answer/decline button in incoming call fragment if device is locked (will help prevent calls from being unintentionally picked up or hung up while the device is being removed from a pocket)
+
+### Changed
+- Show files with square design when more than one (as it is for media files)
+- Outgoing chat bubbles will now display the sent file size (as it is for received messages)
+
+### Fixed
+- Fixed issue with bluetooth hearing aids
+- Fixed audio call being answered on speakerphone
+- Fixed events related to joined/left conversation being briefly visible sometimes for 1-1 conversations
+- Fixed files/media grid in chat bubble using more than 3 columns in landscape
+- Fixed logs upload server URL setting
+
+## [6.0.7] - 2025-05-16
+
+### Added
+- CS, NL and RU translations from Weblate
+
+### Changed
+- Improved find contact performances
+- Make sure speaker audio device is used for playing the ringtone during early media
+- Reworked bottom navigation bar in portrait and unread count indicators
+- No longer delete conversations when deleting account (for now); causes user to leave group which is an issue when using multiple devices
+
+### Fixed
+- Fixed no default account after remote provisioning
+- Prevent lists from refreshing too many times when using LDAP or remote CardDAV contact directories
+- Fixed black miniatures in conference if bundle mode is disabled in account params
+- Fixed long press on a chat message containing a SIP URI triggering call
+- Disable IMDN bottom sheet for incoming messages in groups instead of showing it empty
+- Refresh conversations list after clearing conversation history
+- Fixed another race condition issue related to foreground call service
+
+## [6.0.6] - 2025-05-02
+
+### Added
+- Added recover phone account when clicking on "Forgotten password" in the assistant
+- Improved message when contacts list is empty depending on the currently selected filter and added a button to open the filter popup menu for users that didn't notice the icon on the top right corner of the screen when contacts list is empty and "SIP contacts only" filter is set.
+- Added "Logs collection sharing server URL" setting in developper area
+- Added "Disable sending logs to Crashlytics" advanced setting.
+
+### Changed
+- Improved VFS message in confirmation dialog
+- Moved "Print logs in logcat" and "File sharing server URL" settings to developper area
+
+### Fixed
+- Fixed crash when opening a password protected PDF
+- Fixed chat room lookup while in 1-1 call, using SDK method for getting chat room from conference
+- Fixed newly created contact not being visible in contacts list without reloading it
+- Fixed missing event icon for group conversations
+- Another attempts at preventing crashes due to In-Call service not being started as foreground before being stopped
+
+## [6.0.5] - 2025-04-18
+
+### Changed
+- When calling a SIP URI that looks like a phone number in the username and an IP in the domain, replace the domain with the one of the currently selected account to workaround issue with PBXs using IPs instead of domains in From header
+- Improved account creation page UI when push notifications aren't available
+- Improved called account display on incoming call screen when more than one account configured
+- Updated telecom package from beta to release candidate
+
+### Fixed
+- Fixed transfer call view numpad button starting a new call instead of forwarding the current one
+- Fixed incoming call not displayed in call history depending on how the From & To headers are formatted (SDK fix)
+- Fixed crashes related to foreground service not being started
+- Fixed crash due to lateinit property not being initialized before used
+
+## [6.0.4] - 2025-04-11
+
+### Changed
+- Third party SIP accounts push notifications will be disabled and setting will be hidden unless if list of supported domains (to prevent issues, specifically when used with UDP transport protocol causing bigger packets getting lost)
+
+### Fixed
+- Prevent refresh of views due to contacts changes to happen to frequently at startup
+- Prevent crash in Help view if app is built without Firebase
+
+## [6.0.3] - 2025-04-04
+
+### Added
+- Show alert when default account is disabled
+- Refesh list details when going back from background after one hour or more (when keep app alive using service is enabled)
+- Click to copy SIP URI in call history shortcut
+- Added developper settings, must click 8 times on version (in Help) to make it appear (E2E encryption for meetings & group calls setting was moved there)
+- Circular indicator while search is in progress in contacts lists
+
+### Changed
+- Force some default values on notifications channels
+- Contacts list filter is now applied to new call / conversation & other contact pickers
+- Attach file icon stays visible while typing message in conversation instead of emoji picker icon
+
+### Fixed
+- No default account being selected if the default one is removed
+- Navigation bar turning orange when opening search bar
+- Incoming call showed as video even if video is disabled locally
+- Concurrent modification crash in Contacts loader
+- Meetings list not properly sorted when CCMP is used
+- POST_NOTIFICATIONS permission check on old Android devices
+
+## [6.0.2] - 2025-03-28
+
+### Added
+- Show on top bar if FULL_SCREEN_INTENT permission isn't granted, clicking on it sends to the matching settings so user can fix it easily, without it incoming call screen won't be displayed if screen is off
+- Ring during incoming early media call setting added back
+- Added a floating action button to open dialpad during outgoing early media call
+
+### Changed
+- Delete all related call history / conversations / meetings when removing an account
+- Delay / use a separated thread for heavy contacts related tasks to ensure call is correctly handled and foreground service is started quickly enough
+- Newly created account in app will be kept disabled until SMS code validation is done
+- Keep app alive foreground service notification no shows a content message to ease clicking on it to open the app & workaround a crash on some devices
+- Automatically show dialpad setting will now also work on new / transfer call while in call as well
+
+### Fixed
+- Improved POST_NOTIFICATIONS permission check on Android 13 and newer, should prevent crashes
+- Fixed contact lookup if phone number starts by "00" instead of "+"
+- Fixed "delete all call history" sometimes not removing all call logs
+- Fixed LDAP / remote CardDAV contacts sometimes not displayed in contacts list when doing a search
+- Fixed issue where contact filter could be set to only show sip.linphone.org contacts even when third party account was being selected
+- Fixed sometimes wrong displayed SIP URI in detailed call history
+- Fixed invisible meeting icon in status bar
+- Fixed missed call count indicator behavior with some third party providers
+- Prevent today indicator & meeting icon in bottom nav bar from blinking / briefly appearing
+- Fixed bottom nav bar sometimes being hidden
+- Fixed missing share logs server URL when migrating from 5.2 if that value was removed back then
+- Other crashes fixed
+
+## [6.0.1] - 2025-03-21
+
+### Added
+- Start at boot & auto answer settings added back
+- Interface setting to have dialpad automatically opened in start call view
+- Replace "+" by "00" and do not apply prefix for calls & chat account settings
+- Setting to let user choose whether to record calls using MKV or SMFF format (the later allows to record H265/AV1 video but is a proprietary file format that can't be read outside of Linphone)
+
+### Changed
+- Reverted the way of playing incoming call ringone (you may have to configure your own ringtone again), was causing various issues depending on devices/firmwares
+- Show all call history entries if only one account is configured (workaround for missing history for now until a proper fix will be done in SDK)
+
+### Fixed
+- Issue preventing bluetooth Hearing Aids from working properly (and fixed earpiece/hearing aids icon)
+- Prevent Qr Code scanner to use static picture camera
+- Prevent user from connecting the same account multiple times
+- Quit menu visibility not updated when changing Keep Alive setting
+- Participant selection in group when typing "@"
+- Recordings order has been reversed to have newest ones at top
+- Improved message when network is not reachable due to "Wifi only mode" being enabled
+- Various crash & bug fixes
+
+## [6.0.0] - 2025-03-11
 
 6.0.0 release is a complete rework of Linphone Android, with a fully redesigned UI, so it is impossible to list everything here.
 
@@ -21,6 +251,7 @@ Group changes to describe their impact on the project, as follows:
 - Improved multi account: you'll only see history, conversations, meetings etc... related to currently selected account, and you can switch the default account in two clicks.
 - Call transfer: Blind & Attended call transfer have been merged into one: during a call, if you initiate a transfer action, either pick another call to do the attended transfer or select a contact from the list (you can input a SIP URI not already in the suggestions list) to start a blind transfer.
 - User can only send up to 12 files in a single chat message.
+- IMDNs are now only sent to the message sender, preventing huge traffic in large groups, and thus the delivery status icon for received messages is now hidden in groups (as it was in 1-1 conversations).
 - Settings: a lot of them are gone, the one that are still there have been reworked to increase user friendliness.
 - Default screen (between contacts, call history, conversations & meetings list) will change depending on where you were when the app was paused or killed, and you will return to that last visited screen on the next startup.
 - Gradle files have been migrated from Groovy to Kotlin DSL, and dependencies are now in a separated file (libs.versions.toml).
@@ -37,6 +268,8 @@ Group changes to describe their impact on the project, as follows:
 - If next message is also a voice recording, playback will automatically start after the currently playing one ends.
 - Chat while in call: a shortcut to a conversation screen with the remote.
 - Chat while in a conference: if the conference has a text stream enabled, you can chat with the other participants of the conference while it lasts. At the end, you'll find the messages history in the call history (and not in the list of conversations).
+- Auto export of media to native gallery even when auto download is enabled (but still not if VFS is enabled nor for ephemeral messages).
+- Save / export document & media from ephemeral messages will be disabled, and secure policy that prevents screenshots will be enforced in file viewer even if the setting is disabled.
 - Notification showing upload/download of files shared through chat will let user know the progress and keep the app alive during that process.
 - Screen sharing in conference: only desktop app starting with 6.0 version is able to start it, but on mobiles you'll be able to see it.
 - You can choose whatever ringtone you'd like for incoming calls (in Android notification channel settings).

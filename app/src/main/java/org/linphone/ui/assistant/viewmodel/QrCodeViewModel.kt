@@ -30,6 +30,8 @@ import org.linphone.core.CoreListenerStub
 import org.linphone.core.tools.Log
 import org.linphone.ui.GenericViewModel
 import org.linphone.utils.Event
+import org.linphone.R
+import org.linphone.core.GlobalState
 
 class QrCodeViewModel
     @UiThread
@@ -38,14 +40,33 @@ class QrCodeViewModel
         private const val TAG = "[Qr Code Scanner ViewModel]"
     }
 
-    val qrCodeFoundEvent = MutableLiveData<Event<Boolean>>()
+    val remoteProvisioningSuccessfulEvent = MutableLiveData<Event<Boolean>>()
+
+    val onErrorEvent = MutableLiveData<Event<Boolean>>()
 
     private val coreListener = object : CoreListenerStub() {
         @WorkerThread
         override fun onConfiguringStatus(core: Core, status: ConfiguringState, message: String?) {
             Log.i("$TAG Configuring state is [$status]")
-            if (status == ConfiguringState.Successful) {
-                qrCodeFoundEvent.postValue(Event(true))
+            if (status == ConfiguringState.Failed) {
+                Log.e("$TAG Failure applying remote provisioning: $message")
+                showRedToast(R.string.remote_provisioning_config_failed_toast, R.drawable.warning_circle)
+                onErrorEvent.postValue(Event(true))
+            }
+        }
+
+        @WorkerThread
+        override fun onGlobalStateChanged(core: Core, state: GlobalState?, message: String) {
+            if (state == GlobalState.On) {
+                if (core.accountList.isEmpty()) {
+                    Log.w("$TAG Provisioning was successful but no account has been configured yet, staying in assistant")
+                    // Remote provisioning didn't contain any account
+                    // and there wasn't at least one configured before either
+                    remoteProvisioningSuccessfulEvent.postValue(Event(false))
+                } else {
+                    Log.i("$TAG At least an account exists in Core, leaving assistant")
+                    remoteProvisioningSuccessfulEvent.postValue(Event(true))
+                }
             }
         }
 
@@ -53,21 +74,28 @@ class QrCodeViewModel
         override fun onQrcodeFound(core: Core, result: String?) {
             Log.i("$TAG QR Code found: [$result]")
             if (result == null) {
-                qrCodeFoundEvent.postValue(Event(false))
+                showRedToast(R.string.assistant_qr_code_invalid_toast, R.drawable.warning_circle)
             } else {
                 val isValidUrl = Patterns.WEB_URL.matcher(result).matches()
                 if (!isValidUrl) {
                     Log.e("$TAG The content of the QR Code doesn't seem to be a valid web URL")
-                    qrCodeFoundEvent.postValue(Event(false))
+                    showRedToast(R.string.assistant_qr_code_invalid_toast, R.drawable.warning_circle)
                 } else {
                     Log.i(
-                        "$TAG QR code URL set, restarting the Core to apply configuration changes"
+                        "$TAG QR code URL set, restarting the Core outside of iterate() loop to apply configuration changes"
                     )
+                    core.nativePreviewWindowId = null
+                    core.isVideoPreviewEnabled = false
+                    core.isQrcodeVideoPreviewEnabled = false
                     core.provisioningUri = result
-                    coreContext.core.stop()
-                    Log.i("$TAG Core has been stopped, restarting it")
-                    coreContext.core.start()
-                    Log.i("$TAG Core has been restarted")
+
+                    coreContext.postOnCoreThread { core ->
+                        Log.i("$TAG Stopping Core")
+                        coreContext.core.stop()
+                        Log.i("$TAG Core has been stopped, restarting it")
+                        coreContext.core.start()
+                        Log.i("$TAG Core has been restarted")
+                    }
                 }
             }
         }
@@ -98,11 +126,15 @@ class QrCodeViewModel
                 }
             }
 
-            val first = core.videoDevicesList.firstOrNull()
-            if (first != null) {
-                Log.w("$TAG No back facing camera found, using first one available [$first]")
-                coreContext.core.videoDevice = first
+            for (camera in core.videoDevicesList) {
+                if (camera != "StaticImage: Static picture") {
+                    Log.w("$TAG No back facing camera found, using first one available [$camera]")
+                    coreContext.core.videoDevice = camera
+                    return@postOnCoreThread
+                }
             }
+
+            Log.e("$TAG No camera device found!")
         }
     }
 }

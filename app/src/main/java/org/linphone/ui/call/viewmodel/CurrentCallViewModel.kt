@@ -20,6 +20,8 @@
 package org.linphone.ui.call.viewmodel
 
 import android.Manifest
+import android.app.KeyguardManager
+import android.content.Context
 import android.content.pm.PackageManager
 import androidx.annotation.AnyThread
 import androidx.annotation.UiThread
@@ -111,6 +113,8 @@ class CurrentCallViewModel
 
     val isHeadsetEnabled = MutableLiveData<Boolean>()
 
+    val isHearingAidEnabled = MutableLiveData<Boolean>()
+
     val isBluetoothEnabled = MutableLiveData<Boolean>()
 
     val fullScreenMode = MutableLiveData<Boolean>()
@@ -199,8 +203,8 @@ class CurrentCallViewModel
 
     val operationInProgress = MutableLiveData<Boolean>()
 
-    val goToConversationEvent: MutableLiveData<Event<Pair<String, String>>> by lazy {
-        MutableLiveData<Event<Pair<String, String>>>()
+    val goToConversationEvent: MutableLiveData<Event<String>> by lazy {
+        MutableLiveData<Event<String>>()
     }
 
     val chatRoomCreationErrorEvent: MutableLiveData<Event<Int>> by lazy {
@@ -247,6 +251,18 @@ class CurrentCallViewModel
         MutableLiveData<Event<Boolean>>()
     }
 
+    // Sliding answer/decline button
+
+    val isScreenLocked = MutableLiveData<Boolean>()
+
+    val slidingButtonAboveAnswer = MutableLiveData<Boolean>()
+
+    val slidingButtonAboveDecline = MutableLiveData<Boolean>()
+
+    val answerAlpha = MutableLiveData<Float>()
+
+    val declineAlpha = MutableLiveData<Float>()
+
     lateinit var currentCall: Call
 
     private val contactsListener = object : ContactsListener {
@@ -278,6 +294,7 @@ class CurrentCallViewModel
             updateEncryption()
         }
 
+        @WorkerThread
         override fun onAuthenticationTokenVerified(call: Call, verified: Boolean) {
             Log.w(
                 "$TAG Notified that authentication token is [${if (verified) "verified" else "not verified!"}]"
@@ -291,11 +308,13 @@ class CurrentCallViewModel
             updateAvatarModelSecurityLevel(verified)
         }
 
+        @WorkerThread
         override fun onRemoteRecording(call: Call, recording: Boolean) {
             Log.i("$TAG Remote recording changed: $recording")
             isRemoteRecordingEvent.postValue(Event(Pair(recording, displayedName.value.orEmpty())))
         }
 
+        @WorkerThread
         override fun onStatsUpdated(call: Call, stats: CallStats) {
             callStatsModel.update(call, stats)
         }
@@ -320,7 +339,6 @@ class CurrentCallViewModel
                             "$TAG From now on current call will be [${newCurrentCall.remoteAddress.asStringUriOnly()}]"
                         )
                         configureCall(newCurrentCall)
-                        updateEncryption()
                     } else {
                         Log.e("$TAG Failed to get a valid call to display")
                         endCall(call)
@@ -329,7 +347,7 @@ class CurrentCallViewModel
                     endCall(call)
                 }
             } else {
-                val videoEnabled = call.currentParams.isVideoEnabled
+                val videoEnabled = LinphoneUtils.isVideoEnabled(call)
                 if (videoEnabled && isVideoEnabled.value == false) {
                     if (isBluetoothEnabled.value == true || isHeadsetEnabled.value == true) {
                         Log.i(
@@ -341,7 +359,7 @@ class CurrentCallViewModel
                     }
                 }
                 isVideoEnabled.postValue(videoEnabled)
-                updateVideoDirection(call.currentParams.videoDirection)
+                updateVideoDirection(call.currentParams.videoDirection, skipIfNotStreamsRunning = true)
 
                 if (call.state == Call.State.Connected) {
                     updateCallDuration()
@@ -394,33 +412,27 @@ class CurrentCallViewModel
             val state = chatRoom.state
             if (state == ChatRoom.State.Instantiated) return
 
-            val id = LinphoneUtils.getChatRoomId(chatRoom)
+            val id = LinphoneUtils.getConversationId(chatRoom)
             Log.i("$TAG Conversation [$id] (${chatRoom.subject}) state changed: [$state]")
 
             if (state == ChatRoom.State.Created) {
                 Log.i("$TAG Conversation [$id] successfully created")
                 chatRoom.removeListener(this)
                 operationInProgress.postValue(false)
-                goToConversationEvent.postValue(
-                    Event(
-                        Pair(
-                            chatRoom.localAddress.asStringUriOnly(),
-                            chatRoom.peerAddress.asStringUriOnly()
-                        )
-                    )
-                )
+                goToConversationEvent.postValue(Event(LinphoneUtils.getConversationId(chatRoom)))
             } else if (state == ChatRoom.State.CreationFailed) {
                 Log.e("$TAG Conversation [$id] creation has failed!")
                 chatRoom.removeListener(this)
                 operationInProgress.postValue(false)
                 chatRoomCreationErrorEvent.postValue(
-                    Event(R.string.conversation_creation_error_toast)
+                    Event(R.string.conversation_failed_to_create_toast)
                 )
             }
         }
     }
 
     private val coreListener = object : CoreListenerStub() {
+        @WorkerThread
         override fun onCallStateChanged(
             core: Core,
             call: Call,
@@ -439,7 +451,6 @@ class CurrentCallViewModel
                         )
                         currentCall.removeListener(callListener)
                         configureCall(call)
-                        updateEncryption()
                     } else if (LinphoneUtils.isCallIncoming(call.state)) {
                         Log.w(
                             "$TAG A call is being received [${call.remoteAddress.asStringUriOnly()}], using it as current call unless declined"
@@ -502,31 +513,10 @@ class CurrentCallViewModel
                 unreadMessagesCount.postValue(0)
             }
         }
-    }
 
-    @WorkerThread
-    private fun updateProximitySensor() {
-        if (::currentCall.isInitialized) {
-            val callState = currentCall.state
-            if (LinphoneUtils.isCallIncoming(callState)) {
-                proximitySensorEnabled.postValue(false)
-            } else if (LinphoneUtils.isCallOutgoing(callState)) {
-                val videoEnabled = currentCall.params.isVideoEnabled
-                proximitySensorEnabled.postValue(!videoEnabled)
-            } else {
-                if (isSendingVideo.value == true || isReceivingVideo.value == true) {
-                    proximitySensorEnabled.postValue(false)
-                } else {
-                    val outputAudioDevice = currentCall.outputAudioDevice ?: coreContext.core.outputAudioDevice
-                    if (outputAudioDevice != null && outputAudioDevice.type == AudioDevice.Type.Earpiece) {
-                        proximitySensorEnabled.postValue(true)
-                    } else {
-                        proximitySensorEnabled.postValue(false)
-                    }
-                }
-            }
-        } else {
-            proximitySensorEnabled.postValue(false)
+        @WorkerThread
+        override fun onAudioDevicesListUpdated(core: Core) {
+            Log.i("$TAG Audio devices list has been updated")
         }
     }
 
@@ -535,6 +525,10 @@ class CurrentCallViewModel
         operationInProgress.value = false
         proximitySensorEnabled.value = false
         videoUpdateInProgress.value = false
+
+        refreshKeyguardLockedStatus()
+        answerAlpha.value = 1f
+        declineAlpha.value = 1f
 
         coreContext.postOnCoreThread { core ->
             coreContext.contactsManager.addListener(contactsListener)
@@ -573,6 +567,8 @@ class CurrentCallViewModel
             },
             { // OnCallClicked
             },
+            { // OnBlindTransferClicked
+            },
             { // OnClearInput
             }
         )
@@ -594,6 +590,14 @@ class CurrentCallViewModel
                 currentCall.removeListener(callListener)
             }
         }
+    }
+
+    @UiThread
+    fun refreshKeyguardLockedStatus() {
+        val keyguardManager = coreContext.context.getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
+        val secure = keyguardManager.isKeyguardLocked
+        isScreenLocked.value = secure
+        Log.i("$TAG Device is [${if (secure) "locked" else "unlocked"}]")
     }
 
     @UiThread
@@ -708,9 +712,14 @@ class CurrentCallViewModel
     @UiThread
     fun changeAudioOutputDevice() {
         val routeAudioToSpeaker = isSpeakerEnabled.value != true
+        if (!::currentCall.isInitialized) {
+            Log.w("$TAG Current call not initialized yet, do not attempt to change output audio device")
+            return
+        }
 
         coreContext.postOnCoreThread { core ->
             var earpieceFound = false
+            var speakerFound = false
             val audioDevices = core.audioDevices
             val currentDevice = currentCall.outputAudioDevice
             Log.i("$TAG Currently used output audio device is [${currentDevice?.deviceName} (${currentDevice?.type}])")
@@ -726,6 +735,7 @@ class CurrentCallViewModel
                         AppUtils.getString(R.string.call_audio_device_type_earpiece)
                     }
                     AudioDevice.Type.Speaker -> {
+                        speakerFound = true
                         AppUtils.getString(R.string.call_audio_device_type_speaker)
                     }
                     AudioDevice.Type.Headset -> {
@@ -758,7 +768,10 @@ class CurrentCallViewModel
                                 AudioDevice.Type.Headset, AudioDevice.Type.Headphones -> AudioUtils.routeAudioToHeadset(
                                     currentCall
                                 )
-                                AudioDevice.Type.Bluetooth, AudioDevice.Type.HearingAid -> AudioUtils.routeAudioToBluetooth(
+                                AudioDevice.Type.Bluetooth -> AudioUtils.routeAudioToBluetooth(
+                                    currentCall
+                                )
+                                AudioDevice.Type.HearingAid -> AudioUtils.routeAudioToHearingAid(
                                     currentCall
                                 )
                                 AudioDevice.Type.Speaker -> AudioUtils.routeAudioToSpeaker(
@@ -773,19 +786,17 @@ class CurrentCallViewModel
                 Log.i("$TAG Found audio device [${device.id}]")
             }
 
-            if (list.size > 2 || (list.size > 1 && !earpieceFound)) {
-                Log.i("$TAG Found more than two devices (or more than 1 but no earpiece), showing list to let user choose")
+            if (list.size > 2 || (list.size > 1 && (!earpieceFound || !speakerFound))) {
+                Log.i("$TAG Found more than two devices (or more than 1 but no earpiece or speaker), showing list to let user choose")
                 showAudioDevicesListEvent.postValue(Event(list))
             } else {
                 Log.i(
                     "$TAG Found less than two devices, simply switching between earpiece & speaker"
                 )
-                if (::currentCall.isInitialized) {
-                    if (routeAudioToSpeaker) {
-                        AudioUtils.routeAudioToSpeaker(currentCall)
-                    } else {
-                        AudioUtils.routeAudioToEarpiece(currentCall)
-                    }
+                if (routeAudioToSpeaker) {
+                    AudioUtils.routeAudioToSpeaker(currentCall)
+                } else {
+                    AudioUtils.routeAudioToEarpiece(currentCall)
                 }
             }
         }
@@ -929,21 +940,12 @@ class CurrentCallViewModel
     fun createConversation() {
         if (::currentCall.isInitialized) {
             coreContext.postOnCoreThread {
-                val existingConversation = lookupCurrentCallConversation(currentCall)
+                val existingConversation = currentCallConversation ?: lookupCurrentCallConversation(currentCall)
                 if (existingConversation != null) {
                     Log.i(
-                        "$TAG Found existing conversation [${
-                        LinphoneUtils.getChatRoomId(existingConversation)
-                        }], going to it"
+                        "$TAG Found existing conversation [${LinphoneUtils.getConversationId(existingConversation)}], going to it"
                     )
-                    goToConversationEvent.postValue(
-                        Event(
-                            Pair(
-                                existingConversation.localAddress.asStringUriOnly(),
-                                existingConversation.peerAddress.asStringUriOnly()
-                            )
-                        )
-                    )
+                    goToConversationEvent.postValue(Event(LinphoneUtils.getConversationId(existingConversation)))
                 } else {
                     Log.i("$TAG No existing conversation was found, let's create it")
                     createCurrentCallConversation(currentCall)
@@ -955,6 +957,17 @@ class CurrentCallViewModel
     @WorkerThread
     fun attendedTransferCallTo(to: Call) {
         if (::currentCall.isInitialized) {
+            val toCallState = to.state
+            if (LinphoneUtils.isCallEnding(toCallState, considerReleasedAsEnding = true)) {
+                Log.e("$TAG Do not attempt attended transfer to call in state [$toCallState]")
+                return
+            }
+            val currentCallState = currentCall.state
+            if (LinphoneUtils.isCallEnding(currentCallState, considerReleasedAsEnding = true)) {
+                Log.e("$TAG Do not attempt attended transfer of call in state [$currentCallState]")
+                return
+            }
+
             Log.i(
                 "$TAG Doing an attended transfer between currently displayed call [${currentCall.remoteAddress.asStringUriOnly()}] and paused call [${to.remoteAddress.asStringUriOnly()}]"
             )
@@ -969,6 +982,12 @@ class CurrentCallViewModel
     @WorkerThread
     fun blindTransferCallTo(to: Address) {
         if (::currentCall.isInitialized) {
+            val callState = currentCall.state
+            if (LinphoneUtils.isCallEnding(callState, considerReleasedAsEnding = true)) {
+                Log.e("$TAG Do not attempt blind transfer of call in state [$callState]")
+                return
+            }
+
             Log.i(
                 "$TAG Call [${currentCall.remoteAddress.asStringUriOnly()}] is being blindly transferred to [${to.asStringUriOnly()}]"
             )
@@ -1070,9 +1089,14 @@ class CurrentCallViewModel
         callMediaEncryptionModel.update(call)
         call.addListener(callListener)
 
-        if (call.currentParams.mediaEncryption == MediaEncryption.None) {
-            waitingForEncryptionInfo.postValue(true)
-            isMediaEncrypted.postValue(false)
+        val state = call.state
+        if (LinphoneUtils.isCallOutgoing(state) || LinphoneUtils.isCallIncoming(state)) {
+            if (call.currentParams.mediaEncryption == MediaEncryption.None) {
+                waitingForEncryptionInfo.postValue(true)
+                isMediaEncrypted.postValue(false)
+            } else {
+                updateEncryption()
+            }
         } else {
             updateEncryption()
         }
@@ -1091,7 +1115,19 @@ class CurrentCallViewModel
         if (call.dir == Call.Dir.Incoming) {
             val isVideo = call.remoteParams?.isVideoEnabled == true && call.remoteParams?.videoDirection != MediaDirection.Inactive
             if (call.core.accountList.size > 1) {
-                val displayName = LinphoneUtils.getDisplayName(call.toAddress)
+                val localAddress = call.callLog.toAddress
+                Log.i("$TAG Local address for incoming call is [${localAddress.asStringUriOnly()}]")
+                val localAccount = coreContext.core.accountList.find {
+                    it.params.identityAddress?.weakEqual(localAddress) == true
+                }
+                val displayName = if (localAccount != null) {
+                    LinphoneUtils.getDisplayName(localAccount.params.identityAddress)
+                } else {
+                    Log.w("$TAG Matching local account was not found, using TO address display name or username")
+                    LinphoneUtils.getDisplayName(localAddress)
+                }
+                Log.i("$TAG Showing account being called as [$displayName]")
+
                 if (isVideo) {
                     incomingCallTitle.postValue(
                         AppUtils.getFormattedString(
@@ -1125,7 +1161,7 @@ class CurrentCallViewModel
             )
         } else {
             isVideoEnabled.postValue(call.currentParams.isVideoEnabled)
-            updateVideoDirection(call.currentParams.videoDirection)
+            updateVideoDirection(call.currentParams.videoDirection, skipIfNotStreamsRunning = true)
         }
 
         if (ActivityCompat.checkSelfPermission(
@@ -1149,7 +1185,6 @@ class CurrentCallViewModel
         updateOutputAudioDevice(audioDevice)
 
         isOutgoing.postValue(call.dir == Call.Dir.Outgoing)
-        val state = call.state
         isOutgoingRinging.postValue(state == Call.State.OutgoingRinging)
         isIncomingEarlyMedia.postValue(state == Call.State.IncomingEarlyMedia)
         isOutgoingEarlyMedia.postValue(state == Call.State.OutgoingEarlyMedia)
@@ -1225,6 +1260,7 @@ class CurrentCallViewModel
         isHeadsetEnabled.postValue(
             audioDevice?.type == AudioDevice.Type.Headphones || audioDevice?.type == AudioDevice.Type.Headset
         )
+        isHearingAidEnabled.postValue(audioDevice?.type == AudioDevice.Type.HearingAid)
         isBluetoothEnabled.postValue(audioDevice?.type == AudioDevice.Type.Bluetooth)
 
         updateProximitySensor()
@@ -1250,14 +1286,15 @@ class CurrentCallViewModel
     }
 
     @WorkerThread
-    private fun updateVideoDirection(direction: MediaDirection) {
+    private fun updateVideoDirection(direction: MediaDirection, skipIfNotStreamsRunning: Boolean = false) {
         val state = currentCall.state
-        if (state != Call.State.StreamsRunning) {
+        if (skipIfNotStreamsRunning && state != Call.State.StreamsRunning) {
             return
         }
 
-        val isSending = direction == MediaDirection.SendRecv || direction == MediaDirection.SendOnly
-        val isReceiving = direction == MediaDirection.SendRecv || direction == MediaDirection.RecvOnly
+        val isConnected = state == Call.State.Connected || state == Call.State.StreamsRunning
+        val isSending = (state == Call.State.OutgoingEarlyMedia || isConnected) && (direction == MediaDirection.SendRecv || direction == MediaDirection.SendOnly)
+        val isReceiving = (state == Call.State.IncomingEarlyMedia || isConnected) && (direction == MediaDirection.SendRecv || direction == MediaDirection.RecvOnly)
 
         val wasSending = isSendingVideo.value == true
         val wasReceiving = isReceivingVideo.value == true
@@ -1336,16 +1373,13 @@ class CurrentCallViewModel
         val localAddress = call.callLog.localAddress
         val remoteAddress = call.remoteAddress
 
-        val params: ConferenceParams? = null
         val existingConversation = if (call.conference != null) {
-            call.core.searchChatRoom(
-                params,
-                localAddress,
-                remoteAddress,
-                arrayOf()
-            )
+            Log.i("$TAG We're in [${remoteAddress.asStringUriOnly()}] conference, using it as chat room if possible")
+            call.conference?.chatRoom
         } else {
+            val params = getChatRoomParams(call)
             val participants = arrayOf(remoteAddress)
+            Log.i("$TAG Looking for conversation with local address [${localAddress.asStringUriOnly()}] and participant [${remoteAddress.asStringUriOnly()}]")
             call.core.searchChatRoom(
                 params,
                 localAddress,
@@ -1363,44 +1397,29 @@ class CurrentCallViewModel
 
     @WorkerThread
     private fun createCurrentCallConversation(call: Call) {
-        val localAddress = call.callLog.localAddress
         val remoteAddress = call.remoteAddress
         val participants = arrayOf(remoteAddress)
         val core = call.core
         operationInProgress.postValue(true)
 
         val params = getChatRoomParams(call) ?: return // TODO: show error to user
-        val conversation = core.createChatRoom(params, localAddress, participants)
-        if (conversation != null) {
+        val chatRoom = core.createChatRoom(params, participants)
+        if (chatRoom != null) {
             if (params.chatParams?.backend == ChatRoom.Backend.FlexisipChat) {
-                if (conversation.state == ChatRoom.State.Created) {
-                    val id = LinphoneUtils.getChatRoomId(conversation)
+                if (chatRoom.state == ChatRoom.State.Created) {
+                    val id = LinphoneUtils.getConversationId(chatRoom)
                     Log.i("$TAG 1-1 conversation [$id] has been created")
                     operationInProgress.postValue(false)
-                    goToConversationEvent.postValue(
-                        Event(
-                            Pair(
-                                conversation.localAddress.asStringUriOnly(),
-                                conversation.peerAddress.asStringUriOnly()
-                            )
-                        )
-                    )
+                    goToConversationEvent.postValue(Event(LinphoneUtils.getConversationId(chatRoom)))
                 } else {
                     Log.i("$TAG Conversation isn't in Created state yet, wait for it")
-                    conversation.addListener(chatRoomListener)
+                    chatRoom.addListener(chatRoomListener)
                 }
             } else {
-                val id = LinphoneUtils.getChatRoomId(conversation)
+                val id = LinphoneUtils.getConversationId(chatRoom)
                 Log.i("$TAG Conversation successfully created [$id]")
                 operationInProgress.postValue(false)
-                goToConversationEvent.postValue(
-                    Event(
-                        Pair(
-                            conversation.localAddress.asStringUriOnly(),
-                            conversation.peerAddress.asStringUriOnly()
-                        )
-                    )
-                )
+                goToConversationEvent.postValue(Event(LinphoneUtils.getConversationId(chatRoom)))
             }
         } else {
             Log.e(
@@ -1408,7 +1427,7 @@ class CurrentCallViewModel
             )
             operationInProgress.postValue(false)
             chatRoomCreationErrorEvent.postValue(
-                Event(R.string.conversation_creation_error_toast)
+                Event(R.string.conversation_failed_to_create_toast)
             )
         }
     }
@@ -1424,6 +1443,8 @@ class CurrentCallViewModel
         params.isChatEnabled = true
         params.isGroupEnabled = false
         params.subject = AppUtils.getString(R.string.conversation_one_to_one_hidden_subject)
+        params.account = account
+
         val chatParams = params.chatParams ?: return null
         chatParams.ephemeralLifetime = 0 // Make sure ephemeral is disabled by default
 
@@ -1492,5 +1513,31 @@ class CurrentCallViewModel
     @AnyThread
     private fun showRecordingToast() {
         showGreenToast(R.string.call_is_being_recorded, R.drawable.record_fill)
+    }
+
+    @WorkerThread
+    private fun updateProximitySensor() {
+        if (::currentCall.isInitialized) {
+            val callState = currentCall.state
+            if (LinphoneUtils.isCallIncoming(callState)) {
+                proximitySensorEnabled.postValue(false)
+            } else if (LinphoneUtils.isCallOutgoing(callState)) {
+                val videoEnabled = currentCall.params.isVideoEnabled
+                proximitySensorEnabled.postValue(!videoEnabled)
+            } else {
+                if (isSendingVideo.value == true || isReceivingVideo.value == true) {
+                    proximitySensorEnabled.postValue(false)
+                } else {
+                    val outputAudioDevice = currentCall.outputAudioDevice ?: coreContext.core.outputAudioDevice
+                    if (outputAudioDevice != null && outputAudioDevice.type == AudioDevice.Type.Earpiece) {
+                        proximitySensorEnabled.postValue(true)
+                    } else {
+                        proximitySensorEnabled.postValue(false)
+                    }
+                }
+            }
+        } else {
+            proximitySensorEnabled.postValue(false)
+        }
     }
 }

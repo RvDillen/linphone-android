@@ -20,11 +20,11 @@
 package org.linphone.ui.main.contacts.fragment
 
 import android.app.Dialog
+import android.content.ActivityNotFoundException
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import android.os.Bundle
 import android.provider.ContactsContract
 import android.view.LayoutInflater
@@ -52,6 +52,7 @@ import org.linphone.utils.AppUtils
 import org.linphone.utils.ConfirmationDialogModel
 import org.linphone.utils.DialogUtils
 import org.linphone.utils.Event
+import androidx.core.net.toUri
 
 @UiThread
 class ContactFragment : SlidingPaneChildFragment() {
@@ -170,27 +171,34 @@ class ContactFragment : SlidingPaneChildFragment() {
 
         viewModel.openNativeContactEditor.observe(viewLifecycleOwner) {
             it.consume { uri ->
-                val editIntent = Intent(Intent.ACTION_EDIT).apply {
-                    setDataAndType(Uri.parse(uri), ContactsContract.Contacts.CONTENT_ITEM_TYPE)
-                    putExtra("finishActivityOnSaveCompleted", true)
+                try {
+                    val editIntent = Intent(Intent.ACTION_EDIT).apply {
+                        setDataAndType(uri.toUri(), ContactsContract.Contacts.CONTENT_ITEM_TYPE)
+                        putExtra("finishActivityOnSaveCompleted", true)
+                    }
+                    startActivity(editIntent)
+                } catch (anfe: ActivityNotFoundException) {
+                    Log.e("$TAG Failed to open native contact editor with URI [$uri]: $anfe")
                 }
-                startActivity(editIntent)
             }
         }
 
         viewModel.openLinphoneContactEditor.observe(viewLifecycleOwner) {
             it.consume { refKey ->
-                val action = ContactFragmentDirections.actionContactFragmentToEditContactFragment(
-                    refKey
-                )
-                findNavController().navigate(action)
+                if (findNavController().currentDestination?.id == R.id.contactFragment) {
+                    val action =
+                        ContactFragmentDirections.actionContactFragmentToEditContactFragment(
+                            refKey
+                        )
+                    findNavController().navigate(action)
+                }
             }
         }
 
         viewModel.goToConversationEvent.observe(viewLifecycleOwner) {
-            it.consume { pair ->
-                Log.i("$TAG Going to conversation [${pair.first}][${pair.second}]")
-                sharedViewModel.showConversationEvent.value = Event(pair)
+            it.consume { conversationId ->
+                Log.i("$TAG Going to conversation [$conversationId]")
+                sharedViewModel.showConversationEvent.value = Event(conversationId)
                 sharedViewModel.navigateToConversationsEvent.value = Event(true)
             }
         }
@@ -287,7 +295,7 @@ class ContactFragment : SlidingPaneChildFragment() {
         )
         val smsIntent: Intent = Intent().apply {
             action = Intent.ACTION_SENDTO
-            data = Uri.parse("smsto:$number")
+            data = "smsto:$number".toUri()
             putExtra("address", number)
             putExtra("sms_body", smsBody)
         }
@@ -319,7 +327,7 @@ class ContactFragment : SlidingPaneChildFragment() {
 
     private fun showConfirmTrustCallDialog(contactName: String, deviceSipUri: String) {
         val label = AppUtils.getFormattedString(
-            org.linphone.R.string.contact_dialog_increase_trust_level_message,
+            R.string.contact_dialog_increase_trust_level_message,
             contactName,
             deviceSipUri
         )

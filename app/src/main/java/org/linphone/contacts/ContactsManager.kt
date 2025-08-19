@@ -32,6 +32,7 @@ import androidx.annotation.WorkerThread
 import androidx.core.app.ActivityCompat
 import androidx.core.app.Person
 import androidx.core.graphics.drawable.IconCompat
+import androidx.core.text.isDigitsOnly
 import androidx.loader.app.LoaderManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -73,7 +74,7 @@ class ContactsManager
         private const val TAG = "[Contacts Manager]"
 
         private const val DELAY_BEFORE_RELOADING_CONTACTS_AFTER_PRESENCE_RECEIVED = 1000L // 1 second
-        private const val FRIEND_LIST_TEMPORARY_STORED_NATIVE = "TempNativeContacts"
+        private const val DELAY_BEFORE_RELOADING_CONTACTS_AFTER_MAGIC_SEARCH_RESULT = 1000L // 1 second
         private const val FRIEND_LIST_TEMPORARY_STORED_REMOTE_DIRECTORY = "TempRemoteDirectoryContacts"
     }
 
@@ -89,13 +90,16 @@ class ContactsManager
     private val unknownRemoteContactDirectoriesContactsMap = arrayListOf<String>()
 
     private val coroutineScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
-    private var reloadContactsJob: Job? = null
+    private var reloadPresenceContactsJob: Job? = null
+    private var reloadRemoteContactsJob: Job? = null
 
     private var loadContactsOnlyFromDefaultDirectory = true
 
     private val magicSearchListener = object : MagicSearchListenerStub() {
         @WorkerThread
         override fun onSearchResultsReceived(magicSearch: MagicSearch) {
+            reloadRemoteContactsJob?.cancel()
+
             val results = magicSearch.lastSearch
             Log.i("$TAG [${results.size}] magic search results available")
 
@@ -110,7 +114,7 @@ class ContactsManager
                     found = true
 
                     // Store friend in app's cache to be re-used in call history, conversations, etc...
-                    val temporaryFriendList = getTemporaryFriendList(native = false)
+                    val temporaryFriendList = getRemoteContactDirectoriesCacheFriendList()
                     temporaryFriendList.addFriend(friend)
                     newContactAdded(friend)
                     Log.i(
@@ -119,6 +123,17 @@ class ContactsManager
 
                     for (listener in listeners) {
                         listener.onContactFoundInRemoteDirectory(friend)
+                    }
+
+                    reloadRemoteContactsJob = coroutineScope.launch {
+                        delay(DELAY_BEFORE_RELOADING_CONTACTS_AFTER_MAGIC_SEARCH_RESULT)
+                        coreContext.postOnCoreThread {
+                            Log.i("$TAG At least a new SIP address was discovered, reloading contacts")
+                            conferenceAvatarMap.values.forEach(ContactAvatarModel::destroy)
+                            conferenceAvatarMap.clear()
+
+                            notifyContactsListChanged()
+                        }
                     }
                 }
             }
@@ -157,7 +172,7 @@ class ContactsManager
             friend: Friend,
             sipUri: String
         ) {
-            reloadContactsJob?.cancel()
+            reloadPresenceContactsJob?.cancel()
             Log.d(
                 "$TAG Newly discovered SIP Address [$sipUri] for friend [${friend.name}] in list [${friendList.displayName}]"
             )
@@ -173,7 +188,7 @@ class ContactsManager
                 Log.e("$TAG Failed to parse SIP URI [$sipUri] as Address!")
             }
 
-            reloadContactsJob = coroutineScope.launch {
+            reloadPresenceContactsJob = coroutineScope.launch {
                 delay(DELAY_BEFORE_RELOADING_CONTACTS_AFTER_PRESENCE_RECEIVED)
                 coreContext.postOnCoreThread {
                     Log.i("$TAG At least a new SIP address was discovered, reloading contacts")
@@ -333,10 +348,6 @@ class ContactsManager
         for (sipAddress in friend.addresses) {
             newContactAddedWithSipUri(friend, sipAddress.asStringUriOnly())
         }
-
-        conferenceAvatarMap.values.forEach(ContactAvatarModel::destroy)
-        conferenceAvatarMap.clear()
-        notifyContactsListChanged()
     }
 
     @WorkerThread
@@ -368,14 +379,6 @@ class ContactsManager
     fun onNativeContactsLoaded() {
         nativeContactsLoaded = true
         Log.i("$TAG Native contacts have been loaded, cleaning avatars maps")
-
-        val core = coreContext.core
-        val found = getTemporaryFriendList(native = true)
-        val count = found.friends.size
-        Log.i(
-            "$TAG Found temporary friend list with [$count] friends, removing it as no longer necessary"
-        )
-        core.removeFriendList(found)
 
         knownContactsAvatarsMap.values.forEach(ContactAvatarModel::destroy)
         knownContactsAvatarsMap.clear()
@@ -414,16 +417,13 @@ class ContactsManager
 
     @WorkerThread
     fun findContactByAddress(address: Address): Friend? {
-        val sipUri = LinphoneUtils.getAddressAsCleanStringUriOnly(address)
-        Log.d("$TAG Looking for friend with SIP URI [$sipUri]")
-
-        val username = address.username
         val found = coreContext.core.findFriend(address)
         if (found != null) {
-            Log.d("$TAG Friend [${found.name}] was found using SIP URI [$sipUri]")
             return found
         }
 
+        val username = address.username
+        val sipUri = LinphoneUtils.getAddressAsCleanStringUriOnly(address)
         // Start an async query in Magic Search in case LDAP or remote CardDAV is configured
         val remoteContactDirectories = coreContext.core.remoteContactDirectories
         if (remoteContactDirectories.isNotEmpty() && !magicSearchMap.keys.contains(sipUri) && !unknownRemoteContactDirectoriesContactsMap.contains(
@@ -446,33 +446,12 @@ class ContactsManager
             )
         }
 
-        val sipAddress = if (sipUri.startsWith("sip:")) {
-            sipUri.substring("sip:".length)
-        } else if (sipUri.startsWith("sips:")) {
-            sipUri.substring("sips:".length)
-        } else {
-            sipUri
-        }
-
-        return if (!username.isNullOrEmpty() && username.startsWith("+")) {
+        return if (!username.isNullOrEmpty() && (username.startsWith("+") || username.isDigitsOnly())) {
             Log.d("$TAG Looking for friend with phone number [$username]")
             val foundUsingPhoneNumber = coreContext.core.findFriendByPhoneNumber(username)
-            if (foundUsingPhoneNumber != null) {
-                Log.d(
-                    "$TAG Friend [${foundUsingPhoneNumber.name}] was found using phone number [$username]"
-                )
-                foundUsingPhoneNumber
-            } else {
-                Log.d(
-                    "$TAG Friend wasn't found using phone number [$username], looking in native address book directly"
-                )
-                findNativeContact(sipAddress, username, true)
-            }
+            foundUsingPhoneNumber
         } else {
-            Log.d(
-                "$TAG Friend wasn't found using SIP address [$sipAddress] and username [$username] isn't a phone number, looking in native address book directly"
-            )
-            findNativeContact(sipAddress, username.orEmpty(), false)
+            null
         }
     }
 
@@ -516,7 +495,7 @@ class ContactsManager
             model
         } else {
             Log.d("$TAG Looking for friend matching SIP URI [$key]")
-            val friend = coreContext.contactsManager.findContactByAddress(clone)
+            val friend = findContactByAddress(clone)
             if (friend != null) {
                 Log.d("$TAG Matching friend [${friend.name}] found for SIP URI [$key]")
                 val model = ContactAvatarModel(friend, address)
@@ -578,7 +557,7 @@ class ContactsManager
     fun isContactTemporary(friend: Friend, allowNullFriendList: Boolean = false): Boolean {
         val friendList = friend.friendList
         if (friendList == null && !allowNullFriendList) return true
-        return friendList?.displayName == FRIEND_LIST_TEMPORARY_STORED_NATIVE || friendList?.displayName == FRIEND_LIST_TEMPORARY_STORED_REMOTE_DIRECTORY
+        return friendList?.type == FriendList.Type.ApplicationCache
     }
 
     @WorkerThread
@@ -625,27 +604,20 @@ class ContactsManager
     }
 
     @WorkerThread
-    fun getTemporaryFriendList(native: Boolean): FriendList {
+    fun getRemoteContactDirectoriesCacheFriendList(): FriendList {
         val core = coreContext.core
-        val name = if (native) FRIEND_LIST_TEMPORARY_STORED_NATIVE else FRIEND_LIST_TEMPORARY_STORED_REMOTE_DIRECTORY
+        val name = FRIEND_LIST_TEMPORARY_STORED_REMOTE_DIRECTORY
         val temporaryFriendList = core.getFriendListByName(name) ?: core.createFriendList()
         if (temporaryFriendList.displayName.isNullOrEmpty()) {
             temporaryFriendList.isDatabaseStorageEnabled = false
             temporaryFriendList.displayName = name
+            temporaryFriendList.type = FriendList.Type.ApplicationCache
             core.addFriendList(temporaryFriendList)
             Log.i(
                 "$TAG Created temporary friend list with name [$name]"
             )
         }
         return temporaryFriendList
-    }
-
-    @WorkerThread
-    fun findNativeContact(address: String, username: String, searchAsPhoneNumber: Boolean): Friend? {
-        // As long as read contacts permission is granted, friends will be stored in DB,
-        // so if Core didn't find a matching item it in the FriendList, there's no reason the native address book
-        // shall contain a matching contact.
-        return null
     }
 
     @WorkerThread
@@ -656,7 +628,7 @@ class ContactsManager
         val name = account?.params?.identityAddress?.displayName ?: LinphoneUtils.getDisplayName(
             localAddress
         )
-        val personBuilder = Person.Builder().setName(name)
+        val personBuilder = Person.Builder().setName(name.ifEmpty { "Unknown" })
 
         val photo = account?.params?.pictureUri.orEmpty()
         val bm = ImageUtils.getBitmap(coreContext.context, photo)
@@ -711,7 +683,7 @@ fun Friend.getAvatarBitmap(round: Boolean = false): Bitmap? {
             photo ?: getNativeContactPictureUri()?.toString(),
             round
         )
-    } catch (numberFormatException: NumberFormatException) {
+    } catch (_: NumberFormatException) {
         // Expected for contacts created by Linphone
     }
     return null
@@ -748,7 +720,7 @@ fun Friend.getNativeContactPictureUri(): Uri? {
                 lookupUri,
                 ContactsContract.Contacts.Photo.CONTENT_DIRECTORY
             )
-        } catch (numberFormatException: NumberFormatException) {
+        } catch (_: NumberFormatException) {
             // Expected for contacts created by Linphone
         }
     }
@@ -757,7 +729,25 @@ fun Friend.getNativeContactPictureUri(): Uri? {
 
 @WorkerThread
 fun Friend.getPerson(): Person {
-    val personBuilder = Person.Builder().setName(name)
+    val personBuilder = Person.Builder()
+    val personName = if (name.orEmpty().isNotEmpty()) {
+        name
+    } else {
+        if (!lastName.isNullOrEmpty() || !firstName.isNullOrEmpty()) {
+            Log.w("[Friend] Name is null or empty, using first and last name")
+            "$firstName $lastName".trim()
+        } else if (!organization.isNullOrEmpty()) {
+            Log.w("[Friend] Name, first name & last name are null or empty, using organization instead")
+            organization
+        } else if (!jobTitle.isNullOrEmpty()) {
+            Log.w("[Friend] Name, first and last names & organization are null or empty, using job title instead")
+            jobTitle
+        } else {
+            Log.e("[Friend] No identification field filled for this friend!")
+            "Unknown"
+        }
+    }
+    personBuilder.setName(personName.orEmpty().ifEmpty { "Unknown" })
 
     val bm: Bitmap? = getAvatarBitmap()
     personBuilder.setIcon(
@@ -765,7 +755,7 @@ fun Friend.getPerson(): Person {
             Log.i(
                 "[Friend] Can't use friend [$name] picture path, generating avatar based on initials"
             )
-            AvatarGenerator(coreContext.context).setInitials(AppUtils.getInitials(name.orEmpty())).buildIcon()
+            AvatarGenerator(coreContext.context).setInitials(AppUtils.getInitials(personName.orEmpty())).buildIcon()
         } else {
             IconCompat.createWithAdaptiveBitmap(bm)
         }

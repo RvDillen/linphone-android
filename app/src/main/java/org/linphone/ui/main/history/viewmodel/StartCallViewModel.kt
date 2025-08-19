@@ -80,12 +80,22 @@ class StartCallViewModel
         MutableLiveData<Event<Boolean>>()
     }
 
+    val initiateBlindTransferEvent: MutableLiveData<Event<Address>> by lazy {
+        MutableLiveData<Event<Address>>()
+    }
+
     private val conferenceListener = object : ConferenceListenerStub() {
         @WorkerThread
         override fun onStateChanged(conference: Conference, newState: Conference.State?) {
             Log.i("$TAG Conference state changed [$newState]")
-            if (newState == Conference.State.Created || newState == Conference.State.CreationFailed) {
-                operationInProgress.postValue(false)
+            when (newState) {
+                Conference.State.Created, Conference.State.CreationFailed, Conference.State.TerminationPending -> {
+                    operationInProgress.postValue(false)
+                }
+                Conference.State.Terminated -> {
+                     leaveFragmentEvent.postValue(Event(true))
+                }
+                else -> {}
             }
         }
     }
@@ -126,6 +136,24 @@ class StartCallViewModel
                         if (address != null) {
                             Log.i("$TAG Calling [${address.asStringUriOnly()}]")
                             coreContext.startAudioCall(address)
+                            leaveFragmentEvent.postValue(Event(true))
+                        } else {
+                            Log.e("$TAG Failed to parse [$suggestion] as SIP address")
+                        }
+                    }
+                }
+            },
+            { // OnBlindTransferClicked
+                val suggestion = searchFilter.value.orEmpty()
+                if (suggestion.isNotEmpty()) {
+                    Log.i("$TAG Using numpad transfer button to blind forward call to [$suggestion]")
+                    coreContext.postOnCoreThread { core ->
+                        val address = core.interpretUrl(
+                            suggestion,
+                            LinphoneUtils.applyInternationalPrefix()
+                        )
+                        if (address != null) {
+                            initiateBlindTransferEvent.postValue(Event(address))
                             leaveFragmentEvent.postValue(Event(true))
                         } else {
                             Log.e("$TAG Failed to parse [$suggestion] as SIP address")

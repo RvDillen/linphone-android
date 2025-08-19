@@ -142,14 +142,7 @@ class AccountCreationViewModel
                     goToSmsCodeConfirmationViewEvent.postValue(Event(true))
                 }
                 AccountManagerServicesRequest.Type.LinkPhoneNumberUsingCode -> {
-                    val account = accountCreated
-                    if (account != null) {
-                        Log.i(
-                            "$TAG Account [${account.params.identityAddress?.asStringUriOnly()}] has been created & activated, setting it as default"
-                        )
-                        coreContext.core.defaultAccount = account
-                    }
-                    accountCreatedEvent.postValue(Event(true))
+                    enableAccountAndSetItAsDefault()
                 }
                 else -> { }
             }
@@ -372,7 +365,7 @@ class AccountCreationViewModel
         val account = accountCreated
         if (::accountManagerServices.isInitialized && account != null) {
             val code =
-                "${smsCodeFirstDigit.value}${smsCodeSecondDigit.value}${smsCodeThirdDigit.value}${smsCodeLastDigit.value}"
+                "${smsCodeFirstDigit.value.orEmpty().trim()}${smsCodeSecondDigit.value.orEmpty().trim()}${smsCodeThirdDigit.value.orEmpty().trim()}${smsCodeLastDigit.value.orEmpty().trim()}"
             val identity = account.params.identityAddress
             if (identity != null) {
                 Log.i(
@@ -442,9 +435,9 @@ class AccountCreationViewModel
             operationInProgress.postValue(true)
             createEnabled.postValue(false)
 
-            val usernameValue = username.value
-            val passwordValue = password.value
-            if (usernameValue.isNullOrEmpty() || passwordValue.isNullOrEmpty()) {
+            val usernameValue = username.value.orEmpty().trim()
+            val passwordValue = password.value.orEmpty().trim()
+            if (usernameValue.isEmpty() || passwordValue.isEmpty()) {
                 Log.e("$TAG Either username [$usernameValue] or password is null or empty!")
                 return
             }
@@ -496,6 +489,9 @@ class AccountCreationViewModel
             )
             accountParams.internationalPrefix = dialPlan.internationalCallPrefix
             accountParams.internationalPrefixIsoCountryCode = dialPlan.isoCountryCode
+
+            // Do not enable account just yet, wait for it to be activated using SMS code
+            accountParams.isRegisterEnabled = false
         }
         val account = core.createAccount(accountParams)
         core.addAccount(account)
@@ -505,6 +501,21 @@ class AccountCreationViewModel
         accountCreated = account
 
         lockUsernameAndPassword.postValue(true)
+    }
+
+    @WorkerThread
+    private fun enableAccountAndSetItAsDefault() {
+        val account = accountCreated ?: return
+        Log.i(
+            "$TAG Account [${account.params.identityAddress?.asStringUriOnly()}] has been created & activated, enable it & setting it as default"
+        )
+
+        val newParams = account.params.clone()
+        newParams.isRegisterEnabled = true
+        account.params = newParams
+
+        coreContext.core.defaultAccount = account
+        accountCreatedEvent.postValue(Event(true))
     }
 
     @WorkerThread

@@ -23,6 +23,7 @@ import android.content.Context
 import androidx.annotation.AnyThread
 import androidx.annotation.UiThread
 import androidx.annotation.WorkerThread
+import org.linphone.BuildConfig
 import java.io.File
 import java.io.FileOutputStream
 import org.linphone.LinphoneApplication.Companion.coreContext
@@ -54,6 +55,13 @@ class CorePreferences
         }
 
     @get:WorkerThread @set:WorkerThread
+    var sendLogsToCrashlytics: Boolean
+        get() = config.getBool("app", "send_logs_to_crashlytics", BuildConfig.CRASHLYTICS_ENABLED)
+        set(value) {
+            config.setBool("app", "send_logs_to_crashlytics", value)
+        }
+
+    @get:WorkerThread @set:WorkerThread
     var firstLaunch: Boolean
         get() = config.getBool("app", "first_6.0_launch", true)
         set(value) {
@@ -65,6 +73,13 @@ class CorePreferences
         get() = config.getInt("app", "config_version", 52005)
         set(value) {
             config.setInt("app", "config_version", value)
+        }
+
+    @get:WorkerThread @set:WorkerThread
+    var autoStart: Boolean
+        get() = config.getBool("app", "auto_start", true)
+        set(value) {
+            config.setBool("app", "auto_start", value)
         }
 
     @get:WorkerThread @set:WorkerThread
@@ -102,6 +117,13 @@ class CorePreferences
             config.setString("app", "device", value.trim())
         }
 
+    @get:WorkerThread @set:WorkerThread
+    var showDeveloperSettings: Boolean
+        get() = config.getBool("ui", "show_developer_settings", false)
+        set(value) {
+            config.setBool("ui", "show_developer_settings", value)
+        }
+
     // Call settings
 
     // This won't be done if bluetooth or wired headset is used
@@ -110,6 +132,13 @@ class CorePreferences
         get() = config.getBool("app", "route_audio_to_speaker_when_video_enabled", true)
         set(value) {
             config.setBool("app", "route_audio_to_speaker_when_video_enabled", value)
+        }
+
+    @get:WorkerThread @set:WorkerThread
+    var callRecordingUseSmffFormat: Boolean
+        get() = config.getBool("app", "use_smff_for_call_recording", false)
+        set(value) {
+            config.setBool("app", "use_smff_for_call_recording", value)
         }
 
     @get:WorkerThread @set:WorkerThread
@@ -140,6 +169,20 @@ class CorePreferences
             config.setBool("misc", "real_early_media", value)
         }
 
+    @get:WorkerThread @set:WorkerThread
+    var autoAnswerEnabled: Boolean
+        get() = config.getBool("app", "auto_answer", false)
+        set(value) {
+            config.setBool("app", "auto_answer", value)
+        }
+
+    @get:WorkerThread @set:WorkerThread
+    var autoAnswerDelay: Int
+        get() = config.getInt("app", "auto_answer_delay", 0)
+        set(value) {
+            config.setInt("app", "auto_answer_delay", value)
+        }
+
     // Conversation related
 
     @get:WorkerThread @set:WorkerThread
@@ -147,6 +190,13 @@ class CorePreferences
         get() = config.getBool("app", "mark_as_read_notif_dismissal", false)
         set(value) {
             config.setBool("app", "mark_as_read_notif_dismissal", value)
+        }
+
+    var makePublicMediaFilesDownloaded: Boolean
+        // Keep old name for backward compatibility
+        get() = config.getBool("app", "make_downloaded_images_public_in_gallery", false)
+        set(value) {
+            config.setBool("app", "make_downloaded_images_public_in_gallery", value)
         }
 
     // Conference related
@@ -214,11 +264,27 @@ class CorePreferences
         }
 
     @get:WorkerThread @set:WorkerThread
+    var automaticallyShowDialpad: Boolean
+        get() = config.getBool("ui", "automatically_show_dialpad", false)
+        set(value) {
+            config.setBool("ui", "automatically_show_dialpad", value)
+        }
+
+    @get:WorkerThread @set:WorkerThread
     var themeMainColor: String
         get() = config.getString("ui", "theme_main_color", "orange")!!
         set(value) {
             config.setString("ui", "theme_main_color", value)
         }
+
+    // Customization options
+
+    @get:WorkerThread
+    val defaultDomain: String
+        get() = config.getString("app", "default_domain", "sip.linphone.org")!!
+
+    val pushNotificationCompatibleDomains: Array<String>
+        get() = config.getStringList("app", "push_notification_domains", arrayOf("sip.linphone.org"))
 
     @get:WorkerThread
     val darkModeAllowed: Boolean
@@ -265,6 +331,10 @@ class CorePreferences
         get() = config.getBool("ui", "hide_account_settings", false)
 
     @get:WorkerThread
+    val hideAdvancedSettings: Boolean
+        get() = config.getBool("ui", "hide_advanced_settings", false)
+
+    @get:WorkerThread
     val hideAssistantCreateAccount: Boolean
         get() = config.getBool("ui", "assistant_hide_create_account", false)
 
@@ -275,6 +345,14 @@ class CorePreferences
     @get:WorkerThread
     val hideAssistantThirdPartySipAccount: Boolean
         get() = config.getBool("ui", "assistant_hide_third_party_account", false)
+
+    @get:WorkerThread
+    val magicSearchResultsLimit: Int
+        get() = config.getInt("ui", "max_number_of_magic_search_results", 300)
+
+    @get:WorkerThread
+    val singleSignOnClientId: String
+        get() = config.getString("app", "oidc_client_id", "linphone")!!
 
     @get:WorkerThread
     val useUsernameAsSingleSignOnLoginHint: Boolean
@@ -301,18 +379,10 @@ class CorePreferences
         get() = config.getBool("app", "fetch_contacts_from_default_directory", true)
 
     @get:WorkerThread
-    val automaticallyShowDialpad: Boolean
-        get() = config.getBool("ui", "automatically_show_dialpad", false)
-
-    @get:WorkerThread
     val showLettersOnDialpad: Boolean
         get() = config.getBool("ui", "show_letters_on_dialpad", true)
 
     // Paths
-
-    @get:WorkerThread
-    val defaultDomain: String
-        get() = config.getString("app", "default_domain", "sip.linphone.org")!!
 
     @get:AnyThread
     val configPath: String
@@ -337,6 +407,10 @@ class CorePreferences
     @get:AnyThread
     val ssoCacheFile: String
         get() = context.filesDir.absolutePath + "/auth_state.json"
+
+    @get:AnyThread
+    val messageReceivedInVisibleConversationNotificationSound: String
+        get() = context.filesDir.absolutePath + "/share/sounds/linphone/incoming_chat.wav"
 
     @UiThread
     fun copyAssetsFromPackage() {

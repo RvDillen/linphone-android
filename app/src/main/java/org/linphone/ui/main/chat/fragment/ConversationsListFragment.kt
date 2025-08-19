@@ -36,14 +36,13 @@ import com.google.android.material.bottomsheet.BottomSheetDialogFragment
 import org.linphone.R
 import org.linphone.core.tools.Log
 import org.linphone.databinding.ChatListFragmentBinding
-import org.linphone.ui.GenericActivity
 import org.linphone.ui.fileviewer.FileViewerActivity
 import org.linphone.ui.fileviewer.MediaViewerActivity
+import org.linphone.ui.main.MainActivity.Companion.ARGUMENTS_CONVERSATION_ID
 import org.linphone.ui.main.chat.adapter.ConversationsListAdapter
 import org.linphone.ui.main.chat.viewmodel.ConversationsListViewModel
 import org.linphone.ui.main.fragment.AbstractMainFragment
 import org.linphone.ui.main.history.fragment.HistoryMenuDialogFragment
-import org.linphone.utils.AppUtils
 import org.linphone.utils.Event
 import org.linphone.utils.LinphoneUtils
 
@@ -162,9 +161,7 @@ class ConversationsListFragment : AbstractMainFragment() {
             it.consume { model ->
                 Log.i("$TAG Show conversation with ID [${model.id}]")
                 sharedViewModel.displayedChatRoom = model.chatRoom
-                sharedViewModel.showConversationEvent.value = Event(
-                    Pair(model.localSipUri, model.remoteSipUri)
-                )
+                sharedViewModel.showConversationEvent.value = Event(model.id)
             }
         }
 
@@ -191,16 +188,9 @@ class ConversationsListFragment : AbstractMainFragment() {
         }
 
         sharedViewModel.showConversationEvent.observe(viewLifecycleOwner) {
-            it.consume { pair ->
-                val localSipUri = pair.first
-                val remoteSipUri = pair.second
-                Log.i(
-                    "$TAG Navigating to conversation fragment with local SIP URI [$localSipUri] and remote SIP URI [$remoteSipUri]"
-                )
-                val action = ConversationFragmentDirections.actionGlobalConversationFragment(
-                    localSipUri,
-                    remoteSipUri
-                )
+            it.consume { conversationId ->
+                Log.i("$TAG Navigating to conversation fragment with ID [$conversationId]")
+                val action = ConversationFragmentDirections.actionGlobalConversationFragment(conversationId)
                 binding.chatNavContainer.findNavController().navigate(action)
             }
         }
@@ -259,36 +249,16 @@ class ConversationsListFragment : AbstractMainFragment() {
             }
         }
 
-        sharedViewModel.filesToShareFromIntent.observe(viewLifecycleOwner) { filesToShare ->
-            val count = filesToShare.size
-            if (count > 0) {
-                val message = AppUtils.getStringWithPlural(
-                    R.plurals.conversations_files_waiting_to_be_shared_toast,
-                    count,
-                    filesToShare.size.toString()
-                )
-                val icon = R.drawable.file
-                (requireActivity() as GenericActivity).showGreenToast(message, icon)
-                Log.i("$TAG Found [$count] files waiting to be shared")
+        sharedViewModel.updateConversationLastMessageEvent.observe(viewLifecycleOwner) {
+            it.consume { conversationId ->
+                val model = listViewModel.conversations.value.orEmpty().find {
+                    it.id == conversationId
+                }
+                model?.updateLastMessageInfo()
             }
         }
 
-        sharedViewModel.textToShareFromIntent.observe(viewLifecycleOwner) { textToShare ->
-            if (textToShare.isNotEmpty()) {
-                val message = getString(R.string.conversations_text_waiting_to_be_shared_toast)
-                val icon = R.drawable.file_text
-                (requireActivity() as GenericActivity).showGreenToast(message, icon)
-                Log.i("$TAG Found text waiting to be shared")
-            }
-        }
-
-        sharedViewModel.forceRefreshConversations.observe(viewLifecycleOwner) {
-            it.consume {
-                listViewModel.filter()
-            }
-        }
-
-        sharedViewModel.forceRefreshDisplayedConversation.observe(viewLifecycleOwner) {
+        sharedViewModel.forceRefreshDisplayedConversationEvent.observe(viewLifecycleOwner) {
             it.consume {
                 val displayChatRoom = sharedViewModel.displayedChatRoom
                 if (displayChatRoom != null) {
@@ -330,12 +300,10 @@ class ConversationsListFragment : AbstractMainFragment() {
 
         val args = arguments
         if (args != null) {
-            val localSipUri = args.getString("LocalSipUri")
-            val remoteSipUri = args.getString("RemoteSipUri")
-            if (localSipUri != null && remoteSipUri != null) {
-                Log.i("$TAG Found local [$localSipUri] & remote [$remoteSipUri] URIs in arguments")
-                val pair = Pair(localSipUri, remoteSipUri)
-                sharedViewModel.showConversationEvent.value = Event(pair)
+            val conversationId = args.getString(ARGUMENTS_CONVERSATION_ID)
+            if (!conversationId.isNullOrEmpty()) {
+                Log.i("$TAG Found conversation ID [$conversationId] in arguments")
+                sharedViewModel.showConversationEvent.value = Event(conversationId)
                 args.clear()
             }
         }
@@ -355,6 +323,11 @@ class ConversationsListFragment : AbstractMainFragment() {
             adapter.registerAdapterDataObserver(dataObserver)
         } catch (e: IllegalStateException) {
             Log.e("$TAG Failed to unregister data observer to adapter: $e")
+        }
+
+        if (shouldRefreshDataInOnResume()) {
+            Log.i("$TAG Keep app alive setting is enabled, refreshing view just in case")
+            listViewModel.filter()
         }
     }
 

@@ -28,9 +28,9 @@ import org.linphone.core.Account
 import org.linphone.core.Call
 import org.linphone.core.ChatMessage
 import org.linphone.core.ChatRoom
-import org.linphone.core.ConfiguringState
 import org.linphone.core.Core
 import org.linphone.core.CoreListenerStub
+import org.linphone.core.GlobalState
 import org.linphone.core.tools.Log
 import org.linphone.ui.GenericViewModel
 import org.linphone.ui.main.model.AccountModel
@@ -139,23 +139,19 @@ open class AbstractMainViewModel
         }
 
         @WorkerThread
-        override fun onConfiguringStatus(core: Core, status: ConfiguringState?, message: String?) {
-            if (status != ConfiguringState.Skipped) {
-                account.value?.destroy()
-
-                val defaultAccount = core.defaultAccount
-                if (defaultAccount != null) {
-                    Log.i("$TAG Configuring status is [$status], reload default account")
-                    account.postValue(AccountModel(defaultAccount))
-                    defaultAccountChangedEvent.postValue(Event(true))
-                } else {
-                    Log.w("$TAG Configuring status is [$status] but no default account was found!")
-                }
+        override fun onGlobalStateChanged(core: Core, state: GlobalState?, message: String) {
+            if (core.globalState == GlobalState.On) {
+                Log.i("$TAG Global state is [${core.globalState}], reload account info")
+                configure()
             }
         }
 
         @WorkerThread
         override fun onDefaultAccountChanged(core: Core, defaultAccount: Account?) {
+            updateAvailableMenus()
+            computeUnreadMessagesCount()
+            updateMissedCallsCount()
+
             account.value?.destroy()
 
             if (defaultAccount == null) {
@@ -170,15 +166,14 @@ open class AbstractMainViewModel
                 account.postValue(AccountModel(defaultAccount))
             }
 
-            computeUnreadMessagesCount()
-            updateMissedCallsCount()
-            updateAvailableMenus()
-
             defaultAccountChangedEvent.postValue(Event(true))
         }
     }
 
     init {
+        // Pre-compute this value to prevent the menu being briefly visible
+        hideMeetings.value = !coreContext.defaultAccountHasVideoConferenceFactoryUri
+
         coreContext.postOnCoreThread { core ->
             core.addListener(coreListener)
             configure()
@@ -274,7 +269,13 @@ open class AbstractMainViewModel
     @WorkerThread
     fun updateMissedCallsCount() {
         val account = LinphoneUtils.getDefaultAccount()
-        val count = account?.missedCallsCount ?: coreContext.core.missedCallsCount
+        // Fetch all call logs if only one account to workaround no history issue
+        // TODO FIXME: remove workaround later
+        val count = if (coreContext.core.accountList.size > 1) {
+            account?.missedCallsCount ?: coreContext.core.missedCallsCount
+        } else {
+            coreContext.core.missedCallsCount
+        }
         val moreThanOne = count > 1
         Log.i(
             "$TAG There ${if (moreThanOne) "are" else "is"} [$count] missed ${if (moreThanOne) "calls" else "call"}"
@@ -297,7 +298,13 @@ open class AbstractMainViewModel
     fun resetMissedCallsCount() {
         coreContext.postOnCoreThread { core ->
             val account = LinphoneUtils.getDefaultAccount()
-            account?.resetMissedCallsCount() ?: core.resetMissedCallsCount()
+            // Fetch all call logs if only one account to workaround no history issue
+            // TODO FIXME: remove workaround later
+            if (coreContext.core.accountList.size > 1) {
+                account?.resetMissedCallsCount() ?: core.resetMissedCallsCount()
+            } else {
+                core.resetMissedCallsCount()
+            }
             updateMissedCallsCount()
         }
     }
@@ -309,8 +316,7 @@ open class AbstractMainViewModel
         val conferencingAvailable = LinphoneUtils.isRemoteConferencingAvailable(
             coreContext.core
         )
-        val hideGroupCall =
-            coreContext.core.accountList.isEmpty() || corePreferences.disableMeetings || !conferencingAvailable
+        val hideGroupCall = corePreferences.disableMeetings || !conferencingAvailable
         hideMeetings.postValue(hideGroupCall)
     }
 

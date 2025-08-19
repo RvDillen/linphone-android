@@ -38,6 +38,7 @@ import org.linphone.core.tools.Log
 import org.linphone.ui.GenericViewModel
 import org.linphone.ui.main.recordings.model.RecordingModel
 import org.linphone.utils.AudioUtils
+import org.linphone.utils.LinphoneUtils
 
 class RecordingMediaPlayerViewModel
     @UiThread
@@ -55,6 +56,8 @@ class RecordingMediaPlayerViewModel
     val isPlaying = MutableLiveData<Boolean>()
 
     val position = MutableLiveData<Int>()
+
+    val isUsingSmffFileFormat = MutableLiveData<Boolean>()
 
     private var audioFocusRequest: AudioFocusRequestCompat? = null
 
@@ -88,20 +91,24 @@ class RecordingMediaPlayerViewModel
         recordingModel = model
 
         coreContext.postOnCoreThread { core ->
+            isUsingSmffFileFormat.postValue(model.filePath.endsWith(LinphoneUtils.RECORDING_SMFF_FILE_EXTENSION))
             initPlayer()
         }
     }
 
     @UiThread
     fun setVideoRenderingSurface(textureView: TextureView) {
+        val texture = textureView.surfaceTexture
         coreContext.postOnCoreThread {
             Log.i("$TAG Setting window ID in player")
-            player.setWindowId(textureView.surfaceTexture)
+            player.setWindowId(texture)
         }
     }
 
     @WorkerThread
     private fun initPlayer() {
+        if (!::recordingModel.isInitialized) return
+
         Log.i("$TAG Creating player")
         val playbackSoundCard = AudioUtils.getAudioPlaybackDeviceIdForCallRecordingOrVoiceMessage()
         val recordingPlayer = coreContext.core.createLocalPlayer(
@@ -158,6 +165,7 @@ class RecordingMediaPlayerViewModel
     @WorkerThread
     private fun startPlayback() {
         if (!::player.isInitialized) return
+        if (!::recordingModel.isInitialized) return
 
         Log.i("$TAG Starting player")
         if (player.state == Player.State.Closed) {

@@ -127,7 +127,7 @@
                     android:layout_width="@dimen/small_icon_size"
                     android:layout_height="@dimen/small_icon_size"
                     android:layout_marginEnd="5dp"
-                    android:src="@drawable/bell_simple_slash"
+                    android:src="@drawable/bell_slash"
                     android:contentDescription="@string/content_description_chat_muted"
                     android:visibility="@{viewModel.isMuted ? View.VISIBLE : View.GONE, default=gone}"
                     app:layout_constraintStart_toStartOf="@id/title"
@@ -289,7 +289,7 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:visibility="@{viewModel.isEmpty &amp;&amp; viewModel.isEndToEndEncrypted ? View.VISIBLE : View.GONE}"
-                    layout="@layout/chat_conversation_secured_first_event"
+                    layout="@layout/chat_conversation_e2e_encrypted_first_event"
                     app:layout_constraintTop_toTopOf="@id/events_list"
                     app:layout_constraintStart_toStartOf="@id/events_list"
                     app:layout_constraintEnd_toEndOf="@id/events_list" />
@@ -348,17 +348,13 @@
                     app:layout_constraintBottom_toTopOf="@id/send_area" />
 
                 <androidx.appcompat.widget.AppCompatTextView
-                    style="@style/default_text_style"
+                    style="@style/unread_count_text_style"
                     android:id="@+id/unread_messages"
-                    android:layout_width="24dp"
-                    android:layout_height="24dp"
+                    android:layout_width="@dimen/unread_count_indicator_size"
+                    android:layout_height="@dimen/unread_count_indicator_size"
                     android:layout_marginTop="-13dp"
                     android:layout_marginStart="-11dp"
-                    android:gravity="center"
-                    android:background="@drawable/shape_red_round"
                     android:text="@{String.valueOf(viewModel.unreadMessagesCount), default=`1`}"
-                    android:textColor="?attr/color_on_main"
-                    android:textSize="13sp"
                     android:visibility="@{viewModel.isUserScrollingUp &amp;&amp; viewModel.unreadMessagesCount > 0 ? View.VISIBLE : View.GONE}"
                     app:layout_constraintTop_toTopOf="@id/scroll_to_bottom"
                     app:layout_constraintStart_toEndOf="@id/scroll_to_bottom"/>

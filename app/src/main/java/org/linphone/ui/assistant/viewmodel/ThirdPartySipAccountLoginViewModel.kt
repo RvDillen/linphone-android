@@ -173,33 +173,49 @@ class ThirdPartySipAccountLoginViewModel
 
             // Remove sip: in front of domain, just in case...
             val domainValue = domain.value.orEmpty().trim()
-            val domain = if (domainValue.startsWith("sip:")) {
+            val domainWithoutSip = if (domainValue.startsWith("sip:")) {
                 domainValue.substring("sip:".length)
             } else {
                 domainValue
             }
+            val domainAddress = Factory.instance().createAddress("sip:$domainWithoutSip")
+            val port = domainAddress?.port ?: -1
+            if (port != -1) {
+                Log.w("$TAG It seems a port [$port] was set in the domain [$domainValue], removing it from SIP identity but setting it to proxy server URI")
+            }
+            val domain = domainAddress?.domain ?: domainWithoutSip
 
             // Allow to enter SIP identity instead of simply username
             // in case identity domain doesn't match proxy domain
-            val user = username.value.orEmpty().trim()
-            val userId = authId.value.orEmpty().trim()
-            val identity = if (user.startsWith("sip:")) {
-                if (user.contains("@")) {
-                    user
-                } else {
-                    "$user@$domain"
-                }
-            } else {
-                if (user.contains("@")) {
-                    "sip:$user"
-                } else {
-                    "sip:$user@$domain"
-                }
+            var user = username.value.orEmpty().trim()
+            if (user.startsWith("sip:")) {
+                user = user.substring("sip:".length)
+            } else if (user.startsWith("sips:")) {
+                user = user.substring("sips:".length)
             }
+            if (user.contains("@")) {
+                user = user.split("@")[0]
+            }
+
+            val userId = authId.value.orEmpty().trim()
+
+            Log.i("$TAG Parsed username is [$user], user ID [$userId] and domain [$domain]")
+            val identity = "sip:$user@$domain"
             val identityAddress = Factory.instance().createAddress(identity)
             if (identityAddress == null) {
                 Log.e("$TAG Can't parse [$identity] as Address!")
                 showRedToast(R.string.assistant_login_cant_parse_address_toast, R.drawable.warning_circle)
+                return@postOnCoreThread
+            }
+            Log.i("$TAG Computed SIP identity is [${identityAddress.asStringUriOnly()}]")
+
+            val accounts = core.accountList
+            val found = accounts.find {
+                it.params.identityAddress?.weakEqual(identityAddress) == true
+            }
+            if (found != null) {
+                Log.w("$TAG An account with the same identity address [${found.params.identityAddress?.asStringUriOnly()}] already exists, do not add it again!")
+                showRedToast(R.string.assistant_account_login_already_connected_error, R.drawable.warning_circle)
                 return@postOnCoreThread
             }
 
@@ -209,7 +225,7 @@ class ThirdPartySipAccountLoginViewModel
                 password.value.orEmpty().trim(),
                 null,
                 null,
-                null
+                domainAddress?.domain ?: domainValue
             )
             core.addAuthInfo(newlyCreatedAuthInfo)
 
@@ -229,7 +245,7 @@ class ThirdPartySipAccountLoginViewModel
                 }
                 Factory.instance().createAddress(server)
             } else {
-                Factory.instance().createAddress("sip:$domain")
+                domainAddress ?: Factory.instance().createAddress("sip:$domainWithoutSip")
             }
 
             serverAddress?.transport = when (transport.value.orEmpty().trim()) {
@@ -237,6 +253,7 @@ class ThirdPartySipAccountLoginViewModel
                 TransportType.Tls.name.uppercase(Locale.getDefault()) -> TransportType.Tls
                 else -> TransportType.Udp
             }
+            Log.i("$TAG Created proxy server SIP address [${serverAddress?.asStringUriOnly()}]")
             accountParams.serverAddress = serverAddress
 
             val prefix = internationalPrefix.value.orEmpty().trim()

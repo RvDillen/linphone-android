@@ -170,6 +170,7 @@ class MeetingsListAdapter :
 
     private class MeetingDiffCallback : DiffUtil.ItemCallback<MeetingListItemModel>() {
         override fun areItemsTheSame(oldItem: MeetingListItemModel, newItem: MeetingListItemModel): Boolean {
+            if (oldItem.isTodayIndicator && newItem.isTodayIndicator) return true
             if (oldItem.model is MeetingModel && newItem.model is MeetingModel) {
                 return oldItem.model.id.isNotEmpty() && oldItem.model.id == newItem.model.id
             }
@@ -180,10 +181,14 @@ class MeetingsListAdapter :
             oldItem: MeetingListItemModel,
             newItem: MeetingListItemModel
         ): Boolean {
+            if (oldItem.isTodayIndicator && newItem.isTodayIndicator) return true
             if (oldItem.model is MeetingModel && newItem.model is MeetingModel) {
                 return oldItem.model.subject.value.orEmpty().isNotEmpty() &&
                     oldItem.model.subject.value == newItem.model.subject.value &&
                     oldItem.model.time == newItem.model.time &&
+                    oldItem.model.isCancelled == newItem.model.isCancelled &&
+                    oldItem.model.isToday == newItem.model.isToday &&
+                    oldItem.model.isAfterToday == newItem.model.isAfterToday &&
                     oldItem.firstMeetingOfTheWeek == newItem.firstMeetingOfTheWeek &&
                     oldItem.model.firstMeetingOfTheDay.value == newItem.model.firstMeetingOfTheDay.value
             }

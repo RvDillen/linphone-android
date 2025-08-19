@@ -52,9 +52,11 @@ import androidx.navigation.NavOptions
 import androidx.navigation.findNavController
 import kotlin.math.max
 import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.linphone.LinphoneApplication.Companion.coreContext
 import org.linphone.LinphoneApplication.Companion.corePreferences
 import org.linphone.R
@@ -86,6 +88,9 @@ class MainActivity : GenericActivity() {
         private const val HISTORY_FRAGMENT_ID = 2
         private const val CHAT_FRAGMENT_ID = 3
         private const val MEETINGS_FRAGMENT_ID = 4
+
+        const val ARGUMENTS_CHAT = "Chat"
+        const val ARGUMENTS_CONVERSATION_ID = "ConversationId"
     }
 
     private lateinit var binding: MainActivityBinding
@@ -115,9 +120,20 @@ class MainActivity : GenericActivity() {
     ) { isGranted ->
         if (isGranted) {
             Log.i("$TAG POST_NOTIFICATIONS permission has been granted")
-            viewModel.updatePostNotificationsPermission()
+            viewModel.updateMissingPermissionAlert()
         } else {
             Log.w("$TAG POST_NOTIFICATIONS permission has been denied!")
+        }
+    }
+
+    private val fullScreenIntentPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            Log.i("$TAG USE_FULL_SCREEN_INTENT permission has been granted")
+            viewModel.updateMissingPermissionAlert()
+        } else {
+            Log.w("$TAG USE_FULL_SCREEN_INTENT permission has been denied!")
         }
     }
 
@@ -138,7 +154,8 @@ class MainActivity : GenericActivity() {
         binding.lifecycleOwner = this
         setUpToastsArea(binding.toastsArea)
 
-        ViewCompat.setOnApplyWindowInsetsListener(binding.inCallTopBar.root) { v, windowInsets ->
+        // Will give the device's status bar background color
+        ViewCompat.setOnApplyWindowInsetsListener(binding.notificationsArea) { v, windowInsets ->
             val insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars())
             v.updatePadding(0, insets.top, 0, 0)
             windowInsets
@@ -199,17 +216,14 @@ class MainActivity : GenericActivity() {
             }
         }
 
-        viewModel.defaultAccountRegistrationErrorEvent.observe(this) {
-            it.consume { error ->
-                val tag = "DEFAULT_ACCOUNT_REGISTRATION_ERROR"
-                if (error) {
-                    // First remove any already existing connection error toast
-                    removePersistentRedToast(tag)
-
-                    val message = getString(R.string.default_account_connection_state_error_toast)
-                    showPersistentRedToast(message, R.drawable.warning_circle, tag)
+        viewModel.askFullScreenIntentPermissionEvent.observe(this) {
+            it.consume {
+                if (ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.USE_FULL_SCREEN_INTENT)) {
+                    Log.w("$TAG Asking for USE_FULL_SCREEN_INTENT permission")
+                    fullScreenIntentPermissionLauncher.launch(Manifest.permission.USE_FULL_SCREEN_INTENT)
                 } else {
-                    removePersistentRedToast(tag)
+                    Log.i("$TAG Permission request for USE_FULL_SCREEN_INTENT will be automatically denied, go to manage app full screen intent android settings instead")
+                    Compatibility.requestFullScreenIntentPermission(this)
                 }
             }
         }
@@ -232,6 +246,29 @@ class MainActivity : GenericActivity() {
         viewModel.lastAccountRemovedEvent.observe(this) {
             it.consume {
                 startActivity(Intent(this, AssistantActivity::class.java))
+            }
+        }
+
+        viewModel.clearFilesOrTextPendingSharingEvent.observe(this) {
+            it.consume {
+                sharedViewModel.filesToShareFromIntent.value = arrayListOf<String>()
+                sharedViewModel.textToShareFromIntent.value = ""
+            }
+        }
+
+        sharedViewModel.filesToShareFromIntent.observe(this) { list ->
+            if (list.isNotEmpty()) {
+                viewModel.addFilesPendingSharing(list)
+            } else {
+                viewModel.filesOrTextPendingSharingListCleared()
+            }
+        }
+
+        sharedViewModel.textToShareFromIntent.observe(this) { text ->
+            if (!text.isEmpty()) {
+                viewModel.addTextPendingSharing()
+            } else {
+                viewModel.filesOrTextPendingSharingListCleared()
             }
         }
 
@@ -272,10 +309,18 @@ class MainActivity : GenericActivity() {
         coreContext.digestAuthenticationRequestedEvent.observe(this) {
             it.consume { identity ->
                 try {
-                    showAuthenticationRequestedDialog(identity)
+                    if (coreContext.digestAuthInfoPendingPasswordUpdate != null) {
+                        showAuthenticationRequestedDialog(identity)
+                    }
                 } catch (e: WindowManager.BadTokenException) {
                     Log.e("$TAG Failed to show authentication dialog: $e")
                 }
+            }
+        }
+
+        coreContext.clearAuthenticationRequestDialogEvent.observe(this) {
+            it.consume {
+                currentlyDisplayedAuthDialog?.dismiss()
             }
         }
 
@@ -307,6 +352,19 @@ class MainActivity : GenericActivity() {
             it.consume {
                 Log.i("$TAG Remote provisioning was applied, checking if theme has changed")
                 checkMainColorTheme()
+            }
+        }
+
+        coreContext.filesToExportToNativeMediaGalleryEvent.observe(this) {
+            it.consume { files ->
+                Log.i("$TAG Found [${files.size}] files to export to native media gallery")
+                for (file in files) {
+                    exportFileToNativeMediaGallery(file)
+                }
+
+                coreContext.postOnCoreThread {
+                    coreContext.clearFilesToExportToNativeGallery()
+                }
             }
         }
 
@@ -373,7 +431,7 @@ class MainActivity : GenericActivity() {
         viewModel.enableAccountMonitoring(true)
         viewModel.checkForNewAccount()
         viewModel.updateNetworkReachability()
-        viewModel.updatePostNotificationsPermission()
+        viewModel.updateMissingPermissionAlert()
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -514,14 +572,9 @@ class MainActivity : GenericActivity() {
 
     private fun handleLocusOrShortcut(id: String) {
         Log.i("$TAG Found locus ID [$id]")
-        val pair = LinphoneUtils.getLocalAndPeerSipUrisFromChatRoomId(id)
-        if (pair != null) {
-            val localSipUri = pair.first
-            val remoteSipUri = pair.second
-            Log.i(
-                "$TAG Navigating to conversation with local [$localSipUri] and peer [$remoteSipUri] addresses, computed from shortcut ID"
-            )
-            sharedViewModel.showConversationEvent.value = Event(pair)
+        if (id.isNotEmpty()) {
+            Log.i("$TAG Navigating to conversation with ID [$id], computed from shortcut ID")
+            sharedViewModel.showConversationEvent.value = Event(id)
         }
     }
 
@@ -547,22 +600,18 @@ class MainActivity : GenericActivity() {
                     }
                 }
             } else {
-                if (intent.hasExtra("Chat")) {
+                if (intent.hasExtra(ARGUMENTS_CHAT)) {
                     Log.i("$TAG Intent has [Chat] extra")
                     coreContext.postOnMainThread {
                         try {
                             Log.i("$TAG Trying to go to Conversations fragment")
                             val args = intent.extras
-                            val localSipUri = args?.getString("LocalSipUri", "")
-                            val remoteSipUri = args?.getString("RemoteSipUri", "")
-                            if (remoteSipUri.isNullOrEmpty() || localSipUri.isNullOrEmpty()) {
-                                Log.w("$TAG Found [Chat] extra but no local and/or remote SIP URI!")
+                            val conversationId = args?.getString(ARGUMENTS_CONVERSATION_ID, "")
+                            if (conversationId.isNullOrEmpty()) {
+                                Log.w("$TAG Found [Chat] extra but no conversation ID!")
                             } else {
-                                Log.i(
-                                    "$TAG Found [Chat] extra with local [$localSipUri] and peer [$remoteSipUri] addresses"
-                                )
-                                val pair = Pair(localSipUri, remoteSipUri)
-                                sharedViewModel.showConversationEvent.value = Event(pair)
+                                Log.i("$TAG Found [Chat] extra with conversation ID [$conversationId]")
+                                sharedViewModel.showConversationEvent.value = Event(conversationId)
                             }
                             args?.clear()
 
@@ -665,25 +714,23 @@ class MainActivity : GenericActivity() {
                 Log.i(
                     "$TAG App is already started and in debug fragment, navigating to conversations list"
                 )
-                val pair = parseShortcutIfAny(intent)
-                if (pair != null) {
+                val conversationId = parseShortcutIfAny(intent)
+                if (conversationId != null) {
                     Log.i(
-                        "$TAG Navigating from debug to conversation with local [${pair.first}] and peer [${pair.second}] addresses, computed from shortcut ID"
+                        "$TAG Navigating from debug to conversation with ID [$conversationId], computed from shortcut ID"
                     )
-                    sharedViewModel.showConversationEvent.value = Event(pair)
+                    sharedViewModel.showConversationEvent.value = Event(conversationId)
                 }
 
                 val action = DebugFragmentDirections.actionDebugFragmentToConversationsListFragment()
                 findNavController().navigate(action)
             } else {
-                val pair = parseShortcutIfAny(intent)
-                if (pair != null) {
-                    val localSipUri = pair.first
-                    val remoteSipUri = pair.second
+                val conversationId = parseShortcutIfAny(intent)
+                if (conversationId != null) {
                     Log.i(
-                        "$TAG Navigating to conversation with local [$localSipUri] and peer [$remoteSipUri] addresses, computed from shortcut ID"
+                        "$TAG Navigating to conversation with conversation ID [$conversationId] addresses, computed from shortcut ID"
                     )
-                    sharedViewModel.showConversationEvent.value = Event(pair)
+                    sharedViewModel.showConversationEvent.value = Event(conversationId)
                 }
 
                 if (findNavController().currentDestination?.id == R.id.conversationsListFragment) {
@@ -698,11 +745,11 @@ class MainActivity : GenericActivity() {
         }
     }
 
-    private fun parseShortcutIfAny(intent: Intent): Pair<String, String>? {
+    private fun parseShortcutIfAny(intent: Intent): String? {
         val shortcutId = intent.getStringExtra("android.intent.extra.shortcut.ID") // Intent.EXTRA_SHORTCUT_ID
         if (shortcutId != null) {
             Log.i("$TAG Found shortcut ID [$shortcutId]")
-            return LinphoneUtils.getLocalAndPeerSipUrisFromChatRoomId(shortcutId)
+            return shortcutId
         } else {
             Log.i("$TAG No shortcut ID was found")
         }
@@ -784,5 +831,19 @@ class MainActivity : GenericActivity() {
 
         dialog.show()
         currentlyDisplayedAuthDialog = dialog
+    }
+
+    private fun exportFileToNativeMediaGallery(filePath: String) {
+        lifecycleScope.launch {
+            withContext(Dispatchers.IO) {
+                Log.i("$TAG Export file [$filePath] to Android's MediaStore")
+                val mediaStorePath = FileUtils.addContentToMediaStore(filePath)
+                if (mediaStorePath.isNotEmpty()) {
+                    Log.i("$TAG File [$filePath] has been successfully exported to MediaStore")
+                } else {
+                    Log.e("$TAG Failed to export file [$filePath] to MediaStore!")
+                }
+            }
+        }
     }
 }

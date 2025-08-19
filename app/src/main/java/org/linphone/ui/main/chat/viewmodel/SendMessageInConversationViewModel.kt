@@ -154,8 +154,10 @@ class SendMessageInConversationViewModel
             isFileTransferServerAvailable.postValue(!core.fileTransferServer.isNullOrEmpty())
         }
 
+        isKeyboardOpen.value = false
         isEmojiPickerOpen.value = false
         areFilePickersOpen.value = false
+        isVoiceRecording.value = false
         isPlayingVoiceRecord.value = false
         isCallConversation.value = false
         maxNumberOfAttachmentsReached.value = false
@@ -377,35 +379,41 @@ class SendMessageInConversationViewModel
     }
 
     @UiThread
-    fun addAttachment(file: String) {
-        if (attachments.value.orEmpty().size >= MAX_FILES_TO_ATTACH) {
-            Log.w(
-                "$TAG Max number of attachments [$MAX_FILES_TO_ATTACH] reached, file [$file] won't be attached"
-            )
-            showRedToast(R.string.conversation_maximum_number_of_attachments_reached, R.drawable.warning_circle)
-            viewModelScope.launch {
-                Log.i("$TAG Deleting temporary file [$file]")
-                FileUtils.deleteFile(file)
-            }
-            return
-        }
-
+    fun addAttachments(files: ArrayList<String>) {
         val list = arrayListOf<FileModel>()
         list.addAll(attachments.value.orEmpty())
 
-        val fileName = FileUtils.getNameFromFilePath(file)
-        val timestamp = System.currentTimeMillis() / 1000
-        val model = FileModel(file, fileName, 0, timestamp, false, file) { model ->
-            removeAttachment(model.path)
-        }
+        for (file in files) {
+            if (list.size >= MAX_FILES_TO_ATTACH) {
+                Log.w(
+                    "$TAG Max number of attachments [$MAX_FILES_TO_ATTACH] reached, file [$file] won't be attached"
+                )
+                showRedToast(
+                    R.string.conversation_maximum_number_of_attachments_reached,
+                    R.drawable.warning_circle
+                )
+                viewModelScope.launch {
+                    Log.i("$TAG Deleting temporary file [$file]")
+                    FileUtils.deleteFile(file)
+                }
+                return
+            }
 
-        list.add(model)
+            val fileName = FileUtils.getNameFromFilePath(file)
+            val timestamp = System.currentTimeMillis() / 1000
+            val size = FileUtils.getFileSize(file)
+            val model = FileModel(file, fileName, size, timestamp, false, file, false) { model ->
+                removeAttachment(model.path)
+            }
+
+            list.add(model)
+        }
         attachments.value = list
         maxNumberOfAttachmentsReached.value = list.size >= MAX_FILES_TO_ATTACH
 
         if (list.isNotEmpty()) {
             isFileAttachmentsListOpen.value = true
-            Log.i("$TAG [${list.size}] attachment(s) added")
+            Log.i("$TAG [${files.size}] attachment(s) added, in total ${list.size}] file(s) are attached")
         } else {
             Log.w("$TAG No attachment to display!")
         }
@@ -431,7 +439,7 @@ class SendMessageInConversationViewModel
         attachments.value = list
         maxNumberOfAttachmentsReached.value = list.size >= MAX_FILES_TO_ATTACH
 
-        if (list.isEmpty) {
+        if (list.isEmpty()) {
             isFileAttachmentsListOpen.value = false
         }
     }

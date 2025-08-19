@@ -38,7 +38,6 @@ import org.linphone.core.MagicSearchListenerStub
 import org.linphone.core.SearchResult
 import org.linphone.core.tools.Log
 import org.linphone.ui.main.contacts.model.ContactAvatarModel
-import org.linphone.ui.main.model.isEndToEndEncryptionMandatory
 import org.linphone.ui.main.viewmodel.AbstractMainViewModel
 import org.linphone.utils.Event
 import org.linphone.utils.FileUtils
@@ -52,7 +51,7 @@ class ContactsListViewModel
 
     val contactsList = MutableLiveData<ArrayList<ContactAvatarModel>>()
 
-    val favourites = MutableLiveData<ArrayList<ContactAvatarModel>>()
+    val favouritesList = MutableLiveData<ArrayList<ContactAvatarModel>>()
 
     val fetchInProgress = MutableLiveData<Boolean>()
 
@@ -61,6 +60,10 @@ class ContactsListViewModel
     val showFilter = MutableLiveData<Boolean>()
 
     val isListFiltered = MutableLiveData<Boolean>()
+
+    val areAllContactsDisplayed = MutableLiveData<Boolean>()
+
+    val searchInProgress = MutableLiveData<Boolean>()
 
     val isDefaultAccountLinphone = MutableLiveData<Boolean>()
 
@@ -73,13 +76,23 @@ class ContactsListViewModel
 
     private lateinit var magicSearch: MagicSearch
 
+    private lateinit var favouritesMagicSearch: MagicSearch
+
     private var firstLoad = true
 
     private val magicSearchListener = object : MagicSearchListenerStub() {
         @WorkerThread
         override fun onSearchResultsReceived(magicSearch: MagicSearch) {
             Log.i("$TAG Magic search contacts available")
-            processMagicSearchResults(magicSearch.lastSearch)
+            processMagicSearchResults(magicSearch.lastSearch, favourites = false)
+        }
+    }
+
+    private val favouritesMagicSearchListener = object : MagicSearchListenerStub() {
+        @WorkerThread
+        override fun onSearchResultsReceived(magicSearch: MagicSearch) {
+            Log.i("$TAG Magic search favourites contacts available")
+            processMagicSearchResults(magicSearch.lastSearch, favourites = true)
         }
     }
 
@@ -88,6 +101,7 @@ class ContactsListViewModel
         override fun onContactsLoaded() {
             Log.i("$TAG Contacts have been (re)loaded, updating list")
             magicSearch.resetSearchCache()
+            favouritesMagicSearch.resetSearchCache()
 
             applyFilter(
                 currentFilter,
@@ -105,12 +119,19 @@ class ContactsListViewModel
         showFilter.value = !corePreferences.hidePhoneNumbers
 
         coreContext.postOnCoreThread { core ->
-            updateDomainFilter()
+            domainFilter = corePreferences.contactsFilter
+            areAllContactsDisplayed.postValue(domainFilter.isEmpty())
+            checkIfDefaultAccountOnDefaultDomain()
 
             coreContext.contactsManager.addListener(contactsListener)
             magicSearch = core.createMagicSearch()
-            magicSearch.limitedSearch = false
+            magicSearch.limitedSearch = true
+            magicSearch.searchLimit = corePreferences.magicSearchResultsLimit
             magicSearch.addListener(magicSearchListener)
+
+            favouritesMagicSearch = core.createMagicSearch()
+            favouritesMagicSearch.limitedSearch = false
+            favouritesMagicSearch.addListener(favouritesMagicSearchListener)
 
             coreContext.postOnMainThread {
                 applyFilter(currentFilter)
@@ -122,6 +143,7 @@ class ContactsListViewModel
     override fun onCleared() {
         coreContext.postOnCoreThread {
             magicSearch.removeListener(magicSearchListener)
+            favouritesMagicSearch.removeListener(favouritesMagicSearchListener)
             coreContext.contactsManager.removeListener(contactsListener)
         }
         super.onCleared()
@@ -141,10 +163,14 @@ class ContactsListViewModel
     @UiThread
     fun applyCurrentDefaultAccountFilter() {
         coreContext.postOnCoreThread {
-            updateDomainFilter()
-        }
+            domainFilter = corePreferences.contactsFilter
+            areAllContactsDisplayed.postValue(domainFilter.isEmpty())
+            checkIfDefaultAccountOnDefaultDomain()
 
-        applyFilter(currentFilter)
+            coreContext.postOnMainThread {
+                applyFilter(currentFilter)
+            }
+        }
     }
 
     @UiThread
@@ -157,6 +183,7 @@ class ContactsListViewModel
             } else {
                 ""
             }
+            areAllContactsDisplayed.postValue(domainFilter.isEmpty())
             corePreferences.contactsFilter = domainFilter
             Log.i("$TAG Newly set filter is [${corePreferences.contactsFilter}]")
 
@@ -166,10 +193,6 @@ class ContactsListViewModel
         }
     }
 
-    fun areAllContactsDisplayed(): Boolean {
-        return domainFilter.isEmpty()
-    }
-
     @UiThread
     fun toggleFavouritesVisibility() {
         val show = showFavourites.value == false
@@ -177,27 +200,10 @@ class ContactsListViewModel
         corePreferences.showFavoriteContacts = show
     }
 
-    @WorkerThread
-    private fun updateDomainFilter() {
-        val defaultAccount = coreContext.core.defaultAccount
-        val defaultDomain = defaultAccount?.params?.domain == corePreferences.defaultDomain
-        isDefaultAccountLinphone.postValue(defaultDomain)
-
-        Log.i("$TAG Currently selected filter is [${corePreferences.contactsFilter}]")
-        domainFilter = corePreferences.contactsFilter
-        if (isEndToEndEncryptionMandatory() && (domainFilter.isEmpty() || domainFilter == "*")) {
-            domainFilter = corePreferences.defaultDomain
-            corePreferences.contactsFilter = domainFilter
-            Log.i(
-                "$TAG Filter updated to [${corePreferences.contactsFilter}] to match mandatory IM encryption"
-            )
-        }
-    }
-
     @UiThread
     fun exportContactAsVCard(friend: Friend) {
         coreContext.postOnCoreThread {
-            val vCard = friend.vcard?.asVcard4String()
+            val vCard = friend.dumpVcard()
             if (!vCard.isNullOrEmpty()) {
                 Log.i("$TAG Friend has been successfully dumped as vCard string")
                 val fileName = friend.name.orEmpty().replace(" ", "_").lowercase(
@@ -268,6 +274,17 @@ class ContactsListViewModel
         Log.i(
             "$TAG Asking Magic search for contacts matching filter [$filter], domain [$domain] and in sources Friends/LDAP/CardDAV"
         )
+        searchInProgress.postValue(filter.isNotEmpty())
+
+        if (filter.isEmpty()) {
+            favouritesMagicSearch.getContactsListAsync(
+                filter,
+                domain,
+                MagicSearch.Source.FavoriteFriends.toInt(),
+                MagicSearch.Aggregation.Friend
+            )
+        }
+
         magicSearch.getContactsListAsync(
             filter,
             domain,
@@ -277,19 +294,16 @@ class ContactsListViewModel
     }
 
     @WorkerThread
-    private fun processMagicSearchResults(results: Array<SearchResult>) {
+    private fun processMagicSearchResults(results: Array<SearchResult>, favourites: Boolean) {
         // Do not call destroy() on previous list items as they are cached and will be re-used
-        Log.i("$TAG Processing [${results.size}] results")
+        Log.i("$TAG Processing [${results.size}] results, favourites is [$favourites]")
 
         val list = arrayListOf<ContactAvatarModel>()
-        val favouritesList = arrayListOf<ContactAvatarModel>()
         var count = 0
 
         for (result in results) {
             val friend = result.friend
             if (friend != null) {
-                if (coreContext.contactsManager.isContactTemporary(friend, allowNullFriendList = true)) continue
-
                 if (friend.refKey.orEmpty().isEmpty()) {
                     if (friend.vcard != null) {
                         friend.vcard?.generateUniqueId()
@@ -314,27 +328,33 @@ class ContactsListViewModel
 
             val starred = friend?.starred == true
             model.isFavourite.postValue(starred)
-            if (starred) {
-                favouritesList.add(model)
-            }
 
-            if (firstLoad && count == 20) {
+            if (!favourites && firstLoad && count == 20) {
                 contactsList.postValue(list)
             }
         }
 
         val collator = Collator.getInstance(Locale.getDefault())
-        favouritesList.sortWith { model1, model2 ->
-            collator.compare(model1.friend.name, model2.friend.name)
-        }
         list.sortWith { model1, model2 ->
             collator.compare(model1.friend.name, model2.friend.name)
         }
 
-        favourites.postValue(favouritesList)
-        contactsList.postValue(list)
+        searchInProgress.postValue(false)
+        if (favourites) {
+            favouritesList.postValue(list)
+        } else {
+            contactsList.postValue(list)
+            firstLoad = false
+        }
 
         Log.i("$TAG Processed [${results.size}] results into [${list.size} contacts]")
-        firstLoad = false
+    }
+
+    @WorkerThread
+    private fun checkIfDefaultAccountOnDefaultDomain() {
+        val defaultAccount = coreContext.core.defaultAccount
+        val defaultDomain = corePreferences.defaultDomain
+        val isAccountOnDefaultDomain = defaultAccount?.params?.domain == defaultDomain
+        isDefaultAccountLinphone.postValue(isAccountOnDefaultDomain)
     }
 }

@@ -1,7 +1,7 @@
 package org.linphone.ui.fileviewer
 
+import android.content.ActivityNotFoundException
 import android.content.Intent
-import android.net.Uri
 import android.os.Bundle
 import android.util.DisplayMetrics
 import androidx.activity.enableEdgeToEdge
@@ -23,6 +23,7 @@ import org.linphone.ui.GenericActivity
 import org.linphone.ui.fileviewer.adapter.PdfPagesListAdapter
 import org.linphone.ui.fileviewer.viewmodel.FileViewModel
 import org.linphone.utils.FileUtils
+import androidx.core.net.toUri
 
 @UiThread
 class FileViewerActivity : GenericActivity() {
@@ -73,11 +74,19 @@ class FileViewerActivity : GenericActivity() {
             return
         }
 
+        val isFromEphemeralMessage = args.getBoolean("isFromEphemeralMessage", false)
+        if (isFromEphemeralMessage) {
+            Log.i("$TAG Displayed content is from an ephemeral chat message, force secure mode to prevent screenshots")
+            // Force preventing screenshots for ephemeral messages contents
+            enableWindowSecureMode(true)
+        }
+
         val timestamp = args.getLong("timestamp", -1)
         val preLoadedContent = args.getString("content")
         Log.i(
             "$TAG Path argument is [$path], pre loaded text content is ${if (preLoadedContent.isNullOrEmpty()) "not available" else "available, using it"}"
         )
+        viewModel.isFromEphemeralMessage.value = isFromEphemeralMessage
         viewModel.loadFile(path, timestamp, preLoadedContent)
 
         binding.setBackClickListener {
@@ -119,23 +128,13 @@ class FileViewerActivity : GenericActivity() {
 
         viewModel.exportPlainTextFileEvent.observe(this) {
             it.consume { name ->
-                val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
-                    addCategory(Intent.CATEGORY_OPENABLE)
-                    type = "text/plain"
-                    putExtra(Intent.EXTRA_TITLE, name)
-                }
-                startActivityForResult(intent, EXPORT_FILE_AS_DOCUMENT)
+                exportFile(name, "text/plain")
             }
         }
 
         viewModel.exportPdfEvent.observe(this) {
             it.consume { name ->
-                val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
-                    addCategory(Intent.CATEGORY_OPENABLE)
-                    type = "application/pdf"
-                    putExtra(Intent.EXTRA_TITLE, name)
-                }
-                startActivityForResult(intent, EXPORT_FILE_AS_DOCUMENT)
+                exportFile(name, "application/pdf")
             }
         }
     }
@@ -178,7 +177,7 @@ class FileViewerActivity : GenericActivity() {
             val filePath = FileUtils.getProperFilePath(viewModel.getFilePath())
             val copy = FileUtils.getFilePath(
                 baseContext,
-                Uri.parse(filePath),
+                filePath.toUri(),
                 overrideExisting = false,
                 copyToCache = true
             )
@@ -202,6 +201,19 @@ class FileViewerActivity : GenericActivity() {
             } else {
                 Log.e("$TAG Failed to copy file [$filePath] to share!")
             }
+        }
+    }
+
+    private fun exportFile(name: String, mimeType: String) {
+        val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = mimeType
+            putExtra(Intent.EXTRA_TITLE, name)
+        }
+        try {
+            startActivityForResult(intent, EXPORT_FILE_AS_DOCUMENT)
+        } catch (exception: ActivityNotFoundException) {
+            Log.e("$TAG No activity found to handle intent ACTION_CREATE_DOCUMENT: $exception")
         }
     }
 }

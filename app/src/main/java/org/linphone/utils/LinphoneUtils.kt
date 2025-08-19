@@ -61,9 +61,8 @@ class LinphoneUtils {
 
         const val RECORDING_FILE_NAME_HEADER = "call_recording_"
         const val RECORDING_FILE_NAME_URI_TIMESTAMP_SEPARATOR = "_on_"
-        const val RECORDING_FILE_EXTENSION = ".smff"
-
-        private const val CHAT_ROOM_ID_SEPARATOR = "#~#"
+        const val RECORDING_MKV_FILE_EXTENSION = ".mkv"
+        const val RECORDING_SMFF_FILE_EXTENSION = ".smff"
 
         @WorkerThread
         fun getDefaultAccount(): Account? {
@@ -87,7 +86,7 @@ class LinphoneUtils {
         fun getAddressAsCleanStringUriOnly(address: Address): String {
             val scheme = address.scheme ?: "sip"
             val username = address.username
-            if (username.orEmpty().isEmpty()) {
+            if (username.isNullOrEmpty()) {
                 return "$scheme:${address.domain}"
             }
             return "$scheme:$username@${address.domain}"
@@ -96,7 +95,9 @@ class LinphoneUtils {
         @WorkerThread
         fun getDisplayName(address: Address?): String {
             if (address == null) return "[null]"
-            if (address.displayName == null) {
+
+            val displayName = address.displayName
+            if (displayName.isNullOrEmpty()) {
                 val account = coreContext.core.accountList.find { account ->
                     account.params.identityAddress?.asStringUriOnly() == address.asStringUriOnly()
                 }
@@ -106,8 +107,13 @@ class LinphoneUtils {
                     return localDisplayName
                 }
             }
+
             // Do not return an empty display name
-            return address.displayName ?: address.username ?: address.asString()
+            return if (displayName.isNullOrEmpty()) {
+                address.username ?: address.asString()
+            } else {
+                displayName
+            }
         }
 
         @WorkerThread
@@ -131,6 +137,57 @@ class LinphoneUtils {
                     return address
                 } else {
                     Log.e("$TAG Failed to interpret phone number [$number] as SIP address")
+                }
+            }
+
+            val defaultDomain = corePreferences.defaultDomain
+            val currentDomain = friend.core.defaultAccount?.params?.identityAddress?.domain
+            if (defaultDomain != currentDomain) return null
+
+            var defaultDomainAddressesCount = 0
+            var firstDefaultDomainAddress: Address? = null
+            for (address in addresses) {
+                if (address.domain == defaultDomain) {
+                    defaultDomainAddressesCount += 1
+                    firstDefaultDomainAddress = address
+                }
+            }
+            Log.i("$TAG Friend has [$defaultDomainAddressesCount] SIP addresses on the default domain")
+            if (defaultDomainAddressesCount == 1) {
+                return firstDefaultDomainAddress
+            }
+
+            return null
+        }
+
+        @WorkerThread
+        fun getFirstAvailableAddressForFriend(friend: Friend): Address? {
+            // Return any SIP address first
+            val address = friend.address ?: friend.addresses.firstOrNull()
+            if (address != null) return address
+
+            val phoneNumbers = friend.phoneNumbers
+            // If no SIP address stored in Friend, check for SIP address in phone numbers presence
+            for (phoneNumber in phoneNumbers) {
+                val presenceModel = friend.getPresenceModelForUriOrTel(phoneNumber)
+                val hasPresenceInfo = !presenceModel?.contact.isNullOrEmpty()
+                if (presenceModel != null && hasPresenceInfo) {
+                    val contact = presenceModel.contact
+                    if (!contact.isNullOrEmpty()) {
+                        val address = coreContext.core.interpretUrl(contact, false)
+                        if (address != null) {
+                            address.clean() // To remove ;user=phone
+                            return address
+                        }
+                    }
+                }
+            }
+
+            // Finally format any phone number as SIP address
+            for (phoneNumber in phoneNumbers) {
+                val address = coreContext.core.interpretUrl(phoneNumber, false)
+                if (address != null) {
+                    return address
                 }
             }
 
@@ -163,9 +220,10 @@ class LinphoneUtils {
         }
 
         @AnyThread
-        fun isCallEnding(callState: Call.State): Boolean {
+        fun isCallEnding(callState: Call.State, considerReleasedAsEnding: Boolean = false): Boolean {
             return when (callState) {
                 Call.State.End, Call.State.Error -> true
+                Call.State.Released -> considerReleasedAsEnding
                 else -> false
             }
         }
@@ -220,13 +278,18 @@ class LinphoneUtils {
 
         @WorkerThread
         fun isVideoEnabled(call: Call): Boolean {
+            if (!call.core.isVideoEnabled) {
+                Log.w("$TAG Video is disabled in Core, assume call is audio only")
+                return false
+            }
+
             val conference = call.conference
             val isConference = conference != null
 
             val isIncoming = isCallIncoming(call.state)
             return if (isConference || getConferenceInfoIfAny(call) != null) {
                 true
-            } else if (isIncoming) {
+            } else if (isIncoming || call.state == Call.State.Connected) { // In connected state call.currentParams.isVideoEnabled will return false...
                 call.remoteParams?.isVideoEnabled == true && call.remoteParams?.videoDirection != MediaDirection.Inactive
             } else {
                 call.currentParams.isVideoEnabled && call.currentParams.videoDirection != MediaDirection.Inactive
@@ -397,6 +460,9 @@ class LinphoneUtils {
                 ChatMessage.State.InProgress, ChatMessage.State.FileTransferInProgress -> {
                     R.drawable.animated_in_progress
                 }
+                ChatMessage.State.PendingDelivery -> {
+                    R.drawable.hourglass
+                }
                 else -> {
                     R.drawable.animated_in_progress
                 }
@@ -429,40 +495,8 @@ class LinphoneUtils {
         }
 
         @WorkerThread
-        fun getChatRoomId(room: ChatRoom): String {
-            return getChatRoomId(room.localAddress, room.peerAddress)
-        }
-
-        @WorkerThread
-        fun getChatRoomId(localAddress: Address, remoteAddress: Address): String {
-            val localSipUri = localAddress.clone()
-            localSipUri.clean()
-            val remoteSipUri = remoteAddress.clone()
-            remoteSipUri.clean()
-            return getChatRoomId(localSipUri.asStringUriOnly(), remoteSipUri.asStringUriOnly())
-        }
-
-        @AnyThread
-        fun getChatRoomId(localSipUri: String, remoteSipUri: String): String {
-            return "$localSipUri$CHAT_ROOM_ID_SEPARATOR$remoteSipUri"
-        }
-
-        @AnyThread
-        fun getLocalAndPeerSipUrisFromChatRoomId(id: String): Pair<String, String>? {
-            val split = id.split(CHAT_ROOM_ID_SEPARATOR)
-            if (split.size == 2) {
-                val localAddress = split[0]
-                val peerAddress = split[1]
-                Log.i(
-                    "$TAG Got local [$localAddress] and peer [$peerAddress] SIP URIs from conversation id [$id]"
-                )
-                return Pair(localAddress, peerAddress)
-            } else {
-                Log.e(
-                    "$TAG Failed to parse conversation id [$id] with separator [$CHAT_ROOM_ID_SEPARATOR]"
-                )
-            }
-            return null
+        fun getConversationId(chatRoom: ChatRoom): String {
+            return chatRoom.identifier ?: ""
         }
 
         @WorkerThread
@@ -474,7 +508,13 @@ class LinphoneUtils {
 
         @WorkerThread
         fun getRecordingFilePathForAddress(address: Address): String {
-            val fileName = "${RECORDING_FILE_NAME_HEADER}${address.asStringUriOnly()}${RECORDING_FILE_NAME_URI_TIMESTAMP_SEPARATOR}${System.currentTimeMillis()}$RECORDING_FILE_EXTENSION"
+            val extension = if (corePreferences.callRecordingUseSmffFormat) {
+                RECORDING_SMFF_FILE_EXTENSION
+            } else {
+                RECORDING_MKV_FILE_EXTENSION
+            }
+            Log.i("$TAG Using [$extension] file format for call recording")
+            val fileName = "${RECORDING_FILE_NAME_HEADER}${address.asStringUriOnly()}${RECORDING_FILE_NAME_URI_TIMESTAMP_SEPARATOR}${System.currentTimeMillis()}$extension"
             return FileUtils.getFileStoragePath(fileName, isRecording = true).absolutePath
         }
 

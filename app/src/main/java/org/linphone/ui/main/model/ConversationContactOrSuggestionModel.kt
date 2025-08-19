@@ -32,7 +32,7 @@ class ConversationContactOrSuggestionModel
     @WorkerThread
     constructor(
     val address: Address,
-    val localAddress: Address? = null,
+    val conversationId: String = "",
     conversationSubject: String? = null,
     val friend: Friend? = null,
     private val onClicked: ((Address) -> Unit)? = null
@@ -45,7 +45,7 @@ class ConversationContactOrSuggestionModel
         ?: if (friend != null) {
             friend.name ?: LinphoneUtils.getDisplayName(address)
         } else {
-            address.username.orEmpty()
+            address.username ?: address.domain.orEmpty()
         }
 
     val sipUri = address.asStringUriOnly()

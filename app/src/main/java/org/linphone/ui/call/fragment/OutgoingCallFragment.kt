@@ -26,10 +26,13 @@ import android.view.ViewGroup
 import androidx.annotation.UiThread
 import androidx.core.view.doOnLayout
 import androidx.lifecycle.ViewModelProvider
+import com.google.android.material.bottomsheet.BottomSheetBehavior
 import org.linphone.LinphoneApplication.Companion.coreContext
+import org.linphone.core.Call
 import org.linphone.core.tools.Log
 import org.linphone.databinding.CallOutgoingFragmentBinding
 import org.linphone.ui.call.viewmodel.CurrentCallViewModel
+import org.linphone.utils.LinphoneUtils
 
 @UiThread
 class OutgoingCallFragment : GenericCallFragment() {
@@ -60,13 +63,29 @@ class OutgoingCallFragment : GenericCallFragment() {
 
         binding.lifecycleOwner = viewLifecycleOwner
         binding.viewModel = callViewModel
+        binding.numpadModel = callViewModel.numpadModel
 
         callViewModel.isOutgoingEarlyMedia.observe(viewLifecycleOwner) { earlyMedia ->
             if (earlyMedia) {
                 coreContext.postOnCoreThread { core ->
-                    Log.i("$TAG Outgoing early-media call with video, setting preview surface")
-                    core.nativePreviewWindowId = binding.localPreviewVideoSurface
+                    val call = core.calls.find {
+                        it.state == Call.State.OutgoingEarlyMedia
+                    }
+                    if (call != null && LinphoneUtils.isVideoEnabled(call)) {
+                        Log.i("$TAG Outgoing early-media call with video, setting preview surface")
+                        core.nativePreviewWindowId = binding.localPreviewVideoSurface
+                    }
                 }
+            }
+        }
+
+        val numpadBottomSheetBehavior = BottomSheetBehavior.from(binding.callNumpad.root)
+        numpadBottomSheetBehavior.state = BottomSheetBehavior.STATE_HIDDEN
+        numpadBottomSheetBehavior.skipCollapsed = true
+
+        callViewModel.showNumpadBottomSheetEvent.observe(viewLifecycleOwner) {
+            it.consume {
+                numpadBottomSheetBehavior.state = BottomSheetBehavior.STATE_EXPANDED
             }
         }
     }

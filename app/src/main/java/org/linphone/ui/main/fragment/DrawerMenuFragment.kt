@@ -19,8 +19,8 @@
  */
 package org.linphone.ui.main.fragment
 
+import android.content.ActivityNotFoundException
 import android.content.Intent
-import android.net.Uri
 import android.os.Bundle
 import android.view.Gravity
 import android.view.LayoutInflater
@@ -46,6 +46,7 @@ import org.linphone.ui.assistant.AssistantActivity
 import org.linphone.ui.main.MainActivity
 import org.linphone.ui.main.settings.fragment.AccountProfileFragmentDirections
 import org.linphone.ui.main.viewmodel.DrawerMenuViewModel
+import androidx.core.net.toUri
 
 @UiThread
 class DrawerMenuFragment : GenericMainFragment() {
@@ -146,11 +147,19 @@ class DrawerMenuFragment : GenericMainFragment() {
         viewModel.openLinkInBrowserEvent.observe(viewLifecycleOwner) {
             it.consume { link ->
                 try {
-                    val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse(link))
+                    val browserIntent = Intent(Intent.ACTION_VIEW, link.toUri())
                     startActivity(browserIntent)
                 } catch (ise: IllegalStateException) {
                     Log.e(
                         "$TAG Can't start ACTION_VIEW intent for URL [$link], IllegalStateException: $ise"
+                    )
+                } catch (anfe: ActivityNotFoundException) {
+                    Log.e(
+                        "$TAG Can't start ACTION_VIEW intent for URL [$link], ActivityNotFoundException: $anfe"
+                    )
+                } catch (e: Exception) {
+                    Log.e(
+                        "$TAG Can't start ACTION_VIEW intent for URL [$link]: $e"
                     )
                 }
             }
@@ -162,6 +171,14 @@ class DrawerMenuFragment : GenericMainFragment() {
                     viewModel.updateAccountsList()
                 } else {
                     viewModel.refreshAccountsNotificationsCount()
+                }
+            }
+        }
+
+        sharedViewModel.refreshDrawerMenuQuitButtonEvent.observe(viewLifecycleOwner) {
+            it.consume {
+                coreContext.postOnCoreThread {
+                    viewModel.checkIfKeepAliveServiceIsEnabled()
                 }
             }
         }

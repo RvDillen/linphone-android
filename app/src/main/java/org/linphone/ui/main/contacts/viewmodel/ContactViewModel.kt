@@ -117,8 +117,8 @@ class ContactViewModel
         MutableLiveData<Event<String>>()
     }
 
-    val goToConversationEvent: MutableLiveData<Event<Pair<String, String>>> by lazy {
-        MutableLiveData<Event<Pair<String, String>>>()
+    val goToConversationEvent: MutableLiveData<Event<String>> by lazy {
+        MutableLiveData<Event<String>>()
     }
 
     val vCardTerminatedEvent: MutableLiveData<Event<Pair<String, File>>> by lazy {
@@ -178,12 +178,14 @@ class ContactViewModel
     private val contactsListener = object : ContactsManager.ContactsListener {
         @WorkerThread
         override fun onContactsLoaded() {
-            val friend = coreContext.contactsManager.findContactById(refKey)
-            if (friend != null && friend != this@ContactViewModel.friend) {
+            if (!::friend.isInitialized) return
+
+            val found = coreContext.contactsManager.findContactById(refKey)
+            if (found != null && found != friend) {
                 Log.i(
-                    "$TAG Found contact [${friend.name}] matching ref key [$refKey] after contacts have been loaded/updated"
+                    "$TAG Found contact [${found.name}] matching ref key [$refKey] after contacts have been loaded/updated"
                 )
-                this@ContactViewModel.friend = friend
+                friend = found
                 refreshContactInfo()
             }
         }
@@ -198,27 +200,20 @@ class ContactViewModel
             val state = chatRoom.state
             if (state == ChatRoom.State.Instantiated) return
 
-            val id = LinphoneUtils.getChatRoomId(chatRoom)
+            val id = LinphoneUtils.getConversationId(chatRoom)
             Log.i("$TAG Conversation [$id] (${chatRoom.subject}) state changed: [$state]")
 
             if (state == ChatRoom.State.Created) {
                 Log.i("$TAG Conversation [$id] successfully created")
                 chatRoom.removeListener(this)
                 operationInProgress.postValue(false)
-                goToConversationEvent.postValue(
-                    Event(
-                        Pair(
-                            chatRoom.localAddress.asStringUriOnly(),
-                            chatRoom.peerAddress.asStringUriOnly()
-                        )
-                    )
-                )
+                goToConversationEvent.postValue(Event(LinphoneUtils.getConversationId(chatRoom)))
             } else if (state == ChatRoom.State.CreationFailed) {
                 Log.e("$TAG Conversation [$id] creation has failed!")
                 chatRoom.removeListener(this)
                 operationInProgress.postValue(false)
                 chatRoomCreationErrorEvent.postValue(
-                    Event(R.string.conversation_creation_error_toast)
+                    Event(R.string.conversation_failed_to_create_toast)
                 )
             }
         }
@@ -316,7 +311,9 @@ class ContactViewModel
     @WorkerThread
     fun refreshContactInfo() {
         isFavourite.postValue(friend.starred)
-        isStored.postValue(friend.inList())
+        // Do not show edit contact button for contacts not stored in a FriendList or
+        // if they are in a temporary one (for example if they are from a remote directory such as LDAP or CardDAV)
+        isStored.postValue(!coreContext.contactsManager.isContactTemporary(friend))
 
         contact.value?.destroy()
         contact.postValue(ContactAvatarModel(friend))
@@ -376,7 +373,7 @@ class ContactViewModel
     fun exportContactAsVCard() {
         coreContext.postOnCoreThread {
             if (::friend.isInitialized) {
-                val vCard = friend.vcard?.asVcard4String()
+                val vCard = friend.dumpVcard()
                 if (!vCard.isNullOrEmpty()) {
                     Log.i("$TAG Friend has been successfully dumped as vCard string")
                     val fileName = friend.name.orEmpty().replace(" ", "_").lowercase(
@@ -506,20 +503,22 @@ class ContactViewModel
             params.isChatEnabled = true
             params.isGroupEnabled = false
             params.subject = AppUtils.getString(R.string.conversation_one_to_one_hidden_subject)
+            params.account = account
+
             val chatParams = params.chatParams ?: return
             chatParams.ephemeralLifetime = 0 // Make sure ephemeral is disabled by default
 
             val sameDomain = remote.domain == corePreferences.defaultDomain && remote.domain == account.params.domain
             if (account.params.instantMessagingEncryptionMandatory && sameDomain) {
                 Log.i(
-                    "$TAG Account is in secure mode & domain matches, creating a E2E conversation"
+                    "$TAG Account is in secure mode & domain matches, creating an E2E encrypted conversation"
                 )
                 chatParams.backend = ChatRoom.Backend.FlexisipChat
                 params.securityLevel = Conference.SecurityLevel.EndToEnd
             } else if (!account.params.instantMessagingEncryptionMandatory) {
                 if (LinphoneUtils.isEndToEndEncryptedChatAvailable(core)) {
                     Log.i(
-                        "$TAG Account is in interop mode but LIME is available, creating a E2E conversation"
+                        "$TAG Account is in interop mode but LIME is available, creating an E2E encrypted conversation"
                     )
                     chatParams.backend = ChatRoom.Backend.FlexisipChat
                     params.securityLevel = Conference.SecurityLevel.EndToEnd
@@ -543,49 +542,33 @@ class ContactViewModel
             val existingChatRoom = core.searchChatRoom(params, localAddress, null, participants)
             if (existingChatRoom != null) {
                 Log.i(
-                    "$TAG Found existing conversation [${LinphoneUtils.getChatRoomId(
+                    "$TAG Found existing conversation [${LinphoneUtils.getConversationId(
                         existingChatRoom
                     )}], going to it"
                 )
-                goToConversationEvent.postValue(
-                    Event(Pair(localSipUri, existingChatRoom.peerAddress.asStringUriOnly()))
-                )
+                goToConversationEvent.postValue(Event(LinphoneUtils.getConversationId(existingChatRoom)))
             } else {
                 Log.i(
                     "$TAG No existing conversation between [$localSipUri] and [$remoteSipUri] was found, let's create it"
                 )
                 operationInProgress.postValue(true)
-                val chatRoom = core.createChatRoom(params, localAddress, participants)
+                val chatRoom = core.createChatRoom(params, participants)
                 if (chatRoom != null) {
                     if (chatParams.backend == ChatRoom.Backend.FlexisipChat) {
                         if (chatRoom.state == ChatRoom.State.Created) {
-                            val id = LinphoneUtils.getChatRoomId(chatRoom)
+                            val id = LinphoneUtils.getConversationId(chatRoom)
                             Log.i("$TAG 1-1 conversation [$id] has been created")
                             operationInProgress.postValue(false)
-                            goToConversationEvent.postValue(
-                                Event(
-                                    Pair(
-                                        chatRoom.localAddress.asStringUriOnly(),
-                                        chatRoom.peerAddress.asStringUriOnly()
-                                    )
-                                )
-                            )
+                            goToConversationEvent.postValue(Event(LinphoneUtils.getConversationId(chatRoom)))
                         } else {
                             Log.i("$TAG Conversation isn't in Created state yet, wait for it")
                             chatRoom.addListener(chatRoomListener)
                         }
                     } else {
-                        val id = LinphoneUtils.getChatRoomId(chatRoom)
+                        val id = LinphoneUtils.getConversationId(chatRoom)
                         Log.i("$TAG Conversation successfully created [$id]")
                         operationInProgress.postValue(false)
-                        goToConversationEvent.postValue(
-                            Event(
-                                Pair(
-                                    chatRoom.localAddress.asStringUriOnly(),
-                                    chatRoom.peerAddress.asStringUriOnly()
-                                )
-                            )
-                        )
+                        goToConversationEvent.postValue(Event(LinphoneUtils.getConversationId(chatRoom)))
                     }
                 } else {
                     Log.e(
@@ -593,7 +576,7 @@ class ContactViewModel
                     )
                     operationInProgress.postValue(false)
                     chatRoomCreationErrorEvent.postValue(
-                        Event(R.string.conversation_creation_error_toast)
+                        Event(R.string.conversation_failed_to_create_toast)
                     )
                 }
             }

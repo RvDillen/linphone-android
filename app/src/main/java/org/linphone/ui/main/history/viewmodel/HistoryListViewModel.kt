@@ -106,13 +106,16 @@ class HistoryListViewModel
     @UiThread
     fun removeAllCallLogs() {
         coreContext.postOnCoreThread { core ->
-            val account = LinphoneUtils.getDefaultAccount()
-            if (account != null) {
-                account.clearCallLogs()
-            } else {
-                for (callLog in core.callLogs) {
-                    core.removeCallLog(callLog)
+            // TODO FIXME: remove workaround later
+            if (coreContext.core.accountList.size > 1) {
+                val account = LinphoneUtils.getDefaultAccount()
+                if (account != null) {
+                    account.clearCallLogs()
+                } else {
+                    core.clearCallLogs()
                 }
+            } else {
+                core.clearCallLogs()
             }
 
             historyDeletedEvent.postValue(Event(true))
@@ -142,7 +145,14 @@ class HistoryListViewModel
         var count = 0
 
         val account = LinphoneUtils.getDefaultAccount()
-        val logs = account?.callLogs ?: coreContext.core.callLogs
+        // Fetch all call logs if only one account to workaround no history issue
+        // TODO FIXME: remove workaround later
+        val logs = if (coreContext.core.accountList.size > 1) {
+            account?.callLogs ?: coreContext.core.callLogs
+        } else {
+            coreContext.core.callLogs
+        }
+
         for (callLog in logs) {
             val model = CallLogModel(callLog)
             if (isCallLogMatchingFilter(model, filter)) {

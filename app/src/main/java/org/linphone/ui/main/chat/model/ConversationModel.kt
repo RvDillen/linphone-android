@@ -20,8 +20,10 @@
 package org.linphone.ui.main.chat.model
 
 import android.text.Spannable
+import android.text.SpannableStringBuilder
 import androidx.annotation.UiThread
 import androidx.annotation.WorkerThread
+import androidx.core.text.toSpannable
 import androidx.lifecycle.MutableLiveData
 import org.linphone.LinphoneApplication.Companion.coreContext
 import org.linphone.R
@@ -48,17 +50,15 @@ class ConversationModel
         private const val TAG = "[Conversation Model]"
     }
 
-    val id = LinphoneUtils.getChatRoomId(chatRoom)
-
-    val localSipUri = chatRoom.localAddress.asStringUriOnly()
-
-    val remoteSipUri = chatRoom.peerAddress.asStringUriOnly()
+    val id = LinphoneUtils.getConversationId(chatRoom)
 
     val isGroup = !chatRoom.hasCapability(Capabilities.OneToOne.toInt()) && chatRoom.hasCapability(
         Capabilities.Conference.toInt()
     )
 
     val isEncrypted = chatRoom.hasCapability(Capabilities.Encrypted.toInt())
+
+    val isEncryptionAvailable = LinphoneUtils.isEndToEndEncryptedChatAvailable(chatRoom.core)
 
     val isReadOnly = MutableLiveData<Boolean>()
 
@@ -107,6 +107,7 @@ class ConversationModel
             }
         }
 
+        @WorkerThread
         override fun onConferenceJoined(chatRoom: ChatRoom, eventLog: EventLog) {
             // This is required as a Created chat room may not have the participants list yet
             Log.i("$TAG Conversation has been joined")
@@ -117,7 +118,7 @@ class ConversationModel
         @WorkerThread
         override fun onConferenceLeft(chatRoom: ChatRoom, eventLog: EventLog) {
             Log.w("TAG Conversation has been left")
-            isReadOnly.postValue(true)
+            isReadOnly.postValue(chatRoom.isReadOnly)
         }
 
         @WorkerThread
@@ -129,10 +130,12 @@ class ConversationModel
             computeComposingLabel()
         }
 
+        @WorkerThread
         override fun onNewEvent(chatRoom: ChatRoom, eventLog: EventLog) {
             updateLastUpdatedTime()
         }
 
+        @WorkerThread
         override fun onNewEvents(chatRoom: ChatRoom, eventLogs: Array<out EventLog>) {
             updateLastMessage()
             updateLastUpdatedTime()
@@ -274,6 +277,13 @@ class ConversationModel
         }
     }
 
+    @UiThread
+    fun updateLastMessageInfo() {
+        coreContext.postOnCoreThread {
+            updateLastMessage()
+        }
+    }
+
     @WorkerThread
     private fun updateLastMessageStatus(message: ChatMessage) {
         val isOutgoing = message.isOutgoing
@@ -333,16 +343,35 @@ class ConversationModel
 
         val message = chatRoom.lastMessageInHistory
         if (message != null) {
+            lastMessage = message
             updateLastMessageStatus(message)
 
             if (message.isOutgoing && message.state != ChatMessage.State.Displayed) {
                 message.addListener(chatMessageListener)
-                lastMessage = message
             } else if (message.contents.find { it.isFileTransfer == true } != null) {
                 message.addListener(chatMessageListener)
-                lastMessage = message
             }
+
+            val timestamp = message.time
+            val humanReadableTimestamp = when {
+                TimestampUtils.isToday(timestamp) -> {
+                    TimestampUtils.timeToString(timestamp)
+                }
+                TimestampUtils.isYesterday(timestamp) -> {
+                    AppUtils.getString(R.string.yesterday)
+                }
+                else -> {
+                    TimestampUtils.toString(timestamp, onlyDate = true)
+                }
+            }
+            dateTime.postValue(humanReadableTimestamp)
         } else {
+            lastMessage = null
+            lastMessageTextSender.postValue("")
+            lastMessageContentIcon.postValue(0)
+            lastMessageText.postValue(SpannableStringBuilder("").toSpannable())
+            isLastMessageOutgoing.postValue(false)
+            dateTime.postValue("")
             Log.w("$TAG No last message to display for conversation [$id]")
         }
     }
@@ -350,18 +379,6 @@ class ConversationModel
     @WorkerThread
     private fun updateLastUpdatedTime() {
         val timestamp = chatRoom.lastUpdateTime
-        val humanReadableTimestamp = when {
-            TimestampUtils.isToday(timestamp) -> {
-                TimestampUtils.timeToString(chatRoom.lastUpdateTime)
-            }
-            TimestampUtils.isYesterday(timestamp) -> {
-                AppUtils.getString(R.string.yesterday)
-            }
-            else -> {
-                TimestampUtils.toString(chatRoom.lastUpdateTime, onlyDate = true)
-            }
-        }
-        dateTime.postValue(humanReadableTimestamp)
         lastUpdateTime.postValue(timestamp)
     }
 

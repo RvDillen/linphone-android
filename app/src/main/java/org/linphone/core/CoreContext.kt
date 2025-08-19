@@ -30,14 +30,18 @@ import android.os.Handler
 import android.os.HandlerThread
 import android.os.Looper
 import android.provider.Settings
+import android.provider.Settings.SettingNotFoundException
 import androidx.annotation.AnyThread
 import androidx.annotation.UiThread
 import androidx.annotation.WorkerThread
+import androidx.core.text.isDigitsOnly
 import androidx.lifecycle.MutableLiveData
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import kotlin.system.exitProcess
 import org.linphone.BuildConfig
+import org.linphone.LinphoneApplication.Companion.coreContext
 import org.linphone.LinphoneApplication.Companion.corePreferences
+import org.linphone.compatibility.Compatibility
 import org.linphone.contacts.ContactsManager
 import org.linphone.core.tools.Log
 import org.linphone.notifications.NotificationsManager
@@ -46,6 +50,7 @@ import org.linphone.ui.call.CallActivity
 import org.linphone.utils.ActivityMonitor
 import org.linphone.utils.AppUtils
 import org.linphone.utils.Event
+import org.linphone.utils.FileUtils
 import org.linphone.utils.LinphoneUtils
 
 class CoreContext
@@ -79,6 +84,8 @@ class CoreContext
 
     private val mainThread = Handler(Looper.getMainLooper())
 
+    var defaultAccountHasVideoConferenceFactoryUri: Boolean = false
+
     var bearerAuthInfoPendingPasswordUpdate: AuthInfo? = null
     var digestAuthInfoPendingPasswordUpdate: AuthInfo? = null
 
@@ -90,6 +97,10 @@ class CoreContext
 
     val digestAuthenticationRequestedEvent: MutableLiveData<Event<String>> by lazy {
         MutableLiveData<Event<String>>()
+    }
+
+    val clearAuthenticationRequestDialogEvent: MutableLiveData<Event<Boolean>> by lazy {
+        MutableLiveData<Event<Boolean>>()
     }
 
     val refreshMicrophoneMuteStateEvent: MutableLiveData<Event<Boolean>> by lazy {
@@ -112,6 +123,13 @@ class CoreContext
         MutableLiveData<Event<Boolean>>()
     }
 
+    private var filesToExportToNativeMediaGallery = arrayListOf<String>()
+    val filesToExportToNativeMediaGalleryEvent: MutableLiveData<Event<List<String>>> by lazy {
+        MutableLiveData<Event<List<String>>>()
+    }
+
+    private var keepAliveServiceStarted = false
+
     @SuppressLint("HandlerLeak")
     private lateinit var coreThread: Handler
 
@@ -126,8 +144,14 @@ class CoreContext
                     )
                 }
 
-                Log.i("$TAG Reloading sound devices in 500ms")
-                postOnCoreThreadDelayed({ core.reloadSoundDevices() }, 500)
+                if (telecomManager.getCurrentlyFollowedCalls() <= 0) {
+                    Log.i("$TAG No call found in Telecom's CallsManager, reloading sound devices in 500ms")
+                    postOnCoreThreadDelayed({ core.reloadSoundDevices() }, 500)
+                }  else {
+                    Log.i(
+                        "$TAG At least one active call in Telecom's CallsManager, let it handle the added device(s)"
+                    )
+                }
             }
         }
 
@@ -145,7 +169,7 @@ class CoreContext
                     postOnCoreThreadDelayed({ core.reloadSoundDevices() }, 500)
                 } else {
                     Log.i(
-                        "$TAG At least one active call in Telecom's CallsManager, let it handle the removed device"
+                        "$TAG At least one active call in Telecom's CallsManager, let it handle the removed device(s)"
                     )
                 }
             }
@@ -156,6 +180,62 @@ class CoreContext
 
     private val coreListener = object : CoreListenerStub() {
         @WorkerThread
+        override fun onDefaultAccountChanged(core: Core, account: Account?) {
+            defaultAccountHasVideoConferenceFactoryUri = account?.params?.audioVideoConferenceFactoryAddress != null
+
+            val defaultDomain = corePreferences.defaultDomain
+            val isAccountOnDefaultDomain = account?.params?.domain == defaultDomain
+            val domainFilter = corePreferences.contactsFilter
+            Log.i("$TAG Currently selected filter is [$domainFilter]")
+
+            if (!isAccountOnDefaultDomain && domainFilter == defaultDomain) {
+                corePreferences.contactsFilter = "*"
+                Log.i(
+                    "$TAG New default account isn't on default domain, changing filter to any SIP contacts instead"
+                )
+            } else if (isAccountOnDefaultDomain && domainFilter != "") {
+                corePreferences.contactsFilter = defaultDomain
+                Log.i("$TAG New default account is on default domain, using that domain as filter instead of wildcard")
+            }
+        }
+
+        @WorkerThread
+        override fun onMessagesReceived(
+            core: Core,
+            chatRoom: ChatRoom,
+            messages: Array<out ChatMessage?>
+        ) {
+            if (corePreferences.makePublicMediaFilesDownloaded && core.maxSizeForAutoDownloadIncomingFiles >= 0) {
+                for (message in messages) {
+                    // Never do auto media export for ephemeral messages!
+                    if (message?.isEphemeral == true) continue
+
+                    for (content in message?.contents.orEmpty()) {
+                        if (content.isFile) {
+                            val path = content.filePath
+                            if (path.isNullOrEmpty()) continue
+
+                            val mime = "${content.type}/${content.subtype}"
+                            val mimeType = FileUtils.getMimeType(mime)
+                            when (mimeType) {
+                                FileUtils.MimeType.Image, FileUtils.MimeType.Video, FileUtils.MimeType.Audio -> {
+                                    Log.i("$TAG Added file path [$path] to the list of media to export to native media gallery")
+                                    filesToExportToNativeMediaGallery.add(path)
+                                }
+                                else -> {}
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (filesToExportToNativeMediaGallery.isNotEmpty()) {
+                Log.i("$TAG Creating event with [${filesToExportToNativeMediaGallery.size}] files to export to native media gallery")
+                filesToExportToNativeMediaGalleryEvent.postValue(Event(filesToExportToNativeMediaGallery))
+            }
+        }
+
+        @WorkerThread
         override fun onGlobalStateChanged(core: Core, state: GlobalState, message: String) {
             Log.i("$TAG Global state changed [$state]")
 
@@ -163,6 +243,8 @@ class CoreContext
                 // Wait for GlobalState.ON as some settings modification won't be saved
                 // in RC file if Core isn't ON
                 onCoreStarted()
+            } else if (state == GlobalState.Shutdown) {
+                onCoreStopped()
             }
         }
 
@@ -174,6 +256,18 @@ class CoreContext
         ) {
             Log.i("$TAG Configuring state changed [$status], message is [$message]")
             if (status == ConfiguringState.Successful) {
+                val accounts = core.accountList
+                if (core.defaultAccount == null && accounts.isNotEmpty()) {
+                    val firstAccount = accounts.firstOrNull()
+                    if (firstAccount != null) {
+                        val sipUri = firstAccount.params.identityAddress?.asStringUriOnly()
+                        Log.w(
+                            "$TAG Default account is null but account list isn't empty, using account [$sipUri] as default"
+                        )
+                        core.defaultAccount = firstAccount
+                    }
+                }
+
                 provisioningAppliedEvent.postValue(Event(true))
                 corePreferences.firstLaunch = false
                 showGreenToastEvent.postValue(
@@ -208,6 +302,34 @@ class CoreContext
                 "$TAG Call [${call.remoteAddress.asStringUriOnly()}] state changed [$currentState]"
             )
             when (currentState) {
+                Call.State.IncomingReceived -> {
+                    if (corePreferences.autoAnswerEnabled) {
+                        val autoAnswerDelay = corePreferences.autoAnswerDelay
+                        if (autoAnswerDelay == 0) {
+                            Log.w("$TAG Auto answering call immediately")
+                            answerCall(call)
+                        } else {
+                            Log.i("$TAG Scheduling auto answering in $autoAnswerDelay milliseconds")
+                            postOnCoreThreadDelayed({
+                                Log.w("$TAG Auto answering call")
+                                answerCall(call)
+                            }, autoAnswerDelay.toLong())
+                        }
+                    }
+                }
+                Call.State.IncomingEarlyMedia -> {
+                    if (core.ringDuringIncomingEarlyMedia) {
+                        val speaker = core.audioDevices.find {
+                            it.type == AudioDevice.Type.Speaker
+                        }
+                        if (speaker != null) {
+                            Log.i("$TAG Ringing during incoming early media enabled, make sure speaker audio device [${speaker.id}] is used")
+                            call.outputAudioDevice = speaker
+                        } else {
+                            Log.w("$TAG No speaker device found, incoming call early media ringing will be played on default device")
+                        }
+                    }
+                }
                 Call.State.OutgoingInit -> {
                     val conferenceInfo = core.findConferenceInformationFromUri(call.remoteAddress)
                     // Do not show outgoing call view for conference calls, wait for connected state
@@ -347,6 +469,7 @@ class CoreContext
             }
         }
 
+        @WorkerThread
         override fun onAccountAdded(core: Core, account: Account) {
             // Prevent this trigger when core is stopped/start in remote prov
             if (core.globalState == GlobalState.Off) return
@@ -368,9 +491,38 @@ class CoreContext
                 }
             }
         }
+
+        @WorkerThread
+        override fun onAccountRemoved(core: Core, account: Account) {
+            Log.i("$TAG Account [${account.params.identityAddress?.asStringUriOnly()}] removed, clearing auth request dialog if needed")
+            if (account.findAuthInfo() == digestAuthInfoPendingPasswordUpdate) {
+                Log.i("$TAG Removed account matches auth info pending password update, removing dialog")
+                clearAuthenticationRequestDialogEvent.postValue(Event(true))
+                digestAuthInfoPendingPasswordUpdate = null
+            }
+
+            if (core.defaultAccount == null || core.defaultAccount == account) {
+                Log.w("$TAG Removed account was the default one, choosing another as default if possible")
+                val newDefaultAccount = core.accountList.find {
+                    it.params.isRegisterEnabled
+                } ?: core.accountList.firstOrNull()
+                if (newDefaultAccount == null) {
+                    Log.e("$TAG Failed to find a new default account!")
+                } else {
+                    Log.i("$TAG New default account will be [${newDefaultAccount.params.identityAddress?.asStringUriOnly()}]")
+                    // Delay changing default account to allow for other onAccountRemoved listeners to trigger first
+                    postOnCoreThread {
+                        core.defaultAccount = newDefaultAccount
+                    }
+                }
+            }
+        }
     }
 
     private var logcatEnabled: Boolean = corePreferences.printLogsInLogcat
+
+    private var crashlyticsEnabled: Boolean = corePreferences.sendLogsToCrashlytics
+    private var crashlyticsAvailable = true
 
     private val loggingServiceListener = object : LoggingServiceListenerStub() {
         @WorkerThread
@@ -389,7 +541,9 @@ class CoreContext
                     else -> android.util.Log.d(domain, message)
                 }
             }
-            FirebaseCrashlytics.getInstance().log("[$domain] [${level.name}] $message")
+            if (crashlyticsEnabled) {
+                FirebaseCrashlytics.getInstance().log("[$domain] [${level.name}] $message")
+            }
         }
     }
 
@@ -409,9 +563,12 @@ class CoreContext
                 Factory.instance().loggingService.addListener(loggingServiceListener)
             } catch (e: Exception) {
                 Log.e("$TAG Failed to instantiate Crashlytics: $e")
+                crashlyticsEnabled = false
+                crashlyticsAvailable = false
             }
         } else {
             Log.i("$TAG Crashlytics is disabled")
+            crashlyticsAvailable = false
         }
         Log.i("=========================================")
         Log.i("==== Linphone-android information dump ====")
@@ -428,6 +585,8 @@ class CoreContext
         core = Factory.instance().createCoreWithConfig(corePreferences.config, context)
         core.isAutoIterateEnabled = true
         core.addListener(coreListener)
+
+        defaultAccountHasVideoConferenceFactoryUri = core.defaultAccount?.params?.audioVideoConferenceFactoryAddress != null
 
         coreThread.postDelayed({ startCore() }, 50)
 
@@ -479,6 +638,15 @@ class CoreContext
 
             if (oldVersion < 600000) { // 6.0.0 initial release
                 configurationMigration5To6()
+            } else if (oldVersion < 600004) { // 6.0.4
+                disablePushNotificationsFromThirdPartySipAccounts()
+            } else if (oldVersion < 600009) { // 6.0.9
+                removePortFromSipIdentity()
+            }
+
+            if (core.logCollectionUploadServerUrl.isNullOrEmpty()) {
+                Log.w("$TAG Logs sharing server URL not set, fixing that")
+                core.logCollectionUploadServerUrl = "https://files.linphone.org/http-file-transfer-server/hft.php"
             }
 
             corePreferences.linphoneConfigurationVersion = currentVersion
@@ -489,15 +657,27 @@ class CoreContext
             Log.i("$TAG No configuration migration required")
         }
 
-        if (corePreferences.keepServiceAlive) {
-            Log.i("$TAG Starting keep alive service")
-            startKeepAliveService()
-        }
-
         contactsManager.onCoreStarted(core)
         telecomManager.onCoreStarted(core)
         notificationsManager.onCoreStarted(core, oldVersion < 600000) // Re-create channels when migrating from a non 6.0 version
         Log.i("$TAG Started contacts, telecom & notifications managers")
+
+        if (corePreferences.keepServiceAlive) {
+            if (activityMonitor.isInForeground() || corePreferences.autoStart) {
+                Log.i("$TAG Keep alive service is enabled and either app is in foreground or auto start is enabled, starting it")
+                startKeepAliveService()
+            } else {
+                Log.w("$TAG Keep alive service is enabled but auto start isn't and app is not in foreground, not starting it")
+            }
+        }
+    }
+
+    @WorkerThread
+    private fun onCoreStopped() {
+        Log.w("$TAG Core is being shut down, notifying managers so they can remove their listeners and do some cleanup if needed")
+        contactsManager.onCoreStopped(core)
+        telecomManager.onCoreStopped(core)
+        notificationsManager.onCoreStopped(core)
     }
 
     @WorkerThread
@@ -521,10 +701,6 @@ class CoreContext
         audioManager.unregisterAudioDeviceCallback(audioDeviceCallback)
 
         core.stop()
-
-        contactsManager.onCoreStopped(core)
-        telecomManager.onCoreStopped(core)
-        notificationsManager.onCoreStopped(core)
 
         // It's very unlikely the process will survive until the Core reaches GlobalStateOff sadly
         Log.w("$TAG Core has been shut down")
@@ -564,6 +740,21 @@ class CoreContext
     }
 
     @AnyThread
+    fun postOnCoreThreadWhenAvailableForHeavyTask(@WorkerThread lambda: (core: Core) -> Unit, name: String) {
+        postOnCoreThread {
+            if (core.callsNb >= 1) {
+                Log.i("$TAG At least one call is active, wait until there is no more call before executing lambda [$name] (checking again in 1 sec)")
+                coreContext.postOnCoreThreadDelayed({
+                    postOnCoreThreadWhenAvailableForHeavyTask(lambda, name)
+                }, 1000)
+            } else {
+                Log.i("$TAG No active call at the moment, executing lambda [$name] right now")
+                lambda.invoke(core)
+            }
+        }
+    }
+
+    @AnyThread
     fun postOnMainThread(
         @UiThread lambda: () -> Unit
     ) {
@@ -580,6 +771,10 @@ class CoreContext
             if (corePreferences.publishPresence) {
                 Log.i("$TAG App is in foreground, PUBLISHING presence as Online")
                 core.consolidatedPresence = ConsolidatedPresence.Online
+            }
+
+            if (corePreferences.keepServiceAlive && !keepAliveServiceStarted) {
+                startKeepAliveService()
             }
         }
     }
@@ -620,6 +815,11 @@ class CoreContext
             it.params.identityAddress?.weakEqual(address) == true
         }
         return found != null
+    }
+
+    @WorkerThread
+    fun clearFilesToExportToNativeGallery() {
+        filesToExportToNativeMediaGallery.clear()
     }
 
     @WorkerThread
@@ -675,10 +875,6 @@ class CoreContext
         if (forceZRTP) {
             params.mediaEncryption = MediaEncryption.ZRTP
         }
-        /*if (LinphoneUtils.checkIfNetworkHasLowBandwidth(context)) {
-            Log.w("$TAG Enabling low bandwidth mode!")
-            params.isLowBandwidthEnabled = true
-        }*/
 
         params.recordFile = LinphoneUtils.getRecordingFilePathForAddress(address)
 
@@ -692,14 +888,39 @@ class CoreContext
                     "$TAG Using account matching address ${localAddress.asStringUriOnly()} as From"
                 )
             } else {
+                val defaultAccount = core.defaultAccount
+                params.account = defaultAccount
                 Log.e(
-                    "$TAG Failed to find account matching address ${localAddress.asStringUriOnly()}"
+                    "$TAG Failed to find account matching address ${localAddress.asStringUriOnly()}, using default one [${defaultAccount?.params?.identityAddress?.asStringUriOnly()}]"
                 )
+            }
+        } else {
+            val defaultAccount = core.defaultAccount
+            params.account = defaultAccount
+            Log.i("$TAG No local address given, using default account [${defaultAccount?.params?.identityAddress?.asStringUriOnly()}]")
+        }
+
+        val username = address.username.orEmpty()
+        val domain = address.domain.orEmpty()
+        val account = params.account ?: core.defaultAccount
+        if (account != null && Compatibility.isIpAddress(domain)) {
+            Log.i("$TAG SIP URI [${address.asStringUriOnly()}] seems to have an IP address as domain")
+            if (username.isNotEmpty() && (username.startsWith("+") || username.isDigitsOnly())) {
+                val identityDomain = account.params.identityAddress?.domain
+                Log.w("$TAG Username [$username] looks like a phone number, replacing domain [$domain] by the local account one [$identityDomain]")
+                if (identityDomain != null) {
+                    val newAddress = address.clone()
+                    newAddress.domain = identityDomain
+
+                    core.inviteAddressWithParams(newAddress, params)
+                    Log.i("$TAG Starting call to [${newAddress.asStringUriOnly()}]")
+                    return
+                }
             }
         }
 
-        val call = core.inviteAddressWithParams(address, params)
-        Log.i("$TAG Starting call $call")
+        core.inviteAddressWithParams(address, params)
+        Log.i("$TAG Starting call to [${address.asStringUriOnly()}]")
     }
 
     @WorkerThread
@@ -730,7 +951,9 @@ class CoreContext
 
     @WorkerThread
     fun answerCall(call: Call) {
-        Log.i("$TAG Answering call $call")
+        Log.i(
+            "$TAG Answering call with remote address [${call.remoteAddress.asStringUriOnly()}] and to address [${call.toAddress.asStringUriOnly()}]"
+        )
         val params = core.createCallParams(call)
         if (params == null) {
             Log.w("$TAG Answering call without params!")
@@ -785,6 +1008,10 @@ class CoreContext
 
     @WorkerThread
     fun startKeepAliveService() {
+        if (keepAliveServiceStarted) {
+            Log.w("$TAG Keep alive service already started, skipping")
+        }
+
         val serviceIntent = Intent(Intent.ACTION_MAIN).setClass(
             context,
             CoreKeepAliveThirdPartyAccountsService::class.java
@@ -792,6 +1019,7 @@ class CoreContext
         Log.i("$TAG Starting Keep alive for third party accounts Service")
         try {
             context.startService(serviceIntent)
+            keepAliveServiceStarted = true
         } catch (e: Exception) {
             Log.e("$TAG Failed to start keep alive service: $e")
         }
@@ -807,6 +1035,7 @@ class CoreContext
             "$TAG Stopping Keep alive for third party accounts Service"
         )
         context.stopService(serviceIntent)
+        keepAliveServiceStarted = false
     }
 
     @WorkerThread
@@ -827,14 +1056,18 @@ class CoreContext
 
     @WorkerThread
     fun playDtmf(character: Char, duration: Int = 200, ignoreSystemPolicy: Boolean = false) {
-        if (ignoreSystemPolicy || Settings.System.getInt(
-                context.contentResolver,
-                Settings.System.DTMF_TONE_WHEN_DIALING
-            ) != 0
-        ) {
-            core.playDtmf(character, duration)
-        } else {
-            Log.w("$TAG Numpad DTMF tones are disabled in system settings, not playing them")
+        try {
+            if (ignoreSystemPolicy || Settings.System.getInt(
+                    context.contentResolver,
+                    Settings.System.DTMF_TONE_WHEN_DIALING
+                ) != 0
+            ) {
+                core.playDtmf(character, duration)
+            } else {
+                Log.w("$TAG Numpad DTMF tones are disabled in system settings, not playing them")
+            }
+        } catch (snfe: SettingNotFoundException) {
+            Log.e("$TAG DTMF_TONE_WHEN_DIALING system setting not found: $snfe")
         }
     }
 
@@ -866,9 +1099,36 @@ class CoreContext
         core.setUserAgent(userAgent, sdkUserAgent)
     }
 
+    // Migration between versions related
+
     @WorkerThread
-    fun enableLogcat(enable: Boolean) {
-        logcatEnabled = enable
+    private fun removePortFromSipIdentity() {
+        for (account in core.accountList) {
+            val params = account.params
+            val identity = params.identityAddress
+            if (identity != null && identity.port != 0) {
+                val clone = params.clone()
+                val newIdentity = identity.clone()
+                newIdentity.port = 0
+                clone.identityAddress = newIdentity
+                Log.w("$TAG Found account with identity address [${identity.asStringUriOnly()}] that contains port information in domain, removing port information in new identity [${newIdentity.asStringUriOnly()}]")
+                account.params = clone
+            }
+        }
+    }
+
+    @WorkerThread
+    private fun disablePushNotificationsFromThirdPartySipAccounts() {
+        for (account in core.accountList) {
+            val params = account.params
+            val pushAvailableForDomain = params.identityAddress?.domain in corePreferences.pushNotificationCompatibleDomains
+            if (!pushAvailableForDomain && params.pushNotificationAllowed) {
+                val clone = params.clone()
+                clone.pushNotificationAllowed = false
+                Log.w("$TAG Updating account [${params.identityAddress?.asStringUriOnly()}] params to disable push notifications, they won't work and may cause issues when used with UDP transport protocol")
+                account.params = clone
+            }
+        }
     }
 
     @WorkerThread
@@ -897,7 +1157,7 @@ class CoreContext
 
         for (account in core.accountList) {
             val params = account.params
-            if (params.domain == corePreferences.defaultDomain && params.limeAlgo.isNullOrEmpty()) {
+            if (params.identityAddress?.domain == corePreferences.defaultDomain && params.limeAlgo.isNullOrEmpty()) {
                 val clone = params.clone()
                 clone.limeAlgo = "c25519"
                 Log.i("$TAG Updating account [${params.identityAddress?.asStringUriOnly()}] params to use LIME algo c25519")
@@ -929,5 +1189,20 @@ class CoreContext
 
         Log.i("$TAG Removing previous grammar files (without .belr extension)")
         corePreferences.clearPreviousGrammars()
+    }
+
+    @WorkerThread
+    fun isCrashlyticsAvailable(): Boolean {
+        return crashlyticsAvailable
+    }
+
+    @WorkerThread
+    fun updateLogcatEnabledSetting(enabled: Boolean) {
+        logcatEnabled = enabled
+    }
+
+    @WorkerThread
+    fun updateCrashlyticsEnabledSetting(enabled: Boolean) {
+        crashlyticsEnabled = enabled
     }
 }

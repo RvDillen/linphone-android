@@ -35,6 +35,7 @@ import androidx.navigation.fragment.findNavController
 import androidx.slidingpanelayout.widget.SlidingPaneLayout
 import androidx.slidingpanelayout.widget.SlidingPaneLayout.PanelSlideListener
 import com.google.android.material.textfield.TextInputLayout
+import org.linphone.LinphoneApplication.Companion.corePreferences
 import org.linphone.R
 import org.linphone.core.tools.Log
 import org.linphone.databinding.BottomNavBarBinding
@@ -55,6 +56,8 @@ import org.linphone.utils.showKeyboard
 abstract class AbstractMainFragment : GenericMainFragment() {
     companion object {
         private const val TAG = "[Abstract Main Fragment]"
+
+        private const val TIME_MS_AFTER_WHICH_REFRESH_DATA_ON_RESUME = 3600000 // 1 hour
     }
 
     protected val outlineProvider = object : ViewOutlineProvider() {
@@ -65,7 +68,11 @@ abstract class AbstractMainFragment : GenericMainFragment() {
         }
     }
 
+    protected var lastOnPauseTimestamp: Long = -1L
+
     private var currentFragmentId: Int = 0
+
+    private lateinit var navigationBar: View
 
     private lateinit var viewModel: AbstractMainViewModel
 
@@ -96,7 +103,19 @@ abstract class AbstractMainFragment : GenericMainFragment() {
             backPressedCallback
         )
 
+        lastOnPauseTimestamp = -1
         super.onViewCreated(view, savedInstanceState)
+    }
+
+    override fun onPause() {
+        lastOnPauseTimestamp = System.currentTimeMillis()
+        super.onPause()
+    }
+
+    fun shouldRefreshDataInOnResume(): Boolean {
+        if (lastOnPauseTimestamp == -1L) return false
+        if (!corePreferences.keepServiceAlive) return false
+        return System.currentTimeMillis() - lastOnPauseTimestamp > TIME_MS_AFTER_WHICH_REFRESH_DATA_ON_RESUME
     }
 
     fun setViewModel(abstractMainViewModel: AbstractMainViewModel) {
@@ -184,9 +203,10 @@ abstract class AbstractMainFragment : GenericMainFragment() {
         navBar: BottomNavBarBinding,
         @IdRes fragmentId: Int
     ) {
+        navigationBar = navBar.root
+
         initSlidingPane(slidingPane)
         initSearchBar(topBar.search)
-        initBottomNavBar(navBar.root)
         initNavigation(fragmentId)
     }
 
@@ -211,6 +231,7 @@ abstract class AbstractMainFragment : GenericMainFragment() {
             it.consume {
                 if (slidingPane.isSlideable) {
                     Log.d("$TAG Closing sliding pane")
+                    ensureNavigationBarIsVisible()
                     slidingPane.closePane()
                 }
             }
@@ -239,7 +260,9 @@ abstract class AbstractMainFragment : GenericMainFragment() {
                                 slidingPane.removePanelSlideListener(this)
                             }
 
-                            override fun onPanelClosed(panel: View) { }
+                            override fun onPanelClosed(panel: View) {
+                                ensureNavigationBarIsVisible()
+                            }
                         })
                     }
                     slidingPane.openPane()
@@ -268,15 +291,20 @@ abstract class AbstractMainFragment : GenericMainFragment() {
                     searchBar.showKeyboard()
                 } else {
                     searchBar.hideKeyboard()
+                    ensureNavigationBarIsVisible()
                 }
             }
         }
+
+        searchBar.setKeyboardInsetListener { keyboardVisible ->
+            val portraitOrientation = resources.configuration.orientation != Configuration.ORIENTATION_LANDSCAPE
+            navigationBar.visibility = if (!portraitOrientation || !keyboardVisible) View.VISIBLE else View.GONE
+        }
     }
 
-    private fun initBottomNavBar(navBar: View) {
-        view?.setKeyboardInsetListener { keyboardVisible ->
-            val portraitOrientation = resources.configuration.orientation != Configuration.ORIENTATION_LANDSCAPE
-            navBar.visibility = if (!portraitOrientation || !keyboardVisible) View.VISIBLE else View.GONE
+    private fun ensureNavigationBarIsVisible() {
+        if (::navigationBar.isInitialized) {
+            navigationBar.visibility = View.VISIBLE
         }
     }
 

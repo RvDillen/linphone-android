@@ -20,6 +20,7 @@
 package org.linphone.compatibility
 
 import android.content.Intent
+import android.net.InetAddresses.isNumericAddress
 import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
@@ -27,13 +28,10 @@ import android.view.View
 import android.view.contentcapture.ContentCaptureContext
 import android.view.contentcapture.ContentCaptureSession
 import androidx.annotation.RequiresApi
-import org.linphone.utils.LinphoneUtils
 
 @RequiresApi(Build.VERSION_CODES.Q)
 class Api29Compatibility {
     companion object {
-        private const val TAG = "[API 29 Compatibility]"
-
         fun getMediaCollectionUri(isImage: Boolean, isVideo: Boolean, isAudio: Boolean): Uri {
             return when {
                 isImage -> {
@@ -59,12 +57,15 @@ class Api29Compatibility {
             return intent.getStringExtra(Intent.EXTRA_LOCUS_ID)
         }
 
-        fun setLocusIdInContentCaptureSession(root: View, localSipUri: String, remoteSipUri: String) {
+        fun setLocusIdInContentCaptureSession(root: View, conversationId: String) {
             val session: ContentCaptureSession? = root.contentCaptureSession
             if (session != null) {
-                val id = LinphoneUtils.getChatRoomId(localSipUri, remoteSipUri)
-                session.contentCaptureContext = ContentCaptureContext.forLocusId(id)
+                session.contentCaptureContext = ContentCaptureContext.forLocusId(conversationId)
             }
+        }
+
+        fun isIpAddress(string: String): Boolean {
+            return isNumericAddress(string)
         }
     }
 }

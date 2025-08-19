@@ -18,6 +18,7 @@
     <string name="notification_channel_missed_call_id" translatable="false">linphone_6.0_notification_missed_call_id</string>
     <string name="notification_channel_service_id" translatable="false">linphone_6.0_notification_service_id</string>
     <string name="notification_channel_chat_id" translatable="false">linphone_6.0_notification_chat_id</string>
+    <string name="notification_channel_without_ringtone_incoming_call_id" translatable="false">linphone_6.0.1_notification_incoming_call_id</string>
 
     <string name="emoji_love" translatable="false">❤️</string>
     <string name="emoji_thumbs_up" translatable="false">👍</string>
@@ -26,13 +27,14 @@
     <string name="emoji_tear" translatable="false">😢</string>
 
     <string name="help_about_open_source_licenses_title" translatable="false">GNU General Public License v3.0</string>
-    <string name="help_about_open_source_licenses_subtitle" translatable="false">© Belledonne Communications 2010-2024</string>
+    <string name="help_about_open_source_licenses_subtitle" translatable="false">© Belledonne Communications 2010-2025</string>
     <string name="help_advanced_send_debug_logs_email_address" translatable="false">linphone-android@belledonne-communications.com</string>
 
     <string name="website_contact_url" translatable="false">https://linphone.org/contact</string>
     <string name="website_download_url" translatable="false">https://linphone.org/linphone-softphone</string>
+    <string name="website_user_guide_url" translatable="false">https://linphone.org/en/docs/</string>
     <string name="website_privacy_policy_url" translatable="false">https://linphone.org/en/privacy-policy</string>
-    <string name="website_terms_and_conditions_url" translatable="false">https://www.linphone.org/en/terms-of-use</string>
+    <string name="website_terms_and_conditions_url" translatable="false">https://linphone.org/en/terms-of-use</string>
     <string name="web_platform_register_email_url" translatable="false">https://subscribe.linphone.org/register/email</string>
     <string name="web_platform_forgotten_password_url" translatable="false">https://subscribe.linphone.org/</string>
     <string name="website_translate_weblate_url" translatable="false">https://weblate.linphone.org/</string>
@@ -44,7 +46,6 @@
     <!-- Common words -->
     <string name="sip_address">SIP address</string>
     <string name="device_id">Device ID</string>
-    <string name="sip_address_hint">username@domain</string>
     <string name="sip_address_display_name">Display name</string>
     <string name="sip_address_domain">Domain</string>
     <string name="username">Username</string>
@@ -52,7 +53,7 @@
     <string name="password">Password</string>
     <string name="phone_number">Phone number</string>
     <string name="or">or</string>
-    <string name="next">next</string>
+    <string name="next">Next</string>
     <string name="start">Start</string>
     <string name="today">Today</string>
     <string name="yesterday">Yesterday</string>
@@ -108,6 +109,7 @@
         <item quantity="other">%s files being downloaded</item>
     </plurals>
     <string name="notification_file_transfer_upload_download_message" translatable="false">%s, %s</string>
+    <string name="notification_keep_app_alive_message">Click to open</string>
 
     <!-- First screens user see when app is installed and started -->
     <string name="welcome_page_title">Welcome</string>
@@ -129,6 +131,7 @@
     <string name="media_playback_low_volume_warning_toast">Media volume is low, you may not hear anything!</string>
     <string name="remote_provisioning_config_applied_toast">Configuration successfully applied</string>
     <string name="remote_provisioning_config_failed_toast">Error while trying to download and apply remote configuration</string>
+    <string name="media_player_generic_error_toast">Error trying to create media player</string>
 
     <!-- Assistant related string (account register / login / etc...) -->
     <string name="assistant_dialog_general_terms_and_privacy_policy_title">General terms &amp; privacy policy</string>
@@ -145,6 +148,7 @@
     <string name="assistant_login_using_single_sign_on">Single sign on</string>
     <string name="assistant_login_cant_parse_address_toast">SIP address is invalid!</string>
     <string name="assistant_login_address_without_username_toast">SIP address doesn\'t contains a username!</string>
+    <string name="assistant_account_login_already_connected_error">Account already exists</string>
     <string name="assistant_no_account_yet">No account yet?</string>
     <string name="assistant_account_register">Register</string>
     <string name="assistant_account_creation_sms_confirmation_title">Confirm your phone number</string>
@@ -155,10 +159,9 @@
     <string name="assistant_already_have_an_account">Already have an account?</string>
     <string name="assistant_sip_account_transport_protocol">Transport</string>
     <string name="assistant_third_party_sip_account_warning_explanation">Some features require a &appName; account, such as group messaging, video conferences…\n\nThese features are hidden when you register with a third party SIP account.\n\nTo enable it in a commercial project, please contact us.</string>
-    <string name="assistant_third_party_sip_account_create_linphone_account">I prefer to create an account</string>
+    <string name="assistant_third_party_sip_account_create_linphone_account">I prefer to create a &appName; account</string>
     <string name="assistant_third_party_sip_account_warning_ok">I understand</string>
-    <string name="assistant_third_party_sip_account_username_or_identity">Username or SIP identity*</string>
-    <string name="assistant_account_register_unavailable_no_push_toast">Push notifications not available, account creation disabled</string>
+    <string name="assistant_account_register_unavailable_no_push_warning">Push notifications do not seem to be available on your device, but they are mandatory for creating an account in the mobile app.\n\nWe invite you to create an account on our web platform instead:</string>
     <string name="assistant_account_register_push_notification_not_received_error">Push notification with auth token not received in 5 seconds, please try again later</string>
     <string name="assistant_account_register_unexpected_error">Unexpected error occurred, please try again later</string>
     <string name="assistant_account_login_forbidden_error">Wrong username or password</string>
@@ -171,6 +174,14 @@
     <string name="assistant_permissions_post_notifications_title"><b>Post notifications:</b> To be informed when you receive a message or a call.</string>
     <string name="assistant_permissions_record_audio_title"><b>Record audio:</b> So your correspondent can hear you and to record voice messages.</string>
     <string name="assistant_permissions_access_camera_title"><b>Access camera:</b> To capture video during video calls and conferences.</string>
+    <string name="assistant_forgotten_password_title">Password forgotten</string>
+    <string name="assistant_forgotten_password_subtitle">Choose how to recover your account.</string>
+    <string name="assistant_forgotten_password_message">You created your account using:</string>
+    <string name="assistant_recover_email_account_label">An email</string>
+    <string name="assistant_recover_phone_number_account_label">A phone number</string>
+    <string name="assistant_recover_phone_number_account_subtitle">Enter the phone number linked to your account, we\'ll send you a code.</string>
+    <string name="assistant_recover_phone_number_account_send_code_label">Send the code</string>
+    <string name="assistant_recover_phone_number_account_unavailable_no_push_warning">Push notifications do not seem to be available on your device, but they are mandatory for recovering a phone number account in the mobile app.</string>
 
     <!-- Main navigation items -->
     <string name="bottom_navigation_contacts_label">Contacts</string>
@@ -191,11 +202,14 @@
     <!-- Help & troubleshooting related -->
     <string name="help_title">Help</string>
     <string name="help_about_title">About &appName;</string>
+    <string name="help_about_user_guide_title">&appName; user guide</string>
+    <string name="help_about_user_guide_subtitle">Learn how to master all app features, step by step.</string>
     <string name="help_about_privacy_policy_title">Privacy policy</string>
     <string name="help_about_privacy_policy_subtitle">What information &appName; collects and uses</string>
     <string name="help_about_version_title">Version</string>
     <string name="help_about_check_for_update">Check update</string>
     <string name="help_about_contribute_translations_title">Contribute on &appName; translation</string>
+    <string name="help_about_contribute_translations_subtitle">Help make the app accessible to as many people as possible.</string>
     <string name="help_about_advanced_title">Advanced</string>
     <string name="help_version_up_to_date_toast_message">Your version is up-to-date</string>
     <string name="help_error_checking_version_toast_message">An error occurred while checking for update</string>
@@ -203,6 +217,7 @@
     <string name="help_dialog_update_available_message">A new version %s is available. Do you want to update?</string>
     <string name="help_quit_title">Quit app</string>
     <string name="help_troubleshooting_title">Troubleshooting</string>
+    <string name="help_troubleshooting_subtitle">Transmit your diagnostic logs to facilitate bug resolution.</string>
     <string name="help_troubleshooting_print_logs_in_logcat">Print logs in logcat</string>
     <string name="help_troubleshooting_clean_logs">Clean logs</string>
     <string name="help_troubleshooting_share_logs">Share logs</string>
@@ -221,8 +236,9 @@
     <string name="settings_security_enable_vfs_title">Encrypt everything</string>
     <string name="settings_security_enable_vfs_subtitle">Warning: once enabled it can\'t be disabled!</string>
     <string name="settings_security_enable_vfs_failure_toast">Failed to enable encryption module!</string>
+    <string name="settings_security_enable_vfs_success_toast">Encryption module enabled</string>
     <string name="settings_security_enable_vfs_dialog_confirmation_title">Do you really want to encrypt everything?</string>
-    <string name="settings_security_enable_vfs_dialog_confirmation_message">Be careful, it can\'t be undone!</string>
+    <string name="settings_security_enable_vfs_dialog_confirmation_message">Once activated, you\'ll have to restart the app.\nAfter that all application data will be encrypted and accessible only via the application.\n\nBe careful, it can\'t be undone!</string>
     <string name="settings_security_prevent_screenshots_title">Prevent interface from being recorded</string>
     <string name="settings_calls_title">Calls</string>
     <string name="settings_calls_echo_canceller_title">Use software echo canceller</string>
@@ -238,8 +254,10 @@
     <string name="settings_calls_vibrate_while_ringing_title">Vibrate while incoming call is ringing</string>
     <string name="settings_calls_auto_record_title">Automatically start recording calls</string>
     <string name="settings_calls_change_ringtone_title">Change ringtone</string>
+    <string name="settings_calls_change_ringtone_pick_title">Pick ringtone</string>
     <string name="settings_conversations_title">Conversations</string>
     <string name="settings_conversations_auto_download_title">Auto-download files</string>
+    <string name="settings_conversations_auto_export_media_to_native_gallery_title">Make downloaded media public</string>
     <string name="settings_conversations_mark_as_read_when_dismissing_notif_title">Mark conversation as read when dismissing message notification</string>
     <string name="settings_contacts_title">Contacts</string>
     <string name="settings_contacts_add_ldap_server_title">Add LDAP server</string>
@@ -256,6 +274,7 @@
     <string name="settings_contacts_carddav_sync_error_toast">Synchronization error!</string>
     <string name="settings_contacts_carddav_deleted_toast">CardDAV account removed</string>
     <string name="settings_contacts_carddav_mandatory_field_not_filled_toast">Please fill at least the display name and the server URL</string>
+    <string name="settings_contacts_ldap_enabled_title">Enabled</string>
     <string name="settings_contacts_ldap_server_url_title">Server URL (can\'t be empty)</string>
     <string name="settings_contacts_ldap_bind_dn_title">Bind DN</string>
     <string name="settings_contacts_ldap_password_title">Password</string>
@@ -279,6 +298,7 @@
     <string name="settings_network_use_wifi_only">Use only Wi-Fi networks</string>
     <string name="settings_network_allow_ipv6">Allow IPv6</string>
     <string name="settings_user_interface_title">User interface</string>
+    <string name="settings_user_interface_auto_show_dialpad_title">Automatically open dialpad</string>
     <string name="settings_user_interface_theme_title">Theme</string>
     <string name="settings_user_interface_dark_theme_label">Dark theme</string>
     <string name="settings_user_interface_light_theme_label">Light theme</string>
@@ -296,15 +316,24 @@
     <string name="settings_tunnel_mode_auto_label">Auto</string>
 
     <string name="settings_advanced_title">Advanced settings</string>
+    <string name="settings_advanced_print_logs_crashlytics_title">Help developers troubleshoot issues by sending logs to Crashlytics after a crash</string>
+    <string name="settings_advanced_start_at_boot_title">Start when device boots</string>
     <string name="settings_advanced_keep_alive_service_title">Keep app alive using Service</string>
     <string name="settings_advanced_device_id">Device ID</string>
     <string name="settings_advanced_device_id_hint">Alpha-numerical characters only</string>
     <string name="settings_advanced_upload_server_url">File sharing server URL</string>
+    <string name="settings_advanced_logs_upload_server_url">Logs sharing server URL</string>
+    <string name="settings_advanced_use_smff_format_for_call_recordings_title">Record video calls using H265/AV1</string>
+    <string name="settings_advanced_use_smff_format_for_call_recordings_subtitle">Will use a proprietary file format</string>
     <string name="settings_advanced_media_encryption_title">Media encryption</string>
     <string name="settings_advanced_media_encryption_mandatory_title">Media encryption mandatory</string>
     <string name="settings_advanced_create_e2e_encrypted_conferences_title">Create end-to-end encrypted meetings &amp; group calls</string>
     <string name="settings_advanced_accept_early_media_title">Accept early media</string>
+    <string name="settings_advanced_ring_during_early_media_title">Ring during incoming early media call</string>
     <string name="settings_advanced_allow_outgoing_early_media_title">Allow outgoing early media</string>
+    <string name="settings_advanced_enable_auto_answer_incoming_calls_title">Auto answer incoming calls</string>
+    <string name="settings_advanced_enable_auto_answer_incoming_calls_after_delay_title">Delay before auto answering call</string>
+    <string name="settings_advanced_enable_auto_answer_incoming_calls_after_delay_hint">Delay in milliseconds</string>
     <string name="settings_advanced_remote_provisioning_url">Remote provisioning URL</string>
     <string name="settings_advanced_download_apply_remote_provisioning">Download &amp; apply</string>
     <string name="settings_advanced_audio_devices_title">Audio devices</string>
@@ -315,6 +344,11 @@
     <string name="settings_advanced_audio_codecs_stereo_subtitle">stereo</string>
     <string name="settings_advanced_video_codecs_title">Video codecs</string>
     <string name="settings_advanced_go_to_android_app_settings_title">&appName; Android settings</string>
+
+    <string name="settings_developer_title">Developer settings</string>
+    <string name="settings_developer_show_title">Show developer settings</string>
+    <string name="settings_developer_enabled_toast">Developer settings enabled</string>
+    <string name="settings_developer_already_enabled_toast">Developer settings already enabled</string>
 
     <!-- Account profile & settings -->
     <string name="manage_account_title">Manage account</string>
@@ -365,11 +399,13 @@
     <string name="account_settings_cpim_in_basic_conversations_title">Use CPIM in \"basic\" conversations</string>
     <string name="account_settings_voicemail_uri_title">Voicemail URI</string>
     <string name="account_settings_mwi_uri_title"> MWI server URI (Message Waiting Indicator)</string>
+    <string name="account_settings_apply_international_prefix_title">Format phone numbers using international prefix</string>
+    <string name="account_settings_replace_plus_by_00_title">Replace + by 00 when formatting phone numbers</string>
     <string name="account_settings_update_password_title">Update password</string>
 
     <string name="account_settings_dialog_invalid_password_title">Authentication needed</string>
     <string name="account_settings_dialog_invalid_password_message">Connection failed because authentication is missing or invalid for account \n%s.\n\nYou can provide password again, or check your account configuration in the settings.</string>
-    <string name="account_settings_dialog_invalid_password_hint">New password</string>
+    <string name="account_settings_dialog_invalid_password_hint">Password</string>
     <string name="account_failed_to_find_identity_toast">Failed to find matching account!</string>
 
     <!-- Call history -->
@@ -390,6 +426,8 @@
 
     <!-- Contacts -->
     <string name="contacts_list_empty">No contact for the moment…</string>
+    <string name="contacts_list_sip_empty">No SIP contact for the moment…</string>
+    <string name="contacts_change_filter_label">Change filter</string>
     <string name="contacts_list_favourites_title">Favourites</string>
     <string name="contacts_list_all_contacts_title">All contacts</string>
     <string name="contacts_list_filter_popup_see_all">See all</string>
@@ -483,7 +521,6 @@
         <item quantity="one">%s is composing…</item>
         <item quantity="other">%s are composing…</item>
     </plurals>
-    <string name="conversation_creation_error_toast">Failed to create conversation!</string>
     <string name="conversation_add_participants_title">Add participants</string>
     <string name="conversation_reply_to_message_title">Replying to:</string>
     <string name="conversation_menu_search_in_messages">Search</string>
@@ -534,6 +571,7 @@
     <string name="conversation_pick_file_from_gallery_label">Open gallery</string>
     <string name="conversation_pick_any_file_label">Pick file</string>
     <string name="conversation_file_cant_be_opened_error_toast">File can\'t be opened!</string>
+    <string name="conversation_pdf_file_cant_be_opened_error_toast">Can\'t open password protected PDFs yet</string>
 
     <string name="conversation_info_participants_list_title">Group members (%s)</string>
     <string name="conversation_info_add_participants_label">Add participants</string>
@@ -631,6 +669,7 @@
     <string name="meeting_info_cancelled_toast">Meeting has been cancelled</string>
     <string name="meeting_info_cancelled">Meeting cancelled</string>
     <string name="meeting_failed_to_schedule_toast">Failed to schedule meeting!</string>
+    <string name="meeting_failed_to_edit_schedule_toast">Failed to edit meeting!</string>
     <string name="meeting_schedule_mandatory_field_not_filled_toast">Please fill the title and select at least one participant</string>
     <string name="meeting_failed_to_send_invites_toast">Failed to send all invites to meeting!</string>
     <string name="meeting_failed_to_send_part_of_invites_toast">Failed to send invites to some participants of the meeting!</string>
@@ -809,13 +848,16 @@
         <item quantity="one">%s notification for other account(s)</item>
         <item quantity="other">%s notifications for other account(s)</item>
     </plurals>
+    <string name="default_account_disabled">Selected account is currently disabled</string>
     <string name="network_not_reachable">You aren\'t connected to internet</string>
+    <string name="network_is_not_wifi">Wi-Fi only mode enabled</string>
     <string name="operation_in_progress_overlay">Operation in progress, please wait</string>
     <string name="generic_address_picker_conversations_list_title">Conversations</string>
     <string name="generic_address_picker_contacts_list_title">Contacts</string>
     <string name="generic_address_picker_favorites_list_title">Favorites</string>
     <string name="generic_address_picker_suggestions_list_title">Suggestions</string>
     <string name="post_notifications_permission_not_granted">Post notifications permission not granted!</string>
+    <string name="full_screen_intent_permission_not_granted">Show incoming call permission not granted!</string>
     <plurals name="mwi_messages_are_waiting">
         <item quantity="one">%s new voice message</item>
         <item quantity="other">%s new voice messages</item>
@@ -850,7 +892,7 @@
     <string name="content_description_answer_video_call">Answers the video call</string>
     <string name="content_description_call_start">Starts a call</string>
     <string name="content_description_call_start_video">Starts a video call</string>
-    <string name="content_description_toggle_video">Enables/disables sending  your camera feed</string>
+    <string name="content_description_toggle_video">Enables/disables sending your camera feed</string>
     <string name="content_description_toggle_microphone">Mute/un-mute your microphone</string>
     <string name="content_description_change_output_audio_device">Changes output audio device</string>
     <string name="content_description_change_camera">Changes camera (front/back) being used</string>
@@ -920,6 +962,8 @@
     <string name="content_description_go_to_conversation">Go to conversation</string>
     <string name="content_description_copy_text_to_clipboard">Copy text to clipboard</string>
     <string name="content_description_voicemail_available">Voice message are available</string>
+    <string name="content_description_call_voicemail">Long press to dial voicemail</string>
+    <string name="content_description_cancel_files_or_text_pending_sharing">Click to cancel files or text pending sharing</string>
 
     <!-- Copy of private hosts_allowlist_sample in androidx.car.app:app:1.7.0-beta01, as they recommend it -->
     <string-array name="hosts_allowlist_sample_copy" translatable="false">

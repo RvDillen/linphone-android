@@ -179,9 +179,9 @@ fun AppCompatEditText.removeCharacterAtPosition() {
 
 @UiThread
 fun AppCompatEditText.addCharacterAtPosition(character: String) {
-    val newValue = "${text}$character"
-    setText(newValue)
-    setSelection(newValue.length)
+    val start = selectionStart
+    text?.insert(start, character)
+    setSelection(start + character.length)
 }
 
 @UiThread
@@ -225,12 +225,6 @@ fun View.setKeyboardInsetListener(lambda: (visible: Boolean) -> Unit) {
 @BindingAdapter("android:src")
 fun ImageView.setSourceImageResource(resource: Int) {
     this.setImageResource(resource)
-}
-
-@UiThread
-@BindingAdapter("android:textStyle")
-fun AppCompatTextView.setTypeface(typeface: Int) {
-    this.setTypeface(null, typeface)
 }
 
 @UiThread
@@ -335,7 +329,7 @@ private fun loadImageForChatBubble(
     val isVideo = FileUtils.isExtensionVideo(file)
     if (isImage || isVideo) {
         val dimen = if (grid) {
-            imageView.resources.getDimension(R.dimen.chat_bubble_grid_image_size).toInt()
+            imageView.resources.getDimension(R.dimen.chat_bubble_grid_file_size).toInt()
         } else {
             imageView.resources.getDimension(R.dimen.chat_bubble_big_image_max_size).toInt()
         }
@@ -573,6 +567,13 @@ fun setConstraintLayoutWidthMax(view: View, dp: Float) {
 @BindingAdapter("roundCornersRadius")
 fun RoundCornersTextureView.setRoundCornersRadius(radius: Float) {
     setRadius(radius)
+}
+
+@BindingAdapter("passwordInputType")
+fun setInputTypeAndFont(editText: EditText, type: Int) {
+    editText.inputType = type
+    // Typeface must be set again...
+    editText.typeface = ResourcesCompat.getFont(editText.context, R.font.noto_sans)
 }
 
 @BindingAdapter("focusNextOnInput")

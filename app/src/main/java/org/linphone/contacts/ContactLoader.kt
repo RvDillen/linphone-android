@@ -29,8 +29,14 @@ import androidx.annotation.WorkerThread
 import androidx.loader.app.LoaderManager
 import androidx.loader.content.CursorLoader
 import androidx.loader.content.Loader
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import java.lang.Exception
 import org.linphone.LinphoneApplication.Companion.coreContext
+import org.linphone.core.Core
 import org.linphone.core.Factory
 import org.linphone.core.Friend
 import org.linphone.core.FriendList
@@ -61,7 +67,7 @@ class ContactLoader : LoaderManager.LoaderCallbacks<Cursor> {
         private const val MIN_INTERVAL_TO_WAIT_BEFORE_REFRESH = 300000L // 5 minutes
     }
 
-    private val friends = HashMap<String, Friend>()
+    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     @MainThread
     override fun onCreateLoader(id: Int, args: Bundle?): Loader<Cursor> {
@@ -108,25 +114,26 @@ class ContactLoader : LoaderManager.LoaderCallbacks<Cursor> {
         Log.i("$TAG Load finished, found ${cursor.count} entries in cursor")
 
         coreContext.postOnCoreThread {
-            parseFriends(cursor)
+            val core = coreContext.core
+            val state = core.globalState
+            if (state == GlobalState.Shutdown || state == GlobalState.Off) {
+                Log.w("$TAG Core is being stopped or already destroyed, abort")
+            } else {
+                scope.launch {
+                    parseFriends(core, cursor)
+                }
+            }
         }
     }
 
     @MainThread
     override fun onLoaderReset(loader: Loader<Cursor>) {
         Log.i("$TAG Loader reset")
+        scope.cancel()
     }
 
     @WorkerThread
-    private fun parseFriends(cursor: Cursor) {
-        val core = coreContext.core
-
-        val state = core.globalState
-        if (state == GlobalState.Shutdown || state == GlobalState.Off) {
-            Log.w("$TAG Core is being stopped or already destroyed, abort")
-            return
-        }
-
+    private fun parseFriends(core: Core, cursor: Cursor) {
         try {
             val contactIdColumn = cursor.getColumnIndexOrThrow(ContactsContract.Data.CONTACT_ID)
             val mimetypeColumn = cursor.getColumnIndexOrThrow(ContactsContract.Data.MIMETYPE)
@@ -164,6 +171,8 @@ class ContactLoader : LoaderManager.LoaderCallbacks<Cursor> {
             val familyNameColumn = cursor.getColumnIndexOrThrow(
                 ContactsContract.CommonDataKinds.StructuredName.FAMILY_NAME
             )
+
+            val friends = HashMap<String, Friend>()
             while (!cursor.isClosed && cursor.moveToNext()) {
                 try {
                     val id: String = cursor.getString(contactIdColumn)
@@ -219,14 +228,9 @@ class ContactLoader : LoaderManager.LoaderCallbacks<Cursor> {
                                 }
 
                             if (!number.isNullOrEmpty()) {
-                                if (friend.phoneNumbersWithLabel.find {
-                                    PhoneNumberUtils.arePhoneNumberWeakEqual(it.phoneNumber, number)
-                                } == null
-                                ) {
-                                    val phoneNumber = Factory.instance()
-                                        .createFriendPhoneNumber(number, label)
-                                    friend.addPhoneNumberWithLabel(phoneNumber)
-                                }
+                                val phoneNumber = Factory.instance()
+                                    .createFriendPhoneNumber(number, label)
+                                friend.addPhoneNumberWithLabel(phoneNumber)
                             }
                         }
                         ContactsContract.CommonDataKinds.SipAddress.CONTENT_ITEM_TYPE -> {
@@ -250,17 +254,14 @@ class ContactLoader : LoaderManager.LoaderCallbacks<Cursor> {
                             }
                         }
                         ContactsContract.CommonDataKinds.StructuredName.CONTENT_ITEM_TYPE -> {
-                            val vCard = friend.vcard
-                            if (vCard != null) {
-                                val givenName: String? = cursor.getString(givenNameColumn)
-                                if (!givenName.isNullOrEmpty()) {
-                                    vCard.givenName = givenName
-                                }
+                            val givenName: String? = cursor.getString(givenNameColumn)
+                            if (!givenName.isNullOrEmpty()) {
+                                friend.firstName = givenName
+                            }
 
-                                val familyName: String? = cursor.getString(familyNameColumn)
-                                if (!familyName.isNullOrEmpty()) {
-                                    vCard.familyName = familyName
-                                }
+                            val familyName: String? = cursor.getString(familyNameColumn)
+                            if (!familyName.isNullOrEmpty()) {
+                                friend.lastName = familyName
                             }
                         }
                     }
@@ -273,9 +274,9 @@ class ContactLoader : LoaderManager.LoaderCallbacks<Cursor> {
 
             Log.i("$TAG Contacts parsed, posting another task to handle adding them (or not)")
             // Re-post another task to allow other tasks on Core thread
-            coreContext.postOnCoreThread {
-                addFriendsIfNeeded()
-            }
+            coreContext.postOnCoreThreadWhenAvailableForHeavyTask({
+                addFriendsIfNeeded(friends)
+            }, "add friends to Core")
         } catch (sde: StaleDataException) {
             Log.e("$TAG State Data Exception: $sde")
         } catch (ise: IllegalStateException) {
@@ -286,12 +287,12 @@ class ContactLoader : LoaderManager.LoaderCallbacks<Cursor> {
     }
 
     @WorkerThread
-    private fun addFriendsIfNeeded() {
+    private fun addFriendsIfNeeded(friends: HashMap<String, Friend>) {
         val core = coreContext.core
 
         if (core.globalState == GlobalState.Shutdown || core.globalState == GlobalState.Off) {
             Log.w("$TAG Core is being stopped or already destroyed, abort")
-        } else if (friends.isEmpty) {
+        } else if (friends.isEmpty()) {
             Log.w("$TAG No friend created!")
         } else {
             Log.i("$TAG ${friends.size} friends fetched")
@@ -322,7 +323,7 @@ class ContactLoader : LoaderManager.LoaderCallbacks<Cursor> {
                         friends.remove(localFriend.refKey)
                         localFriend.nativeUri =
                             newlyFetchedFriend.nativeUri // Native URI isn't stored in linphone database, needs to be updated
-                        if (newlyFetchedFriend.vcard?.asVcard4String() == localFriend.vcard?.asVcard4String()) continue
+                        if (newlyFetchedFriend.dumpVcard() == localFriend.dumpVcard()) continue
 
                         localFriend.edit()
                         // Update basic fields that may have changed

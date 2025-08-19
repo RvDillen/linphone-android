@@ -33,7 +33,9 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import com.google.android.material.bottomsheet.BottomSheetBehavior
 import kotlin.getValue
 import org.linphone.LinphoneApplication.Companion.coreContext
+import org.linphone.LinphoneApplication.Companion.corePreferences
 import org.linphone.R
+import org.linphone.core.Address
 import org.linphone.core.tools.Log
 import org.linphone.databinding.CallTransferFragmentBinding
 import org.linphone.ui.call.adapter.CallsListAdapter
@@ -41,13 +43,11 @@ import org.linphone.ui.call.model.CallModel
 import org.linphone.ui.call.viewmodel.CallsViewModel
 import org.linphone.ui.call.viewmodel.CurrentCallViewModel
 import org.linphone.ui.main.adapter.ConversationsContactsAndSuggestionsListAdapter
-import org.linphone.ui.main.contacts.model.ContactNumberOrAddressClickListener
-import org.linphone.ui.main.contacts.model.ContactNumberOrAddressModel
 import org.linphone.ui.main.history.viewmodel.StartCallViewModel
 import org.linphone.utils.ConfirmationDialogModel
-import org.linphone.ui.main.model.ConversationContactOrSuggestionModel
 import org.linphone.utils.AppUtils
 import org.linphone.utils.DialogUtils
+import org.linphone.utils.LinphoneUtils
 import org.linphone.utils.RecyclerViewHeaderDecoration
 import org.linphone.utils.hideKeyboard
 import org.linphone.utils.setKeyboardInsetListener
@@ -65,6 +65,16 @@ class TransferCallFragment : GenericCallFragment() {
         R.id.call_nav_graph
     )
 
+    private val bottomSheetCallback = object : BottomSheetBehavior.BottomSheetCallback() {
+        override fun onStateChanged(bottomSheet: View, newState: Int) {
+            if (newState == BottomSheetBehavior.STATE_COLLAPSED || newState == BottomSheetBehavior.STATE_HIDDEN) {
+                viewModel.isNumpadVisible.value = false
+            }
+        }
+
+        override fun onSlide(bottomSheet: View, slideOffset: Float) { }
+    }
+
     private lateinit var callViewModel: CurrentCallViewModel
 
     private lateinit var callsViewModel: CallsViewModel
@@ -74,22 +84,6 @@ class TransferCallFragment : GenericCallFragment() {
     private lateinit var contactsAdapter: ConversationsContactsAndSuggestionsListAdapter
 
     private var numberOrAddressPickerDialog: Dialog? = null
-
-    private val listener = object : ContactNumberOrAddressClickListener {
-        @UiThread
-        override fun onClicked(model: ContactNumberOrAddressModel) {
-            val address = model.address
-            if (address != null) {
-                coreContext.postOnCoreThread {
-                    // TODO FIXME: transfer call (blind)
-                }
-            }
-        }
-
-        @UiThread
-        override fun onLongPress(model: ContactNumberOrAddressModel) {
-        }
-    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -137,18 +131,21 @@ class TransferCallFragment : GenericCallFragment() {
         binding.callsList.setHasFixedSize(true)
         binding.contactsAndSuggestionsList.setHasFixedSize(true)
 
+        binding.contactsAndSuggestionsList.layoutManager = LinearLayoutManager(requireContext())
+        binding.callsList.layoutManager = LinearLayoutManager(requireContext())
+
+        val headerItemDecoration = RecyclerViewHeaderDecoration(requireContext(), contactsAdapter)
+        binding.contactsAndSuggestionsList.addItemDecoration(headerItemDecoration)
+
         callsAdapter.callClickedEvent.observe(viewLifecycleOwner) {
             it.consume { model ->
                 showConfirmAttendedTransferDialog(model)
             }
         }
 
-        val headerItemDecoration = RecyclerViewHeaderDecoration(requireContext(), contactsAdapter)
-        binding.contactsAndSuggestionsList.addItemDecoration(headerItemDecoration)
-
         contactsAdapter.onClickedEvent.observe(viewLifecycleOwner) {
             it.consume { model ->
-                showConfirmBlindTransferDialog(model)
+                showConfirmBlindTransferDialog(model.address, model.name)
             }
         }
 
@@ -162,9 +159,6 @@ class TransferCallFragment : GenericCallFragment() {
                 binding.callsList.adapter = callsAdapter
             }
         }
-
-        binding.contactsAndSuggestionsList.layoutManager = LinearLayoutManager(requireContext())
-        binding.callsList.layoutManager = LinearLayoutManager(requireContext())
 
         viewModel.modelsList.observe(
             viewLifecycleOwner
@@ -226,12 +220,21 @@ class TransferCallFragment : GenericCallFragment() {
             }
         }
 
+        val bottomSheetBehavior = BottomSheetBehavior.from(binding.numpadLayout.root)
+        bottomSheetBehavior.state = BottomSheetBehavior.STATE_COLLAPSED
+        bottomSheetBehavior.addBottomSheetCallback(bottomSheetCallback)
+
         viewModel.isNumpadVisible.observe(viewLifecycleOwner) { visible ->
-            val standardBottomSheetBehavior = BottomSheetBehavior.from(binding.numpadLayout.root)
             if (visible) {
-                standardBottomSheetBehavior.state = BottomSheetBehavior.STATE_EXPANDED
+                bottomSheetBehavior.state = BottomSheetBehavior.STATE_EXPANDED
             } else {
-                standardBottomSheetBehavior.state = BottomSheetBehavior.STATE_COLLAPSED
+                bottomSheetBehavior.state = BottomSheetBehavior.STATE_COLLAPSED
+            }
+        }
+
+        viewModel.initiateBlindTransferEvent.observe(viewLifecycleOwner) {
+            it.consume { address ->
+                showConfirmBlindTransferDialog(address, LinphoneUtils.getDisplayName(address))
             }
         }
 
@@ -256,13 +259,22 @@ class TransferCallFragment : GenericCallFragment() {
             R.string.call_transfer_current_call_title,
             callViewModel.displayedName.value ?: callViewModel.displayedAddress.value
         )
+
+        coreContext.postOnCoreThread {
+            if (corePreferences.automaticallyShowDialpad) {
+                viewModel.isNumpadVisible.postValue(true)
+            }
+        }
     }
 
     private fun showConfirmAttendedTransferDialog(callModel: CallModel) {
+        val from = callViewModel.displayedName.value.orEmpty()
+        val to = callModel.displayName.value.orEmpty()
+        Log.i("$TAG Asking user confirmation before doing attended transfer of call with [$from] to [$to](${callModel.call.remoteAddress.asStringUriOnly()})")
         val label = AppUtils.getFormattedString(
-            org.linphone.R.string.call_transfer_confirm_dialog_message,
-            callViewModel.displayedName.value.orEmpty(),
-            callModel.displayName.value.orEmpty()
+            R.string.call_transfer_confirm_dialog_message,
+            from,
+            to
         )
         val model = ConfirmationDialogModel(label)
         val dialog = DialogUtils.getConfirmCallTransferCallDialog(
@@ -272,6 +284,7 @@ class TransferCallFragment : GenericCallFragment() {
 
         model.cancelEvent.observe(viewLifecycleOwner) {
             it.consume {
+                Log.i("$TAG Attended transfer was cancelled by user")
                 dialog.dismiss()
             }
         }
@@ -294,11 +307,13 @@ class TransferCallFragment : GenericCallFragment() {
         dialog.show()
     }
 
-    private fun showConfirmBlindTransferDialog(contactModel: ConversationContactOrSuggestionModel) {
+    private fun showConfirmBlindTransferDialog(toAddress: Address, toDisplayName: String) {
+        val from = callViewModel.displayedName.value.orEmpty()
+        Log.i("$TAG Asking user confirmation before doing blind transfer of call with [$from] to [$toDisplayName](${toAddress.asStringUriOnly()})")
         val label = AppUtils.getFormattedString(
-            org.linphone.R.string.call_transfer_confirm_dialog_message,
-            callViewModel.displayedName.value.orEmpty(),
-            contactModel.name
+            R.string.call_transfer_confirm_dialog_message,
+            from,
+            toDisplayName
         )
         val model = ConfirmationDialogModel(label)
         val dialog = DialogUtils.getConfirmCallTransferCallDialog(
@@ -308,6 +323,7 @@ class TransferCallFragment : GenericCallFragment() {
 
         model.cancelEvent.observe(viewLifecycleOwner) {
             it.consume {
+                Log.i("$TAG Blind transfer was cancelled by user")
                 dialog.dismiss()
             }
         }
@@ -315,7 +331,7 @@ class TransferCallFragment : GenericCallFragment() {
         model.confirmEvent.observe(viewLifecycleOwner) {
             it.consume {
                 coreContext.postOnCoreThread {
-                    val address = contactModel.address
+                    val address = toAddress
                     Log.i("$TAG Transferring (blind) call to [${address.asStringUriOnly()}]")
                     callViewModel.blindTransferCallTo(address)
                 }

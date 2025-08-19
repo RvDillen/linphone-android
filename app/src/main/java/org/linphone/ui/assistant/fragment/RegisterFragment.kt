@@ -19,9 +19,9 @@
  */
 package org.linphone.ui.assistant.fragment
 
+import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import android.os.Bundle
 import android.telephony.TelephonyManager
 import android.text.Editable
@@ -49,6 +49,7 @@ import org.linphone.utils.ConfirmationDialogModel
 import org.linphone.utils.AppUtils
 import org.linphone.utils.DialogUtils
 import org.linphone.utils.PhoneNumberUtils
+import androidx.core.net.toUri
 
 @UiThread
 class RegisterFragment : GenericFragment() {
@@ -102,11 +103,19 @@ class RegisterFragment : GenericFragment() {
         binding.setOpenSubscribeWebPageClickListener {
             val url = getString(R.string.web_platform_register_email_url)
             try {
-                val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                val browserIntent = Intent(Intent.ACTION_VIEW, url.toUri())
                 startActivity(browserIntent)
             } catch (ise: IllegalStateException) {
                 Log.e(
                     "$TAG Can't start ACTION_VIEW intent for URL [$url], IllegalStateException: $ise"
+                )
+            } catch (anfe: ActivityNotFoundException) {
+                Log.e(
+                    "$TAG Can't start ACTION_VIEW intent for URL [$url], ActivityNotFoundException: $anfe"
+                )
+            } catch (e: Exception) {
+                Log.e(
+                    "$TAG Can't start ACTION_VIEW intent for URL [$url]: $e"
                 )
             }
         }
@@ -130,16 +139,6 @@ class RegisterFragment : GenericFragment() {
 
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
         })
-
-        viewModel.pushNotificationsAvailable.observe(viewLifecycleOwner) { available ->
-            if (!available) {
-                val text = getString(R.string.assistant_account_register_unavailable_no_push_toast)
-                (requireActivity() as GenericActivity).showRedToast(
-                    text,
-                    R.drawable.warning_circle
-                )
-            }
-        }
 
         viewModel.normalizedPhoneNumberEvent.observe(viewLifecycleOwner) {
             it.consume { number ->
@@ -177,8 +176,10 @@ class RegisterFragment : GenericFragment() {
         val telephonyManager = requireContext().getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
         val countryIso = telephonyManager.networkCountryIso
         coreContext.postOnCoreThread {
+            val fragmentContext = context ?: return@postOnCoreThread
+
             val adapter = object : ArrayAdapter<String>(
-                requireContext(),
+                fragmentContext,
                 R.layout.drop_down_item,
                 viewModel.dialPlansLabelList
             ) {

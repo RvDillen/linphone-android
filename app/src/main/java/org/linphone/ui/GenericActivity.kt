@@ -20,6 +20,7 @@
 package org.linphone.ui
 
 import android.annotation.SuppressLint
+import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.content.res.Configuration
 import android.content.res.Resources
@@ -224,18 +225,22 @@ open class GenericActivity : AppCompatActivity() {
 
     fun goToAndroidPermissionSettings() {
         Log.i("$TAG Going into Android settings for our app")
-        val intent = Intent(
-            Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-            Uri.fromParts(
-                "package",
-                packageName, null
+        try {
+            val intent = Intent(
+                Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                Uri.fromParts(
+                    "package",
+                    packageName, null
+                )
             )
-        )
-        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        startActivity(intent)
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            startActivity(intent)
+        } catch (anfe: ActivityNotFoundException) {
+            Log.e("$TAG Failed to go to android settings: $anfe")
+        }
     }
 
-    private fun enableWindowSecureMode(enable: Boolean) {
+    protected fun enableWindowSecureMode(enable: Boolean) {
         val flags: Int = window.attributes.flags
         if ((enable && flags and WindowManager.LayoutParams.FLAG_SECURE != 0) ||
             (!enable && flags and WindowManager.LayoutParams.FLAG_SECURE == 0)

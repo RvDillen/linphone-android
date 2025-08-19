@@ -28,6 +28,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Environment
+import android.util.Patterns
 import android.view.View
 import androidx.appcompat.app.AppCompatDelegate
 import org.linphone.core.tools.Log
@@ -38,7 +39,6 @@ class Compatibility {
     companion object {
         private const val TAG = "[Compatibility]"
 
-        const val FOREGROUND_SERVICE_TYPE_DATA_SYNC = 1 // ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
         const val FOREGROUND_SERVICE_TYPE_PHONE_CALL = 4 // ServiceInfo.FOREGROUND_SERVICE_TYPE_PHONE_CALL
         const val FOREGROUND_SERVICE_TYPE_CAMERA = 64 // ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA
         const val FOREGROUND_SERVICE_TYPE_MICROPHONE = 128 // ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
@@ -112,6 +112,13 @@ class Compatibility {
             return false
         }
 
+        fun isPostNotificationsPermissionGranted(context: Context): Boolean {
+            if (Version.sdkAboveOrEqual(Version.API33_ANDROID_13_TIRAMISU)) {
+                return Api33Compatibility.isPostNotificationsPermissionGranted(context)
+            }
+            return true
+        }
+
         fun enterPipMode(activity: Activity): Boolean {
             if (Version.sdkStrictlyBelow(Version.API31_ANDROID_12)) {
                 return Api28Compatibility.enterPipMode(activity)
@@ -159,12 +166,11 @@ class Compatibility {
             return null
         }
 
-        fun setLocusIdInContentCaptureSession(root: View, localSipUri: String, remoteSipUri: String) {
+        fun setLocusIdInContentCaptureSession(root: View, conversationId: String) {
             if (Version.sdkAboveOrEqual(Version.API29_ANDROID_10)) {
                 return Api29Compatibility.setLocusIdInContentCaptureSession(
                     root,
-                    localSipUri,
-                    remoteSipUri
+                    conversationId
                 )
             }
         }
@@ -180,6 +186,13 @@ class Compatibility {
             if (Version.sdkAboveOrEqual(Version.API35_ANDROID_15_VANILLA_ICE_CREAM)) {
                 Api35Compatibility.setupAppStartupListener(context)
             }
+        }
+
+        fun isIpAddress(string: String): Boolean {
+            if (Version.sdkAboveOrEqual(Version.API29_ANDROID_10)) {
+                return Api29Compatibility.isIpAddress(string)
+            }
+            return Patterns.IP_ADDRESS.matcher(string).matches()
         }
     }
 }

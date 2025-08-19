@@ -172,10 +172,22 @@ open class AccountLoginViewModel
                     "sip:$userInput@$defaultDomain"
                 }
             }
+            Log.i("$TAG Computed identity is [$identity] from user input [$userInput]")
+
             val identityAddress = Factory.instance().createAddress(identity)
             if (identityAddress == null) {
                 Log.e("$TAG Can't parse [$identity] as Address!")
                 showRedToast(R.string.assistant_login_cant_parse_address_toast, R.drawable.warning_circle)
+                return@postOnCoreThread
+            }
+
+            val accounts = core.accountList
+            val found = accounts.find {
+                it.params.identityAddress?.weakEqual(identityAddress) == true
+            }
+            if (found != null) {
+                Log.w("$TAG An account with the same identity address [${identityAddress.asStringUriOnly()}] already exists, do not add it again!")
+                showRedToast(R.string.assistant_account_login_already_connected_error, R.drawable.warning_circle)
                 return@postOnCoreThread
             }
 

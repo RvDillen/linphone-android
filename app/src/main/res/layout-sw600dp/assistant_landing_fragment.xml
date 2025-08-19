@@ -36,6 +36,19 @@
             android:layout_height="wrap_content">
 
             <ImageView
+                android:id="@+id/logo"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:adjustViewBounds="true"
+                android:scaleType="centerCrop"
+                android:contentDescription="@null"
+                android:src="@drawable/assistant_logo"
+                app:layout_constraintStart_toEndOf="@id/title"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintBottom_toTopOf="@id/mountains"
+                app:layout_constraintTop_toBottomOf="@id/register" />
+
+            <ImageView
                 android:id="@+id/back"
                 android:onClick="@{backClickListener}"
                 android:layout_width="@dimen/top_bar_height"
@@ -159,7 +172,7 @@
                 android:textColor="?attr/color_main2_600"
                 android:background="@drawable/edit_text_background"
                 android:hint="@string/password"
-                android:inputType="@{viewModel.showPassword ? InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD : InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD, default=textPassword}"
+                passwordInputType="@{viewModel.showPassword ? InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD : InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD, default=textPassword}"
                 app:layout_constraintWidth_max="@dimen/text_input_max_width"
                 app:layout_constraintStart_toStartOf="@id/title"
                 app:layout_constraintEnd_toEndOf="@id/title"
@@ -253,23 +266,10 @@
                 app:layout_constraintStart_toStartOf="@id/title"
                 app:layout_constraintEnd_toEndOf="@id/title"
                 app:layout_constraintTop_toBottomOf="@id/scan_qr_code"
-                app:layout_constraintBottom_toTopOf="@id/header"/>
+                app:layout_constraintBottom_toTopOf="@id/mountains"/>
 
             <ImageView
-                android:id="@+id/logo"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:adjustViewBounds="true"
-                android:scaleType="centerCrop"
-                android:contentDescription="@null"
-                android:src="@drawable/assistant_logo"
-                app:layout_constraintStart_toEndOf="@id/title"
-                app:layout_constraintEnd_toEndOf="parent"
-                app:layout_constraintBottom_toTopOf="@id/header"
-                app:layout_constraintTop_toBottomOf="@id/register" />
-
-            <ImageView
-                android:id="@+id/header"
+                android:id="@+id/mountains"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:src="@drawable/mountains"
