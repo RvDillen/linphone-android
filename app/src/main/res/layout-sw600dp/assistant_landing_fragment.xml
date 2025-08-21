@@ -35,6 +35,23 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content">
 
+            <androidx.appcompat.widget.AppCompatTextView
+                android:id="@+id/third_party_sip_account3"
+                style="@style/secondary_button_label_style"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="16dp"
+                android:layout_marginTop="16dp"
+                android:layout_marginEnd="16dp"
+                android:onClick="@{thirdPartySipAccountLoginClickListener}"
+                android:paddingStart="20dp"
+                android:paddingEnd="20dp"
+                android:text="@string/assistant_login_third_party_sip_account"
+                android:visibility="@{viewModel.hideThirdPartyAccount ? View.GONE : View.VISIBLE}"
+                app:layout_constraintEnd_toEndOf="@id/title"
+                app:layout_constraintStart_toStartOf="@id/title"
+                app:layout_constraintTop_toBottomOf="@id/scan_qr_code" />
+
             <ImageView
                 android:id="@+id/logo"
                 android:layout_width="wrap_content"
@@ -266,7 +283,24 @@
                 app:layout_constraintStart_toStartOf="@id/title"
                 app:layout_constraintEnd_toEndOf="@id/title"
                 app:layout_constraintTop_toBottomOf="@id/scan_qr_code"
-                app:layout_constraintBottom_toTopOf="@id/mountains"/>
+                app:layout_constraintBottom_toTopOf="@id/third_party_nosip"/>
+
+            <androidx.appcompat.widget.AppCompatTextView
+                android:id="@+id/third_party_nosip"
+                style="@style/secondary_button_label_style"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="16dp"
+                android:layout_marginTop="16dp"
+                android:layout_marginEnd="16dp"
+                android:onClick="@{skipSipAccountLoginClickListener}"
+                android:paddingStart="20dp"
+                android:paddingEnd="20dp"
+                android:text="Use without SIP account"
+                app:layout_constraintBottom_toTopOf="@id/mountains"
+                app:layout_constraintEnd_toEndOf="@id/title"
+                app:layout_constraintStart_toStartOf="@id/title"
+                app:layout_constraintTop_toBottomOf="@id/third_party_sip_account" />
 
             <ImageView
                 android:id="@+id/mountains"

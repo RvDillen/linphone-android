@@ -102,6 +102,14 @@ class LandingFragment : GenericFragment() {
             }
         }
 
+        binding.setSkipSipAccountLoginClickListener {
+            if (viewModel.conditionsAndPrivacyPolicyAccepted) {
+                goToMainLinphoneAndSkipSipAccountLogin()
+            } else {
+                showAcceptConditionsAndPrivacyDialog()
+            }
+        }
+
         binding.setForgottenPasswordClickListener {
             if (findNavController().currentDestination?.id == R.id.landingFragment) {
                 val action =
@@ -139,6 +147,13 @@ class LandingFragment : GenericFragment() {
             }
         }
 
+        // CLB
+        viewModel.skipSipAccountEvent.observe(viewLifecycleOwner){
+            it.consume {
+                goToMainLinphoneAndSkipSipAccountLogin()
+            }
+        }
+
         val telephonyManager = requireContext().getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
         val countryIso = telephonyManager.networkCountryIso
         coreContext.postOnCoreThread {
@@ -168,9 +183,16 @@ class LandingFragment : GenericFragment() {
         }
     }
 
+    // CLB
+    private fun goToMainLinphoneAndSkipSipAccountLogin() {
+        // viewModel.skipSipLogin()
+        requireActivity().finish()
+    }
+
     private fun showAcceptConditionsAndPrivacyDialog(
         goToAccountCreate: Boolean = false,
-        goToThirdPartySipAccountLogin: Boolean = false
+        goToThirdPartySipAccountLogin: Boolean = false,
+        skipAccountLogin: Boolean = false // CLB: Added option to skip SIP account
     ) {
         val model = AcceptConditionsAndPolicyDialogModel()
         val dialog = DialogUtils.getAcceptConditionsAndPrivacyDialog(
@@ -196,6 +218,8 @@ class LandingFragment : GenericFragment() {
                     goToRegisterFragment()
                 } else if (goToThirdPartySipAccountLogin) {
                     goToLoginThirdPartySipAccountFragment(false)
+                } else if (skipAccountLogin) { // CLB Added new option to skip login of SIP account
+                    goToMainLinphoneAndSkipSipAccountLogin()
                 }
             }
         }

@@ -79,6 +79,11 @@ open class AccountLoginViewModel
         MutableLiveData<Event<Boolean>>()
     }
 
+    // CLB
+    val skipSipAccountEvent: MutableLiveData<Event<Boolean>> by lazy {
+        MutableLiveData<Event<Boolean>>()
+    }
+
     var conditionsAndPrivacyPolicyAccepted = false
 
     private lateinit var newlyCreatedAuthInfo: AuthInfo
@@ -241,6 +246,72 @@ open class AccountLoginViewModel
             )
             core.addAccount(newlyCreatedAccount)
         }
+    }
+
+    // CLB: Skip SIP login and create 'empty' account.
+    @UiThread
+    fun skipSipLogin() {
+        // Create a bogus account
+        Log.i("Skipping SIP login flow (CLB special).")
+
+        // Set params for 'empty' account
+        val accountParams = coreContext.core.createAccountParams()
+
+        var sipIdentity = Factory.instance().createAddress("sip:clb@no.sip.com")
+        accountParams.identityAddress = sipIdentity
+        accountParams.identityAddress?.displayName = "clb"
+        accountParams.identityAddress?.username = "clb"
+        accountParams.identityAddress?.password = "bogus"
+
+        // Create bogus 'auth info'
+        val authInfo = Factory.instance().createAuthInfo(
+            sipIdentity?.username.orEmpty(),
+            null,
+            sipIdentity?.password,
+            null,
+            null,
+            sipIdentity?.domain
+        )
+
+        // Create account from params
+        val account = coreContext.core.createAccount(accountParams)
+
+        coreContext.core.addAuthInfo(authInfo)
+        coreContext.core.addAccount(account)
+
+        // Set as default account
+        coreContext.core.defaultAccount = account
+
+        // AccountLoginViewModel listens to 'successful registration' event
+        // Account 'state' should be "RegistrationState.Ok"
+
+        //
+        /*
+            private fun enableAccountAndSetItAsDefault() {
+                val account = accountCreated ?: return
+                Log.i(
+                    "$TAG Account [${account.params.identityAddress?.asStringUriOnly()}] has been created & activated, enable it & setting it as default"
+                )
+
+                val newParams = account.params.clone()
+                newParams.isRegisterEnabled = true
+                account.params = newParams
+
+                coreContext.core.defaultAccount = account
+                accountCreatedEvent.postValue(Event(true))
+            }
+        */
+
+        // When 'empty' account is set, try to navigate to the 'main' Linphone page.
+        // Possibly just "accountCreatedEvent.postValue(Event(true))" from above snippet, but where does the event go to?
+
+        // Or something like (from RegisterCodeConfirmationFragment.kt) :
+        /*
+            val identity = viewModel.username.value.orEmpty()
+            Log.i("$TAG Account [$identity] has been created, leaving assistant")
+            requireActivity().finish()
+        */
+
     }
 
     @UiThread

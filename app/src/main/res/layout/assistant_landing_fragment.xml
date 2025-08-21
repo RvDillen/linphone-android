@@ -18,6 +18,9 @@
             name="thirdPartySipAccountLoginClickListener"
             type="View.OnClickListener" />
         <variable
+            name="skipSipAccountLoginClickListener"
+            type="View.OnClickListener" />
+        <variable
             name="qrCodeClickListener"
             type="View.OnClickListener" />
         <variable
@@ -235,7 +238,7 @@
                 android:onClick="@{thirdPartySipAccountLoginClickListener}"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="24dp"
+                android:layout_marginTop="16dp"
                 android:layout_marginStart="16dp"
                 android:layout_marginEnd="16dp"
                 android:paddingStart="20dp"
@@ -246,6 +249,22 @@
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintEnd_toEndOf="parent"
                 app:layout_constraintTop_toBottomOf="@id/scan_qr_code" />
+
+            <androidx.appcompat.widget.AppCompatTextView
+                android:id="@+id/third_party_nosip"
+                style="@style/secondary_button_label_style"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="16dp"
+                android:layout_marginTop="16dp"
+                android:layout_marginEnd="16dp"
+                android:onClick="@{skipSipAccountLoginClickListener}"
+                android:paddingStart="20dp"
+                android:paddingEnd="20dp"
+                android:text="Use without SIP account"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@id/third_party_sip_account" />
 
             <androidx.appcompat.widget.AppCompatTextView
                 style="@style/default_text_style"
@@ -280,7 +299,7 @@
                 app:layout_constraintVertical_bias="1"
                 app:layout_constraintEnd_toEndOf="parent"
                 app:layout_constraintStart_toEndOf="@id/no_account_yet"
-                app:layout_constraintTop_toBottomOf="@id/third_party_sip_account"
+                app:layout_constraintTop_toBottomOf="@id/third_party_nosip"
                 app:layout_constraintBottom_toTopOf="@id/mountains"/>
 
             <ImageView

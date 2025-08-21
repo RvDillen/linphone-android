@@ -86,7 +86,11 @@ class AssistantActivity : GenericActivity() {
                 Log.w("$TAG Not all required permissions are granted, showing Permissions fragment")
                 val action = PermissionsFragmentDirections.actionGlobalPermissionsFragment()
                 binding.assistantNavContainer.findNavController().navigate(action)
-            } else if (intent.getBooleanExtra(SKIP_LANDING_EXTRA, false)) {
+            } else /* if (intent.getBooleanExtra(SKIP_LANDING_EXTRA, false)) */ {
+                Log.w("CLB Magic. Close Assistant")
+                finish()
+
+                /*
                 Log.w(
                     "$TAG We were asked to leave assistant if at least an account is already configured"
                 )
@@ -102,6 +106,7 @@ class AssistantActivity : GenericActivity() {
                         }
                     }
                 }
+                */
             }
         }
     }
