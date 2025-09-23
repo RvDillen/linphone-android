@@ -103,7 +103,8 @@ class Api34Compatibility {
             notif: Notification,
             isCallActive: Boolean
         ) {
-            val mask = if (isCallActive) {
+            // CLB Modification: Added '|| true' to this if-statement so the background service is _ALWAYS_ started with the best background-service permissions.
+            val mask = if (isCallActive || true) {
                 Log.i(
                     "[Api34 Compatibility] Trying to start service as foreground using at least FOREGROUND_SERVICE_TYPE_PHONE_CALL or FOREGROUND_SERVICE_TYPE_DATA_SYNC"
                 )
@@ -122,6 +123,7 @@ class Api34Compatibility {
                 }
                 computeMask
             } else {
+                // CLB Modification: This else-statement code should never be executed anymore:
                 Log.i(
                     "[Api34 Compatibility] Trying to start service as foreground using only FOREGROUND_SERVICE_TYPE_DATA_SYNC because no call at the time"
                 )
