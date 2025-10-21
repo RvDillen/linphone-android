@@ -53,40 +53,44 @@ class LinphoneApplication : Application(), ImageLoaderFactory {
                 return
             }
 
-            Factory.instance().setLogCollectionPath(context.filesDir.absolutePath)
-            Factory.instance().enableLogCollection(LogCollectionState.Enabled)
+            try {
+                Factory.instance().setLogCollectionPath(context.filesDir.absolutePath)
+                Factory.instance().enableLogCollection(LogCollectionState.Enabled)
 
-            // For VFS
-            Factory.instance().setCacheDir(context.cacheDir.absolutePath)
+                // For VFS
+                Factory.instance().setCacheDir(context.cacheDir.absolutePath)
 
-            corePreferences = CorePreferences(context)
-            corePreferences.copyAssetsFromPackage()
+                corePreferences = CorePreferences(context)
+                corePreferences.copyAssetsFromPackage()
 
-            if (corePreferences.vfsEnabled) {
-                CoreContext.activateVFS()
+                if (corePreferences.vfsEnabled) {
+                    CoreContext.activateVFS()
+                }
+
+                // if (false) {
+                //    TestConfigClbParsing()
+                // }
+
+                // CLB CreateConfigCLB replaces: val config = Factory.instance().createConfigWithFactory()
+                val config = CreateConfigCLB(context)
+                corePreferences.config = config
+                corePreferences.firstStart = false
+
+                val appName = context.getString(R.string.app_name)
+                Factory.instance().setLoggerDomain(appName)
+                Factory.instance().enableLogcatLogs(corePreferences.logcatLogsOutput)
+                if (corePreferences.debugLogs) {
+                    Factory.instance().loggingService.setLogLevel(LogLevel.Message)
+                }
+
+                // CLB Config changed ? => write to log (log is available now)
+                if (LinphonePreferencesCLB.instance().HasLogInfo()) {
+                    LinphonePreferencesCLB.instance().WriteLogLines()
+                }
+                Log.i("[Application] Core config & preferences created")
+            } catch (ex: Exception) {
+                Log.i("[Application] Initialization failed: ${ex.message} - ${ex.stackTrace}")
             }
-
-            // if (false) {
-            //    TestConfigClbParsing()
-            // }
-
-            // CLB CreateConfigCLB replaces: val config = Factory.instance().createConfigWithFactory()
-            val config = CreateConfigCLB(context)
-            corePreferences.config = config
-            corePreferences.firstStart = false
-
-            val appName = context.getString(R.string.app_name)
-            Factory.instance().setLoggerDomain(appName)
-            Factory.instance().enableLogcatLogs(corePreferences.logcatLogsOutput)
-            if (corePreferences.debugLogs) {
-                Factory.instance().loggingService.setLogLevel(LogLevel.Message)
-            }
-
-            // CLB Config changed ? => write to log (log is available now)
-            if (LinphonePreferencesCLB.instance().HasLogInfo()) {
-                LinphonePreferencesCLB.instance().WriteLogLines()
-            }
-            Log.i("[Application] Core config & preferences created")
         }
 
         fun ensureCoreExists(
