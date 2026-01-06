@@ -468,6 +468,11 @@ class CorePreferences constructor(private val context: Context) {
             encryptedSharedPreferences?.edit()?.putString("linphone_rc_xml_config_hash", value)?.apply()
         }
 
+    var blockSettingsByPin: Int
+        get() = encryptedSharedPreferences?.getInt("clb_block_settings_by_pin", 0) ?: 0
+        set(value) {
+            encryptedSharedPreferences?.edit()?.putInt("clb_block_settings_by_pin", value)?.apply()
+        }
     /* *** Read only application settings, some were previously in non_localizable_custom *** */
 
     /* UI related */
