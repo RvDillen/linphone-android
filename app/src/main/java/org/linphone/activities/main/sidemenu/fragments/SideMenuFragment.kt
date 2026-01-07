@@ -114,9 +114,7 @@ class SideMenuFragment : GenericFragment<SideMenuFragmentBinding>() {
             if (corePreferences.blockSettingsByPin == 0) {
                 sharedViewModel.toggleDrawerEvent.value = Event(true)
                 startActivity(Intent(context, AssistantActivity::class.java))
-            }
-            else
-            {
+            } else {
                 Log.i("[Side Menu] Settings blocked by CLB AppConfig.")
             }
         }
@@ -133,7 +131,7 @@ class SideMenuFragment : GenericFragment<SideMenuFragmentBinding>() {
                     navigateToSettings()
                 }
             } else {
-                Log.i("[Side Menu] Settings blocked by CLB AppConfig.");
+                Log.i("[Side Menu] Settings blocked by CLB AppConfig.")
             }
         }
 
