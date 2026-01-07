@@ -134,7 +134,7 @@ class NotificationsManager(private val context: Context) {
                         coreContext.onIncomingReceived()
 
                         // Original code:
-                        //displayIncomingCallNotification(call, false)
+                        // displayIncomingCallNotification(call, false)
 
                         // End CLB
                     } else {

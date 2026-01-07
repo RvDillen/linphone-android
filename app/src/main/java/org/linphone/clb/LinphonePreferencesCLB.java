@@ -359,7 +359,7 @@ public class LinphonePreferencesCLB {
 
                             // Try Get entry value
                             try {
-                                    current.value = parser.nextText();
+                                current.value = parser.nextText();
                             } catch (Exception e) {
                                 String message = String.format("Error entry: %s-%s, Reading value: %s", current.section, current.entry, e.getMessage());
                                 LogLine(message);
