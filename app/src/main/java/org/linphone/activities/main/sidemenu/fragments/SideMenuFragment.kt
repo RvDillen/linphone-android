@@ -25,6 +25,7 @@ import android.os.Bundle
 import android.os.Parcelable
 import android.provider.MediaStore
 import android.view.View
+import android.widget.Toast
 import androidx.core.content.FileProvider
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
@@ -98,6 +99,7 @@ class SideMenuFragment : GenericFragment<SideMenuFragmentBinding>() {
                         navigateToAccountSettings(identity)
                     }
                 } else {
+                    Toast.makeText(context, getString(R.string.settings_blocked), Toast.LENGTH_SHORT).show()
                     Log.i("[SideMenu] Access to Settings blocked by CLB ApplicationConfig.")
                     return // showClbPasswordDialog(goToAccountSettings = true, accountIdentity = identity)
                 }
@@ -115,6 +117,7 @@ class SideMenuFragment : GenericFragment<SideMenuFragmentBinding>() {
                 sharedViewModel.toggleDrawerEvent.value = Event(true)
                 startActivity(Intent(context, AssistantActivity::class.java))
             } else {
+                Toast.makeText(context, getString(R.string.settings_blocked), Toast.LENGTH_SHORT).show()
                 Log.i("[Side Menu] Settings blocked by CLB AppConfig.")
             }
         }
@@ -131,6 +134,7 @@ class SideMenuFragment : GenericFragment<SideMenuFragmentBinding>() {
                     navigateToSettings()
                 }
             } else {
+                Toast.makeText(context, getString(R.string.settings_blocked), Toast.LENGTH_SHORT).show()
                 Log.i("[Side Menu] Settings blocked by CLB AppConfig.")
             }
         }

@@ -7,6 +7,8 @@ import android.util.Log;
 
 import org.linphone.core.CorePreferences;
 
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Set;
@@ -41,7 +43,7 @@ public class AppConfigHelper {
         _rcXmlHash = null;
     }
 
-    public void checkAppConfig() {
+    public void checkAppConfig(boolean testEnvironment, String fileContents) {
 
         log("Checking RestrictionsManager for settings.");
 
@@ -49,15 +51,18 @@ public class AppConfigHelper {
         _bundle = rm.getApplicationRestrictions();
 
         // For testing!!!
-        /*
-        if (_bundle.isEmpty() && true) {
-            _bundle.putString(linphoneRc_key, "test value for linphone rc");
-            _bundle.putString(linphoneRcXml_key, "some test value for linphone rc xml");
+        // Inject XML string for testing
+        if (_bundle.isEmpty() && testEnvironment) {
+            _bundle.putString(linphoneRc_key, fileContents);
+            _bundle.putString(linphoneRcXml_key, fileContents);
         }
-        */
 
         // Do parse! Even when bundle is empty, so internal variables get correct values
         parseConfiguration(_bundle);
+    }
+
+    public void checkAppConfig() {
+        checkAppConfig(false, "");
     }
 
     public boolean linphoneRcHasChanges() {
@@ -233,6 +238,26 @@ public class AppConfigHelper {
     private void logError(String text) {
         org.linphone.core.tools.Log.i(text);
         Log.e(tag, text);
+    }
+
+    private String LoadClbConfigXmlFromAssets(String assetName){
+        String resourceName = "assets/" + assetName;
+        String fileXmlData = "";
+
+        try {
+            InputStream is = _context.getAssets().open(assetName);
+            int size = is.available();
+            byte[] buffer = new byte[size];
+            is.read(buffer);
+            is.close();
+
+            fileXmlData = new String(buffer, StandardCharsets.UTF_8);
+
+        } catch (Exception ex) {
+            log("Asset [$resourceName}] failed to load, with error: [${ex.message}]");
+        }
+
+        return fileXmlData;
     }
 
     /*
