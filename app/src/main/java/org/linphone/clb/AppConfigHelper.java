@@ -240,26 +240,6 @@ public class AppConfigHelper {
         Log.e(tag, text);
     }
 
-    private String LoadClbConfigXmlFromAssets(String assetName){
-        String resourceName = "assets/" + assetName;
-        String fileXmlData = "";
-
-        try {
-            InputStream is = _context.getAssets().open(assetName);
-            int size = is.available();
-            byte[] buffer = new byte[size];
-            is.read(buffer);
-            is.close();
-
-            fileXmlData = new String(buffer, StandardCharsets.UTF_8);
-
-        } catch (Exception ex) {
-            log("Asset [$resourceName}] failed to load, with error: [${ex.message}]");
-        }
-
-        return fileXmlData;
-    }
-
     /*
     linphoneRc is expected to contain a *.ini file format. The MDM (GoogleWorkspace) returns one long string without \r\n
     parseLinphoneRc re-injects line-endings at the desired locations so Linphone will correctly parse the string's contents.
