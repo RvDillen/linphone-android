@@ -83,7 +83,7 @@
     <string name="settings">Settings</string>
     <string name="quit">Quit</string>
     <!-- CLB: Toast translation -->
-    <string name="settings_blocked">Settings blocked</string>
+    <string name="settings_blocked">Access denied</string>
 
     <!-- History -->
     <string name="history_calls_list">Calls</string>
