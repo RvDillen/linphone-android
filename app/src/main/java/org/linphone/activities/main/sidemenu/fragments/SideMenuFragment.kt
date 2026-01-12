@@ -39,6 +39,7 @@ import org.linphone.activities.main.MainActivity
 import org.linphone.activities.main.settings.SettingListenerStub
 import org.linphone.activities.main.sidemenu.viewmodels.SideMenuViewModel
 import org.linphone.activities.main.viewmodels.DialogViewModel
+import org.linphone.clb.ClbSettingsBlockChecker
 import org.linphone.core.Factory
 import org.linphone.core.tools.Log
 import org.linphone.databinding.SideMenuFragmentBinding
@@ -81,6 +82,10 @@ class SideMenuFragment : GenericFragment<SideMenuFragmentBinding>() {
         viewModel.accountsSettingsListener = object : SettingListenerStub() {
             override fun onAccountClicked(identity: String) {
                 Log.i("[Side Menu] Navigating to settings for account with identity: $identity")
+                // CLB: Block access to settings via AppConfig
+                if (ClbSettingsBlockChecker.AreSettingsBlocked(context)) {
+                    return
+                }
 
                 sharedViewModel.toggleDrawerEvent.value = Event(true)
 
@@ -97,11 +102,21 @@ class SideMenuFragment : GenericFragment<SideMenuFragmentBinding>() {
         }
 
         binding.setAssistantClickListener {
+            // CLB: Block access to settings via AppConfig
+            if (ClbSettingsBlockChecker.AreSettingsBlocked(context)) {
+                return@setAssistantClickListener
+            }
+
             sharedViewModel.toggleDrawerEvent.value = Event(true)
             startActivity(Intent(context, AssistantActivity::class.java))
         }
 
         binding.setSettingsClickListener {
+            // CLB: Block access to settings via AppConfig
+            if (ClbSettingsBlockChecker.AreSettingsBlocked(context)) {
+                return@setSettingsClickListener
+            }
+
             sharedViewModel.toggleDrawerEvent.value = Event(true)
 
             if (corePreferences.askForAccountPasswordToAccessSettings) {

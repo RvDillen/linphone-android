@@ -5,8 +5,11 @@ import android.content.RestrictionsManager;
 import android.os.Bundle;
 import android.util.Log;
 
+import org.linphone.core.Config;
 import org.linphone.core.CorePreferences;
 
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Set;
@@ -41,7 +44,7 @@ public class AppConfigHelper {
         _rcXmlHash = null;
     }
 
-    public void checkAppConfig() {
+    public void checkAppConfig(boolean testEnvironment, String fileContents) {
 
         log("Checking RestrictionsManager for settings.");
 
@@ -49,15 +52,18 @@ public class AppConfigHelper {
         _bundle = rm.getApplicationRestrictions();
 
         // For testing!!!
-        /*
-        if (_bundle.isEmpty() && true) {
-            _bundle.putString(linphoneRc_key, "test value for linphone rc");
-            _bundle.putString(linphoneRcXml_key, "some test value for linphone rc xml");
+        // Inject XML string for testing
+        if (_bundle.isEmpty() && testEnvironment) {
+            _bundle.putString(linphoneRc_key, fileContents);
+            _bundle.putString(linphoneRcXml_key, fileContents);
         }
-        */
 
         // Do parse! Even when bundle is empty, so internal variables get correct values
         parseConfiguration(_bundle);
+    }
+
+    public void checkAppConfig() {
+        checkAppConfig(false, "");
     }
 
     public boolean linphoneRcHasChanges() {
@@ -136,6 +142,33 @@ public class AppConfigHelper {
         }
     }
 
+    public void updateShowSettingsToCorePreferences(Config config) {
+
+        // IF the 'show_settings' setting is modified via the XML/RC
+        // It SHOULD be present under the "app" section in the Linphone Config.
+        // This is NOT a default Linphone setting AND we do not want to store it in Linphone.Config...
+
+        // Check setting section='app' name='show_settings' of Config
+        // if it exists: Update corePreferences.block_settings_by_pin with the new value
+        // Finally, erase it from the config.
+        // The 'latest' value will be stored (persistently) in the corePreferences
+        var newShowSettingsValue = config.getInt("app", "show_settings", -1);
+        if (newShowSettingsValue != -1) {
+            if (newShowSettingsValue == 0) {
+                _corePreferences.setBlockSettingsByPin(1); // Show settings == 0 -> Block Settings == 1
+            } else {
+                _corePreferences.setBlockSettingsByPin(0); // Show settings == 1 -> Block Settings == 0
+            }
+
+            // Erase injected setting from Linphone Config
+            config.cleanEntry("app", "show_settings");
+            var keysList = config.getKeysNamesList("app");
+            if (keysList.length == 0) {
+                config.cleanSection("app");
+            }
+            config.sync();
+        }
+    }
 
     private String calculateHash(final String key, final String value) {
         String hash = key + value;

@@ -214,18 +214,18 @@ class LinphoneApplication : Application(), ImageLoaderFactory {
                 ) {
                     LogConfig("Store AppConfig linphoneRc XML hash")
                     ach.storeRcXmlHash()
+
+                    // Update show_settings to corePreferences
+                    ach.updateShowSettingsToCorePreferences(config)
                 }
             } else {
                 LogConfig("Hashes are equal. Linphone Rc XML from bundle has no changes.")
 
-                // TEST: CLB LinphoneRC XML changes? => Update
-                // val linphonercXmlData =
-                //    this::class.java.classLoader.getResource("assets/clb_linphonerc_xml_test")
-                //        .readText()
-
                 // Try 'old' method (i.e. parse linphonerc.xml file and apply changes)
                 LinphonePreferencesCLB.instance().ParseLocalXmlFileConfig(config, corePreferences)
+                ach.updateShowSettingsToCorePreferences(config)
             }
+
             return config
         }
 
