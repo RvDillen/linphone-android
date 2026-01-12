@@ -83,13 +83,12 @@ class SideMenuFragment : GenericFragment<SideMenuFragmentBinding>() {
         viewModel.accountsSettingsListener = object : SettingListenerStub() {
             override fun onAccountClicked(identity: String) {
                 Log.i("[Side Menu] Navigating to settings for account with identity: $identity")
-
-                sharedViewModel.toggleDrawerEvent.value = Event(true)
-                
                 // CLB: Block access to settings via AppConfig
                 if (ClbSettingsBlockChecker.AreSettingsBlocked(context)) {
                     return
                 }
+
+                sharedViewModel.toggleDrawerEvent.value = Event(true)
 
                 if (corePreferences.askForAccountPasswordToAccessSettings) {
                     showPasswordDialog(goToAccountSettings = true, accountIdentity = identity)
