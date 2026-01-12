@@ -215,41 +215,17 @@ class LinphoneApplication : Application(), ImageLoaderFactory {
                     LogConfig("Store AppConfig linphoneRc XML hash")
                     ach.storeRcXmlHash()
 
-                    // CLB: IF the 'show_settings' setting is modified via the XML
-                    // It SHOULD be added under the "app" section in the Linphone Config.
-                    // This is NOT a default Linphone setting AND we do not want to store it here...
-                    // Check setting section='app' name='show_settings' of Config
-                    // if it exists: Update corePreferences.block_settings_by_pin with the new value
-                    // Finally, erase it from the config.
-                    // The 'latest' value will be store (persistently) in the corePreferences
-                    var newShowSettingsValue = config.getInt("app", "show_settings", -1)
-                    if (newShowSettingsValue != -1) {
-                        if (newShowSettingsValue == 0) {
-                            corePreferences.blockSettingsByPin = 1; // Show settings == 0 -> Block Settings == 1
-                        } else {
-                            corePreferences.blockSettingsByPin = 0; // Show settings == 1 -> Block Settings == 0
-                        }
-
-                        // Erase injected setting from Linphone Config
-                        config.cleanEntry("app", "show_settings")
-                        var keysList = config.getKeysNamesList("app")
-                        if (keysList.isEmpty()) {
-                            config.cleanSection("app")
-                        }
-                        config.sync()
-                    }
+                    // Update show_settings to corePreferences
+                    ach.updateShowSettingsToCorePreferences(config)
                 }
             } else {
                 LogConfig("Hashes are equal. Linphone Rc XML from bundle has no changes.")
 
-                // TEST: CLB LinphoneRC XML changes? => Update
-                // val linphonercXmlData =
-                //    this::class.java.classLoader.getResource("assets/clb_linphonerc_xml_test")
-                //        .readText()
-
                 // Try 'old' method (i.e. parse linphonerc.xml file and apply changes)
                 LinphonePreferencesCLB.instance().ParseLocalXmlFileConfig(config, corePreferences)
+                ach.updateShowSettingsToCorePreferences(config)
             }
+
             return config
         }
 
