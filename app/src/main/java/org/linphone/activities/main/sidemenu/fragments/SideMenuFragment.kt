@@ -40,6 +40,7 @@ import org.linphone.activities.main.MainActivity
 import org.linphone.activities.main.settings.SettingListenerStub
 import org.linphone.activities.main.sidemenu.viewmodels.SideMenuViewModel
 import org.linphone.activities.main.viewmodels.DialogViewModel
+import org.linphone.clb.ClbSettingsBlockChecker
 import org.linphone.core.Factory
 import org.linphone.core.tools.Log
 import org.linphone.databinding.SideMenuFragmentBinding
@@ -83,25 +84,16 @@ class SideMenuFragment : GenericFragment<SideMenuFragmentBinding>() {
             override fun onAccountClicked(identity: String) {
                 Log.i("[Side Menu] Navigating to settings for account with identity: $identity")
 
-                if (corePreferences.blockSettingsByPin == 0) {
-                    sharedViewModel.toggleDrawerEvent.value = Event(true)
+                // CLB: Block access to settings via AppConfig
+                if (ClbSettingsBlockChecker.AreSettingsBlocked(context)) {
+                    return
+                }
 
-                    // CLB: FIRST check CLB 'password block' with 'pin'
-                    // Before checking the original 'Linphone' implementation...
-
-                    // If required:
-                    // - Discuss how to "update" the PIN code via the XML settings.
-                    // - Make sure the correct PIN is used from config/settings/whatnot.
-                    // - Re-enable the 'showClbPasswordDialog()'
-                    if (corePreferences.askForAccountPasswordToAccessSettings) {
-                        showPasswordDialog(goToAccountSettings = true, accountIdentity = identity)
-                    } else {
-                        navigateToAccountSettings(identity)
-                    }
+                sharedViewModel.toggleDrawerEvent.value = Event(true)
+                if (corePreferences.askForAccountPasswordToAccessSettings) {
+                    showPasswordDialog(goToAccountSettings = true, accountIdentity = identity)
                 } else {
-                    Toast.makeText(context, getString(R.string.settings_blocked), Toast.LENGTH_SHORT).show()
-                    Log.i("[SideMenu] Access to Settings blocked by CLB ApplicationConfig.")
-                    return // showClbPasswordDialog(goToAccountSettings = true, accountIdentity = identity)
+                    navigateToAccountSettings(identity)
                 }
             }
         }
@@ -112,30 +104,26 @@ class SideMenuFragment : GenericFragment<SideMenuFragmentBinding>() {
 
         binding.setAssistantClickListener {
             // CLB: Block access to settings via AppConfig
-            // Settings are only accessible when blockSettingsByPin == 0
-            if (corePreferences.blockSettingsByPin == 0) {
-                sharedViewModel.toggleDrawerEvent.value = Event(true)
-                startActivity(Intent(context, AssistantActivity::class.java))
-            } else {
-                Toast.makeText(context, getString(R.string.settings_blocked), Toast.LENGTH_SHORT).show()
-                Log.i("[Side Menu] Settings blocked by CLB AppConfig.")
+            if (ClbSettingsBlockChecker.AreSettingsBlocked(context)) {
+                return@setAssistantClickListener
             }
+
+            sharedViewModel.toggleDrawerEvent.value = Event(true)
+            startActivity(Intent(context, AssistantActivity::class.java))
         }
 
         binding.setSettingsClickListener {
             // CLB: Block access to settings via AppConfig
-            // Settings are only accessible when blockSettingsByPin == 0
-            if (corePreferences.blockSettingsByPin == 0) {
-                sharedViewModel.toggleDrawerEvent.value = Event(true)
+            if (ClbSettingsBlockChecker.AreSettingsBlocked(context)) {
+                return@setSettingsClickListener
+            }
 
-                if (corePreferences.askForAccountPasswordToAccessSettings) {
-                    showPasswordDialog(goToSettings = true)
-                } else {
-                    navigateToSettings()
-                }
+            sharedViewModel.toggleDrawerEvent.value = Event(true)
+
+            if (corePreferences.askForAccountPasswordToAccessSettings) {
+                showPasswordDialog(goToSettings = true)
             } else {
-                Toast.makeText(context, getString(R.string.settings_blocked), Toast.LENGTH_SHORT).show()
-                Log.i("[Side Menu] Settings blocked by CLB AppConfig.")
+                navigateToSettings()
             }
         }
 
