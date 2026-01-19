@@ -226,7 +226,8 @@ class LinphoneApplication : Application(), ImageLoaderFactory {
                         config,
                         corePreferences)
                 ) {
-                    ach.updateShowSettingsToCorePreferences(config, true)
+                    // If there were any config changes, also update the 'show_settings' value
+                    ach.updateShowSettingsToCorePreferences(config)
                 }
             }
 
