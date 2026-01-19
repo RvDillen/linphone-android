@@ -178,8 +178,7 @@ class LinphoneApplication : Application(), ImageLoaderFactory {
                 //    this::class.java.classLoader.getResource("assets/clb_linphonerc_test").readText()
                 if (LinphonePreferencesCLB.instance().UpdateFromLinphoneRcData(
                         linphonercData,
-                        corePreferences.configPath
-                    )
+                        corePreferences.configPath)
                 ) {
                     LogConfig("Store AppConfig linphoneRc hash")
                     ach.storeRcHash()
@@ -209,8 +208,7 @@ class LinphoneApplication : Application(), ImageLoaderFactory {
 
                 if (LinphonePreferencesCLB.instance().UpdateFromLinphoneXmlData(
                         linphonercXmlData,
-                        config
-                    )
+                        config)
                 ) {
                     LogConfig("Store AppConfig linphoneRc XML hash")
                     ach.storeRcXmlHash()
@@ -222,8 +220,14 @@ class LinphoneApplication : Application(), ImageLoaderFactory {
                 LogConfig("Hashes are equal. Linphone Rc XML from bundle has no changes.")
 
                 // Try 'old' method (i.e. parse linphonerc.xml file and apply changes)
-                LinphonePreferencesCLB.instance().ParseLocalXmlFileConfig(config, corePreferences)
-                ach.updateShowSettingsToCorePreferences(config)
+                // NOTE! This is no longer allowed on newer Android versions (A11/12+)
+                // When older Androids are no longer supported, remove this code block!
+                if (LinphonePreferencesCLB.instance().ParseLocalXmlFileConfig(
+                        config,
+                        corePreferences)
+                ) {
+                    ach.updateShowSettingsToCorePreferences(config, true)
+                }
             }
 
             return config

@@ -242,7 +242,7 @@ public class LinphonePreferencesCLB {
     }
 
 
-    public void ParseLocalXmlFileConfig(Config config, CorePreferences corePreferences) {
+    public boolean ParseLocalXmlFileConfig(Config config, CorePreferences corePreferences) {
         LogLine("Check if there is a LinphoneRc.xml file in 'downloads' folder...");
 
         File downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
@@ -250,6 +250,8 @@ public class LinphonePreferencesCLB {
 
         // Try to read LinphoneRcXml from file (the 'old' way)
         File configFile = new File(rcXmlConfigFile);
+        boolean fileWasParsed = false;
+
         if (configFile.exists()) {
             LogLine("File (" + rcXmlConfigFile + ") exists. Trying to parse and load configuration.");
             try {
@@ -258,7 +260,7 @@ public class LinphonePreferencesCLB {
                 String hash = ComputeHasCode(sourceChannel, linphoneRcXml_key);
                 String oldHash = corePreferences.getLinphoneRcXmlHash();
                 if (hash.equals(oldHash))
-                    return; // File alreay imported so ready
+                    return false; // File already imported, so abort!
 
                 // Import
                 BufferedReader br = new BufferedReader(new FileReader(configFile));
@@ -267,15 +269,19 @@ public class LinphonePreferencesCLB {
                 UpdateFromLinphoneXmlData(data, config);
 
                 corePreferences.setLinphoneRcXmlHash(hash);
+                fileWasParsed = true;
             } catch (Exception ex) {
                 LogLine("Failed to read config file (" + configFile + "). Ex:" + ex.getLocalizedMessage() + ". If permission was not yet granted, please restart the app.");
+                fileWasParsed = false;
             } finally {
                 LogLine("Erase config file from disk.");
                 configFile.delete();
             }
         } else {
             LogLine("File (" + rcXmlConfigFile + ") not found. Continue...");
+            fileWasParsed = false;
         }
+        return fileWasParsed;
     }
 
     public boolean UpdateFromLinphoneXmlData(String linphonercXml, Config config) {

@@ -143,10 +143,15 @@ public class AppConfigHelper {
     }
 
     public void updateShowSettingsToCorePreferences(Config config) {
+        updateShowSettingsToCorePreferences(config, false);
+    }
+    
+    public void updateShowSettingsToCorePreferences(Config config, boolean suppressShowSettingsUpdate) {
 
         // IF the 'show_settings' setting is modified via the XML/RC
         // It SHOULD be present under the "app" section in the Linphone Config.
         // This is NOT a default Linphone setting AND we do not want to store it in Linphone.Config...
+        // Also, when RC/XML changes are made and 'show_settings' is NOT defined, make sure the settings are accessible to the user.
 
         // Check setting section='app' name='show_settings' of Config
         // if it exists: Update corePreferences.block_settings_by_pin with the new value
@@ -167,6 +172,13 @@ public class AppConfigHelper {
                 config.cleanSection("app");
             }
             config.sync();
+        } else {
+            // The current XML/RC did NOT contain a 'show_settings' config under the 'app' section.
+            // Setting is NOT specified in this config, default to 'Unblocked' to prevent unintentionally blocked configuration.
+            if (!suppressShowSettingsUpdate) {
+                log("'Show settings' not defined: Making sure settings are accessible.");
+                _corePreferences.setBlockSettingsByPin(0); // Settings are NOT blocked!
+            }
         }
     }
 
