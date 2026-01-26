@@ -168,6 +168,7 @@ class LinphoneApplication : Application(), ImageLoaderFactory {
             ach.checkAppConfig()
 
             // Handle changes in LinphoneRc
+            var configShouldBeUpdated = false
             if (ach.linphoneRcHasChanges()) {
                 android.util.Log.i("[CLB]", "Applying AppConfig linphoneRc changes")
 
@@ -182,6 +183,9 @@ class LinphoneApplication : Application(), ImageLoaderFactory {
                 ) {
                     LogConfig("Store AppConfig linphoneRc hash")
                     ach.storeRcHash()
+
+                    // Something was modified... make sure corePreferences.config is updated too.
+                    configShouldBeUpdated = true
                 }
             } else {
                 LogConfig("Hashes are equal, no changes... skipping config from bundle.")
@@ -214,7 +218,7 @@ class LinphoneApplication : Application(), ImageLoaderFactory {
                     ach.storeRcXmlHash()
 
                     // Update show_settings to corePreferences
-                    ach.updateShowSettingsToCorePreferences(config)
+                    configShouldBeUpdated = true;
                 }
             } else {
                 LogConfig("Hashes are equal. Linphone Rc XML from bundle has no changes.")
@@ -229,6 +233,10 @@ class LinphoneApplication : Application(), ImageLoaderFactory {
                     // If there were any config changes, also update the 'show_settings' value
                     ach.updateShowSettingsToCorePreferences(config)
                 }
+            }
+
+            if (configShouldBeUpdated) {
+                ach.updateShowSettingsToCorePreferences(config)
             }
 
             return config
