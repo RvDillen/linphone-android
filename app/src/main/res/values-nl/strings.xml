@@ -153,7 +153,10 @@
     <string name="logs_upload_failure">Uploaden van logs mislukt!</string>
     <string name="about_weblate_translation">Help ons &appName; vertalen</string>
     <string name="no_conference_call_history">Geen vergaderoproep in jouw historiek</string>
-    <string name="contact_cant_be_deleted">Deze contact kan niet verwijderd worden</string>
+    <string name="conference_schedule_participants_list">Deelnemerslijst</string>
+    <string name="conference_local_title">Lokale vergaderoproep</string>
+    <string name="conference_last_user">Alle andere deelnemers hebben de vergaderoproep verlaten</string>
+    <string name="contact_cant_be_deleted">Dit contact kan niet verwijderd worden</string>
     <string name="contacts_ldap_query_more_results_available">Meer resultaten zijn beschikbaar, verfijn jouw zoekopdracht</string>
     <string name="chat_security_event_security_level_downgraded">Beveiligingsniveau verminderd door %s</string>
     <string name="sip_addresses">SIP adressen</string>
@@ -205,13 +208,14 @@
     <string name="call_context_action_pause">Pauze gesprek</string>
     <string name="call_locally_paused_title">Je hebt het gesprek gepauzeerd.</string>
     <string name="settings_call_title">Bellen</string>
+    <string name="call_error_temporarily_unavailable">Tijdelijk niet beschikbaar</string>
     <string name="settings_primary_account_username_title">Gebruikersnaam</string>
     <string name="settings_password_protection_dialog_invalid_input">Verkeerd wachtwoord!</string>
     <string name="tunnel_settings_hostname_url_title">Hostnaam</string>
     <string name="advanced_settings_go_to_battery_optimization_settings">Batterij optimalisatie instellingen</string>
     <string name="advanced_settings_dark_mode_label_yes">Ja</string>
     <string name="incoming_call_notification_title">Inkomende oproep</string>
-    <string name="incoming_group_call_notification_title">Binnenkomende groepsgesprek</string>
+    <string name="incoming_group_call_notification_title">Binnenkomend groepsgesprek</string>
     <string name="incoming_call_notification_hangup_action_label">Beëindigen</string>
     <string name="received_chat_notification_reply_label">Herhalen</string>
     <string name="missed_call_notification_title">Gesprek gemist</string>
