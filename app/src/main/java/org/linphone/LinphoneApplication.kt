@@ -145,6 +145,7 @@ class LinphoneApplication : Application(), ImageLoaderFactory {
 
                 if (contents != null && contents.length > 0) {
                     // If there were any config changes, also update the 'show_settings' value
+                    Log.i("[Application] Applying [app] section provisioning config...");
                     val config = Factory.instance().createConfigWithFactory(
                         corePreferences.configPath,
                         corePreferences.factoryConfigPath

@@ -89,13 +89,12 @@ public class AppConfigHelper {
         String contents = downloadFile(filePath);
 
         if (contents != null && contents.length() > 0) {
-            log("Remote provisioning contents present. Parsing 'local' values...");
+            log("Remote provisioning contents found. Parsing values...");
 
             // Erase all settings but the 'app' section.
             // Linphone SDK will take care of the rest.
             contents = removeNonAppSections(contents);
 
-            log("File contents: " + contents);
             return contents;
         } else {
             return "";
@@ -407,33 +406,28 @@ public class AppConfigHelper {
             HttpURLConnection connection = null;
             try {
                 String tag = "provisioning";
-                Log.i(tag, "Check provisioning from: " + fileUrl);
+
                 URL url = new URL(fileUrl);
-                Log.i(tag, "Open connection");
                 connection = (HttpURLConnection) url.openConnection();
-                Log.i(tag, "Connect");
                 connection.connect();
 
-                Log.i(tag, "Verify response code: "+connection.getResponseCode());
                 if (connection.getResponseCode() != HttpURLConnection.HTTP_OK) {
+                    Log.i(tag, "HTTP failed. Response: " + connection.getResponseCode());
                     throw new Exception("Server returned HTTP "
                             + connection.getResponseCode()
                             + " "
                             + connection.getResponseMessage());
                 }
 
-                Log.i(tag, "Initialize download stream");
                 InputStream input = new BufferedInputStream(connection.getInputStream());
                 ByteArrayOutputStream buffer = new ByteArrayOutputStream();
                 byte[] data = new byte[4096];
                 int n;
 
-                Log.i(tag, "Read data from stream");
                 while ((n = input.read(data)) != -1) {
                     buffer.write(data, 0, n);
                 }
 
-                Log.i(tag, "Convert buffer to string");
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                     return buffer.toString(StandardCharsets.UTF_8);
                 } else {
@@ -443,7 +437,6 @@ public class AppConfigHelper {
                 Log.i(tag, "Something went wrong: " + ex.getMessage());
                 return null;
             } finally  {
-                Log.i(tag, "Clean-up");
                 if (connection != null) {
                     connection.disconnect();
                 }
