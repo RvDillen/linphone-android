@@ -98,6 +98,10 @@ class SideMenuFragment : GenericFragment<SideMenuFragmentBinding>() {
         }
 
         binding.setSelfPictureClickListener {
+            // CLB: Block access to settings via AppConfig
+            if (ClbSettingsBlockChecker.AreSettingsBlocked(context)) {
+                return@setSelfPictureClickListener
+            }
             pickFile()
         }
 
