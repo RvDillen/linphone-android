@@ -130,6 +130,42 @@ class LinphoneApplication : Application(), ImageLoaderFactory {
                 Log.i("[Application] Provisioning URL already configured: $configUrl")
             }
 
+            if (coreContext.core.provisioningUri != null) {
+                // Try to download file... if it exists... pars the 'app' section ourselves.
+                // Linphone SDK does NOT support app section settings
+                val ach = AppConfigHelper(context, corePreferences)
+                var provisioningPath = coreContext.core.provisioningUri
+
+                if (true) {
+                    Log.i(
+                        "[Application] DEBUG DEBUG - Overrule provisioning filepath with own local test server - DEBUG DEBUG"
+                    )
+                    provisioningPath = "http://192.168.178.49:8090/linphonerc.xml"
+                }
+
+                val contents = ach.checkRemoteProvisioning(
+                    false,
+                    coreContext,
+                    provisioningPath
+                )
+
+                if (contents != null && contents.length > 0) {
+                    // If there were any config changes, also update the 'show_settings' value
+                    val config = Factory.instance().createConfigWithFactory(
+                        corePreferences.configPath,
+                        corePreferences.factoryConfigPath
+                    )
+
+                    if (LinphonePreferencesCLB.instance().UpdateFromLinphoneXmlData(
+                            contents,
+                            config
+                        )
+                    ) {
+                        ach.updateShowSettingsToCorePreferences(config)
+                    }
+                }
+            }
+
             if (!skipCoreStart) {
                 coreContext.start()
             }
@@ -218,7 +254,7 @@ class LinphoneApplication : Application(), ImageLoaderFactory {
                     ach.storeRcXmlHash()
 
                     // Update show_settings to corePreferences
-                    configShouldBeUpdated = true;
+                    configShouldBeUpdated = true
                 }
             } else {
                 LogConfig("Hashes are equal. Linphone Rc XML from bundle has no changes.")
