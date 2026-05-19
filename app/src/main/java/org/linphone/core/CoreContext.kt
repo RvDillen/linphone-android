@@ -651,6 +651,17 @@ class CoreContext(
         }
         core.config.setBool("app", "migration_5.1_required", false)
 
+        val oldServerUrl = "https://www.linphone.org:444/lft.php"
+        val newServerUrl = "https://files.linphone.org/http-file-transfer-server/hft.php"
+        if (core.logCollectionUploadServerUrl == oldServerUrl) {
+            Log.i("[Context] Migrating logCollectionUploadServerUrl from old URL to $newServerUrl")
+            core.logCollectionUploadServerUrl = newServerUrl
+        }
+        if (core.fileTransferServer == oldServerUrl) {
+            Log.i("[Context] Migrating fileTransferServer from old URL to $newServerUrl")
+            core.fileTransferServer = newServerUrl
+        }
+
         Log.i("[Context] Core configured")
     }
 
