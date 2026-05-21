@@ -427,13 +427,17 @@ public class AppConfigHelper {
 
                 InputStream input = new BufferedInputStream(connection.getInputStream());
                 ByteArrayOutputStream buffer = new ByteArrayOutputStream();
-                byte[] data = new byte[4096];
-                int n;
 
-                while ((n = input.read(data)) != -1) {
-                    buffer.write(data, 0, n);
+                try {
+                    byte[] data = new byte[4096];
+                    int n;
+
+                    while ((n = input.read(data)) != -1) {
+                        buffer.write(data, 0, n);
+                    }
+                } finally {
+                    input.close();
                 }
-                input.close();
 
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                     return buffer.toString(StandardCharsets.UTF_8);
