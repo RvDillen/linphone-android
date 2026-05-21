@@ -26,6 +26,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
 import org.w3c.dom.*;
+
+import javax.xml.XMLConstants;
 import javax.xml.transform.*;
 import javax.xml.transform.dom.DOMSource;
 import javax.xml.parsers.*;
@@ -395,6 +397,7 @@ public class AppConfigHelper {
     // For the provisioning file, this is as intended as the file needs to be present BEFORE the Linphone core is started
     // by blocking the thread, the execution order can be assured.
     // DO NOT RUN ON THE UI THREAD!
+    // Might need rework, but for now we will keep it this way.
     private String downloadFile(final String fileUrl) {
 
         String output = "";
@@ -409,6 +412,9 @@ public class AppConfigHelper {
 
                 URL url = new URL(fileUrl);
                 connection = (HttpURLConnection) url.openConnection();
+
+                connection.setConnectTimeout(10_000);
+                connection.setReadTimeout(15_000);
                 connection.connect();
 
                 if (connection.getResponseCode() != HttpURLConnection.HTTP_OK) {
@@ -427,6 +433,7 @@ public class AppConfigHelper {
                 while ((n = input.read(data)) != -1) {
                     buffer.write(data, 0, n);
                 }
+                input.close();
 
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                     return buffer.toString(StandardCharsets.UTF_8);
@@ -448,11 +455,23 @@ public class AppConfigHelper {
             return output;
         } catch (Exception ex) {
             return output;
+        } finally {
+            executor.shutdown();
         }
     }
 
     private String removeNonAppSections(final String fileContents) {
         DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+        try {
+            // Fix: disable DOCTYPE and external entities
+            factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+            factory.setFeature("http://xml.org/sax/features/external-general-entities", false);
+            factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+        } catch (Exception ex) {
+            Log.i(tag, "Failed to set XML parsing features: " + ex.getMessage());
+        }
+
+        factory.setExpandEntityReferences(false);
         factory.setNamespaceAware(false);
 
         try {
@@ -474,7 +493,10 @@ public class AppConfigHelper {
             }
 
             // Clean-up done. 'transform' to a one-liner xml format
-            Transformer transformer = TransformerFactory.newInstance().newTransformer();
+            TransformerFactory transformerFactory = TransformerFactory.newInstance();
+            transformerFactory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
+
+            Transformer transformer = transformerFactory.newTransformer();
             transformer.setOutputProperty(OutputKeys.OMIT_XML_DECLARATION, "no");
             transformer.setOutputProperty(OutputKeys.INDENT, "no");
 
