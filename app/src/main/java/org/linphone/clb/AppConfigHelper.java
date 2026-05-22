@@ -2,17 +2,41 @@ package org.linphone.clb;
 
 import android.content.Context;
 import android.content.RestrictionsManager;
+import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
 
 import org.linphone.core.Config;
 import org.linphone.core.CorePreferences;
+import org.linphone.core.CoreContext;
 
+import java.io.BufferedInputStream;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
+import java.io.StringWriter;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+
+import org.w3c.dom.*;
+
+import javax.xml.XMLConstants;
+import javax.xml.transform.*;
+import javax.xml.transform.dom.DOMSource;
+import javax.xml.parsers.*;
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.transform.stream.StreamResult;
+import javax.xml.xpath.XPath;
+import javax.xml.xpath.XPathConstants;
+import javax.xml.xpath.XPathFactory;
 
 public class AppConfigHelper {
 
@@ -60,6 +84,23 @@ public class AppConfigHelper {
 
         // Do parse! Even when bundle is empty, so internal variables get correct values
         parseConfiguration(_bundle);
+    }
+
+    public String checkRemoteProvisioning(boolean testEnvironment, CoreContext coreContext, String filePath) {
+
+        String contents = downloadFile(filePath);
+
+        if (contents != null && contents.length() > 0) {
+            log("Remote provisioning contents found. Parsing values...");
+
+            // Erase all settings but the 'app' section.
+            // Linphone SDK will take care of the rest.
+            contents = removeNonAppSections(contents);
+
+            return contents;
+        } else {
+            return "";
+        }
     }
 
     public void checkAppConfig() {
@@ -349,5 +390,159 @@ public class AppConfigHelper {
             }
         }
         return bob.toString();
+    }
+
+    /* File Downloader for RemoteProvisioning support */
+    // NOTE! This way of downloading a file is BLOCKING.
+    // For the provisioning file, this is as intended as the file needs to be present BEFORE the Linphone core is started
+    // by blocking the thread, the execution order can be assured.
+    // DO NOT RUN ON THE UI THREAD!
+    // Might need rework, but for now we will keep it this way.
+    private String downloadFile(final String fileUrl) {
+
+        String output = "";
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+
+        // Download MUST run on an non-ui thread... (Android policy)
+        Future<String> future = executor.submit(() -> {
+
+            HttpURLConnection connection = null;
+            try {
+                String tag = "provisioning";
+
+                URL url = new URL(fileUrl);
+                connection = (HttpURLConnection) url.openConnection();
+
+                connection.setConnectTimeout(10_000);
+                connection.setReadTimeout(15_000);
+                connection.connect();
+
+                if (connection.getResponseCode() != HttpURLConnection.HTTP_OK) {
+                    Log.i(tag, "HTTP failed. Response: " + connection.getResponseCode());
+                    throw new Exception("Server returned HTTP "
+                            + connection.getResponseCode()
+                            + " "
+                            + connection.getResponseMessage());
+                }
+
+                InputStream input = new BufferedInputStream(connection.getInputStream());
+                ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+
+                try {
+                    byte[] data = new byte[4096];
+                    int n;
+
+                    while ((n = input.read(data)) != -1) {
+                        buffer.write(data, 0, n);
+                    }
+                } finally {
+                    input.close();
+                }
+
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    return buffer.toString(StandardCharsets.UTF_8);
+                } else {
+                    return buffer.toString("UTF-8");
+                }
+            } catch (Exception ex) {
+                Log.i(tag, "Something went wrong: " + ex.getMessage());
+                return null;
+            } finally  {
+                if (connection != null) {
+                    connection.disconnect();
+                }
+            }
+        });
+
+        try {
+            output = future.get();
+            return output;
+        } catch (Exception ex) {
+            return output;
+        } finally {
+            executor.shutdown();
+        }
+    }
+
+    private String removeNonAppSections(final String fileContents) {
+        DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+        try {
+            // Fix: disable DOCTYPE and external entities
+            factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+            factory.setFeature("http://xml.org/sax/features/external-general-entities", false);
+            factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+        } catch (Exception ex) {
+            Log.i(tag, "Failed to set XML parsing features: " + ex.getMessage());
+        }
+
+        factory.setExpandEntityReferences(false);
+        factory.setNamespaceAware(false);
+
+        try {
+            DocumentBuilder builder = factory.newDocumentBuilder();
+            Document doc = builder.parse(new ByteArrayInputStream(fileContents.getBytes(StandardCharsets.UTF_8)));
+
+            NodeList sections = doc.getElementsByTagName("section");
+            for (int i = sections.getLength() - 1; i >=0; i--) {
+                Element section = (Element)sections.item(i);
+                String name = section.getAttribute("name");
+
+                if (!"app".equals(name)) {
+                    section.getParentNode().removeChild(section);
+                }
+            }
+
+            if (!convertToOneLinerXml(doc)) {
+                log("Failed to compress XML to a one-liner.");
+            }
+
+            // Clean-up done. 'transform' to a one-liner xml format
+            TransformerFactory transformerFactory = TransformerFactory.newInstance();
+            transformerFactory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
+
+            Transformer transformer = transformerFactory.newTransformer();
+            transformer.setOutputProperty(OutputKeys.OMIT_XML_DECLARATION, "no");
+            transformer.setOutputProperty(OutputKeys.INDENT, "no");
+
+            StringWriter writer = new StringWriter();
+
+            transformer.transform(
+                    new DOMSource(doc),
+                    new StreamResult(writer)
+            );
+
+            var xmlString = writer.toString();
+            // Remove all empty lines
+            xmlString = xmlString.replaceAll("(?m)^\\s*$\\R?", "");
+            return xmlString;
+
+        } catch (Exception ex) {
+            log("Parsing configXML (provisioning) failed: " + ex.getMessage());
+            return "";
+        }
+    }
+
+    private boolean convertToOneLinerXml(Document doc) {
+        // Clean-up (remove empty lines and trailing spaces
+        XPath xpath = XPathFactory.newInstance().newXPath();
+
+        try {
+            NodeList emptyNodes = (NodeList) xpath.evaluate(
+                    "//text()[normalize-space(.)='']",
+                    doc,
+                    XPathConstants.NODESET
+            );
+
+            for (int i = 0; i < emptyNodes.getLength(); i++) {
+                Node emptyNode = emptyNodes.item(i);
+                emptyNode.getParentNode().removeChild(emptyNode);
+            }
+
+        } catch (Exception ex) {
+            Log.i("ach", "Compressing XML to one-liner failed: " + ex.getMessage());
+            return false;
+        }
+
+        return true;
     }
 }

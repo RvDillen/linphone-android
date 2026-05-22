@@ -130,6 +130,36 @@ class LinphoneApplication : Application(), ImageLoaderFactory {
                 Log.i("[Application] Provisioning URL already configured: $configUrl")
             }
 
+            // CLB: Try to download file... if it exists... parse the 'app' section ourselves.
+            // Linphone SDK provisioning does NOT support app section settings
+            if (coreContext.core.provisioningUri != null) {
+
+                val ach = AppConfigHelper(context, corePreferences)
+                var provisioningPath = coreContext.core.provisioningUri
+
+                val contents = ach.checkRemoteProvisioning(
+                    false,
+                    coreContext,
+                    provisioningPath
+                )
+
+                if (contents != null && contents.length > 0) {
+                    // If there were any config changes, also update the 'show_settings' value
+                    Log.i("[Application] Applying [app] section provisioning config...");
+                    val config = Factory.instance().createConfigWithFactory(
+                        corePreferences.configPath,
+                        corePreferences.factoryConfigPath
+                    )
+
+                    if (LinphonePreferencesCLB.instance().UpdateFromLinphoneXmlData(
+                            contents,
+                            config
+                        )) {
+                        ach.updateShowSettingsToCorePreferences(config)
+                    }
+                }
+            }
+
             if (!skipCoreStart) {
                 coreContext.start()
             }
@@ -218,7 +248,7 @@ class LinphoneApplication : Application(), ImageLoaderFactory {
                     ach.storeRcXmlHash()
 
                     // Update show_settings to corePreferences
-                    configShouldBeUpdated = true;
+                    configShouldBeUpdated = true
                 }
             } else {
                 LogConfig("Hashes are equal. Linphone Rc XML from bundle has no changes.")
