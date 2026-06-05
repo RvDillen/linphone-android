@@ -461,8 +461,14 @@ public class AppConfigHelper {
                 BufferedInputStream bis = new BufferedInputStream(in);
 
                 // Read/Skip headers
-                while ((bis.read()) != -1) {
-                    // Empty, Skipping headers...
+                int b = 0;
+                int state = 0;
+                while ((b = bis.read()) != -1) {
+                    if (state == 0 && b == '\r') state = 1;
+                    else if (state == 1 && b == '\n') state = 2;
+                    else if (state == 2 && b == '\r') state = 3;
+                    else if (state == 3 && b == '\n') break;
+                    else state = 0;
                 }
 
                 StringBuilder body = new StringBuilder();
