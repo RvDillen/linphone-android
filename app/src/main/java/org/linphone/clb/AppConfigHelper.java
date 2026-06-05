@@ -461,23 +461,10 @@ public class AppConfigHelper {
 
                 BufferedInputStream bis = new BufferedInputStream(in);
 
-                // Read headers
-                ByteArrayOutputStream headerBuffer = new ByteArrayOutputStream();
-                int b;
-                int state = 0;
-
-                while ((b = bis.read()) != -1) {
-                    headerBuffer.write(b);
-
-                    if (state == 0 && b == '\r') state = 1;
-                    else if (state == 1 && b == '\n') state = 2;
-                    else if (state == 2 && b == '\r') state = 3;
-                    else if (state == 3 && b == '\n') break;
-                    else state = 0;
+                // Read/Skip headers
+                while ((bis.read()) != -1) {
+                    // Empty, Skipping headers...
                 }
-
-                // String headers = headerBuffer.toString("UTF-8");
-                // System.out.println(headers);
 
                 StringBuilder body = new StringBuilder();
 
