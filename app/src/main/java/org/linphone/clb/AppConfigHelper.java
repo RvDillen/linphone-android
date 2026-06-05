@@ -438,11 +438,11 @@ public class AppConfigHelper {
         log("Downloading from host: " + host + " and path: " + path);
 
         final String downloadPath = path;
+        final int portNr = port == -1 ? 80 : port;
 
         ExecutorService executor = Executors.newSingleThreadExecutor();
         Future<String> future = executor.submit(() -> {
 
-            int portNr = port == -1 ? 80 : port;
             java.net.Socket socket = new java.net.Socket(host, portNr);
 
             try {
