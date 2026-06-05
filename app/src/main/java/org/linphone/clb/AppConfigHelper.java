@@ -419,8 +419,7 @@ public class AppConfigHelper {
         String tag = "provisioning";
         log("Attempting to download provisioningfile with Java Socket: " + fileUrl);
 
-        //String downloadUrl = fileUrl;
-        String downloadUrl = "http://192.168.178.49:8080/linphonerc.xml";
+        String downloadUrl = fileUrl;
         if (!downloadUrl.startsWith("http://") && !downloadUrl.startsWith("https://")) {
             downloadUrl = "http://" + downloadUrl;
         }
