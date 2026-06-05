@@ -2,6 +2,7 @@ package org.linphone.clb;
 
 import android.content.Context;
 import android.content.RestrictionsManager;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
@@ -14,6 +15,7 @@ import java.io.BufferedInputStream;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.io.StringWriter;
 import java.net.HttpURLConnection;
 import java.net.URL;
@@ -401,6 +403,114 @@ public class AppConfigHelper {
     private String downloadFile(final String fileUrl) {
 
         String output = "";
+        output = downloadWithJavaSocket(fileUrl);
+        if (output == null || output.isEmpty()) {
+            log("Failed to download file with Java Socket.");
+
+            output = downloadWithHttpUrlConnection(fileUrl);
+            if (output == null || output.isEmpty()) {
+                log("Failed to download file with HttpUrlConnection.");
+            }
+        }
+        return output;
+    }
+
+    public String downloadWithJavaSocket(final String fileUrl) {
+        String tag = "provisioning";
+        log("Attempting to download provisioningfile with Java Socket: " + fileUrl);
+
+        //String downloadUrl = fileUrl;
+        String downloadUrl = "http://192.168.178.49:8080/linphonerc.xml";
+        if (!downloadUrl.startsWith("http://") && !downloadUrl.startsWith("https://")) {
+            downloadUrl = "http://" + downloadUrl;
+        }
+
+        Uri uri = Uri.parse(downloadUrl);
+
+        String host = uri.getHost();
+        String path = uri.getPath();
+        int port = uri.getPort();
+
+        if (path == null || path.isEmpty()) {
+            path = "/";
+        }
+
+        System.out.println("Downloading from host: " + host + " and path: " + path);
+        log("Downloading from host: " + host + " and path: " + path);
+
+        final String downloadPath = path;
+
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        Future<String> future = executor.submit(() -> {
+
+            int portNr = port == -1 ? 80 : port;
+            java.net.Socket socket = new java.net.Socket(host, portNr);
+
+            try {
+                OutputStream out = socket.getOutputStream();
+                InputStream in = socket.getInputStream();
+
+                String request =
+                        "GET " + downloadPath + " HTTP/1.1\r\n" +
+                                "Host: " + host + "\r\n" +
+                                "Connection: close\r\n" +
+                                "\r\n";
+
+                out.write(request.getBytes("UTF-8"));
+                out.flush();
+
+                BufferedInputStream bis = new BufferedInputStream(in);
+
+                // Read headers
+                ByteArrayOutputStream headerBuffer = new ByteArrayOutputStream();
+                int b;
+                int state = 0;
+
+                while ((b = bis.read()) != -1) {
+                    headerBuffer.write(b);
+
+                    if (state == 0 && b == '\r') state = 1;
+                    else if (state == 1 && b == '\n') state = 2;
+                    else if (state == 2 && b == '\r') state = 3;
+                    else if (state == 3 && b == '\n') break;
+                    else state = 0;
+                }
+
+                // String headers = headerBuffer.toString("UTF-8");
+                // System.out.println(headers);
+
+                StringBuilder body = new StringBuilder();
+
+                byte[] buffer = new byte[8192];
+                int read;
+                while ((read = bis.read(buffer)) != -1) {
+                    body.append(new String(buffer, 0, read, "UTF-8"));
+                }
+
+                return body.toString();
+
+            } catch (Exception ex) {
+                log("Java Socket download failed: " + ex.getMessage());
+                return "";
+            } finally {
+                socket.close();
+            }
+        });
+
+        try {
+            return future.get();
+        } catch (Exception ex) {
+            return "";
+        } finally {
+            executor.shutdown();
+        }
+    }
+
+    private String downloadWithHttpUrlConnection(final String fileUrl) {
+
+        System.out.println("Attempting to download provisioning file with HttpUrlConnection (only works from 'config.clb.nl'): " + fileUrl);
+
+        String output = "";
         ExecutorService executor = Executors.newSingleThreadExecutor();
 
         // Download MUST run on an non-ui thread... (Android policy)
@@ -418,7 +528,7 @@ public class AppConfigHelper {
                 connection.connect();
 
                 if (connection.getResponseCode() != HttpURLConnection.HTTP_OK) {
-                    Log.i(tag, "HTTP failed. Response: " + connection.getResponseCode());
+                    log("HTTP failed. Response: " + connection.getResponseCode());
                     throw new Exception("Server returned HTTP "
                             + connection.getResponseCode()
                             + " "
@@ -445,7 +555,7 @@ public class AppConfigHelper {
                     return buffer.toString("UTF-8");
                 }
             } catch (Exception ex) {
-                Log.i(tag, "Something went wrong: " + ex.getMessage());
+                log("Something went wrong: " + ex.getMessage());
                 return null;
             } finally  {
                 if (connection != null) {
@@ -493,7 +603,7 @@ public class AppConfigHelper {
             }
 
             if (!convertToOneLinerXml(doc)) {
-                log("Failed to compress XML to a one-liner.");
+                Log.i(tag, "Failed to compress XML to a one-liner.");
             }
 
             // Clean-up done. 'transform' to a one-liner xml format
@@ -517,7 +627,7 @@ public class AppConfigHelper {
             return xmlString;
 
         } catch (Exception ex) {
-            log("Parsing configXML (provisioning) failed: " + ex.getMessage());
+            logError("Parsing configXML (provisioning) failed: " + ex.getMessage());
             return "";
         }
     }
@@ -539,7 +649,7 @@ public class AppConfigHelper {
             }
 
         } catch (Exception ex) {
-            Log.i("ach", "Compressing XML to one-liner failed: " + ex.getMessage());
+            logError("Compressing XML to one-liner failed: " + ex.getMessage());
             return false;
         }
 
