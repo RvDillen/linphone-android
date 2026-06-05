@@ -416,7 +416,6 @@ public class AppConfigHelper {
     }
 
     public String downloadWithJavaSocket(final String fileUrl) {
-        String tag = "provisioning";
         log("Attempting to download provisioningfile with Java Socket: " + fileUrl);
 
         String downloadUrl = fileUrl;
@@ -434,7 +433,6 @@ public class AppConfigHelper {
             path = "/";
         }
 
-        System.out.println("Downloading from host: " + host + " and path: " + path);
         log("Downloading from host: " + host + " and path: " + path);
 
         final String downloadPath = path;
@@ -481,7 +479,7 @@ public class AppConfigHelper {
                 return body.toString();
 
             } catch (Exception ex) {
-                log("Java Socket download failed: " + ex.getMessage());
+                logError("Java Socket download failed: " + ex.getMessage());
                 return "";
             } finally {
                 socket.close();
@@ -499,7 +497,7 @@ public class AppConfigHelper {
 
     private String downloadWithHttpUrlConnection(final String fileUrl) {
 
-        System.out.println("Attempting to download provisioning file with HttpUrlConnection (only works from 'config.clb.nl'): " + fileUrl);
+        log("Attempting to download provisioning file with HttpUrlConnection (only works from 'config.clb.nl'): " + fileUrl);
 
         String output = "";
         ExecutorService executor = Executors.newSingleThreadExecutor();
@@ -509,8 +507,6 @@ public class AppConfigHelper {
 
             HttpURLConnection connection = null;
             try {
-                String tag = "provisioning";
-
                 URL url = new URL(fileUrl);
                 connection = (HttpURLConnection) url.openConnection();
 
@@ -573,7 +569,7 @@ public class AppConfigHelper {
             factory.setFeature("http://xml.org/sax/features/external-general-entities", false);
             factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
         } catch (Exception ex) {
-            Log.i(tag, "Failed to set XML parsing features: " + ex.getMessage());
+            logError("Failed to set XML parsing features: " + ex.getMessage());
         }
 
         factory.setExpandEntityReferences(false);
@@ -594,7 +590,7 @@ public class AppConfigHelper {
             }
 
             if (!convertToOneLinerXml(doc)) {
-                Log.i(tag, "Failed to compress XML to a one-liner.");
+                log("Failed to compress XML to a one-liner.");
             }
 
             // Clean-up done. 'transform' to a one-liner xml format
