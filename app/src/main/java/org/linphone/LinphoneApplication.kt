@@ -133,7 +133,6 @@ class LinphoneApplication : Application(), ImageLoaderFactory {
             // CLB: Try to download file... if it exists... parse the 'app' section ourselves.
             // Linphone SDK provisioning does NOT support app section settings
             if (coreContext.core.provisioningUri != null) {
-
                 val ach = AppConfigHelper(context, corePreferences)
                 var provisioningPath = coreContext.core.provisioningUri
 
@@ -145,7 +144,7 @@ class LinphoneApplication : Application(), ImageLoaderFactory {
 
                 if (contents != null && contents.length > 0) {
                     // If there were any config changes, also update the 'show_settings' value
-                    Log.i("[Application] Applying [app] section provisioning config...");
+                    Log.i("[Application] Applying [app] section provisioning config...")
                     val config = Factory.instance().createConfigWithFactory(
                         corePreferences.configPath,
                         corePreferences.factoryConfigPath
@@ -154,7 +153,8 @@ class LinphoneApplication : Application(), ImageLoaderFactory {
                     if (LinphonePreferencesCLB.instance().UpdateFromLinphoneXmlData(
                             contents,
                             config
-                        )) {
+                        )
+                    ) {
                         ach.updateShowSettingsToCorePreferences(config)
                     }
                 }
@@ -209,7 +209,8 @@ class LinphoneApplication : Application(), ImageLoaderFactory {
                 //    this::class.java.classLoader.getResource("assets/clb_linphonerc_test").readText()
                 if (LinphonePreferencesCLB.instance().UpdateFromLinphoneRcData(
                         linphonercData,
-                        corePreferences.configPath)
+                        corePreferences.configPath
+                    )
                 ) {
                     LogConfig("Store AppConfig linphoneRc hash")
                     ach.storeRcHash()
@@ -242,7 +243,8 @@ class LinphoneApplication : Application(), ImageLoaderFactory {
 
                 if (LinphonePreferencesCLB.instance().UpdateFromLinphoneXmlData(
                         linphonercXmlData,
-                        config)
+                        config
+                    )
                 ) {
                     LogConfig("Store AppConfig linphoneRc XML hash")
                     ach.storeRcXmlHash()
@@ -258,7 +260,8 @@ class LinphoneApplication : Application(), ImageLoaderFactory {
                 // When older Androids are no longer supported, remove this code block!
                 if (LinphonePreferencesCLB.instance().ParseLocalXmlFileConfig(
                         config,
-                        corePreferences)
+                        corePreferences
+                    )
                 ) {
                     // If there were any config changes, also update the 'show_settings' value
                     ach.updateShowSettingsToCorePreferences(config)

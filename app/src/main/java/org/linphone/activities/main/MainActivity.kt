@@ -22,7 +22,6 @@ package org.linphone.activities.main
 import android.annotation.SuppressLint
 import android.annotation.TargetApi
 import android.app.Dialog
-import android.app.PendingIntent
 import android.app.role.RoleManager
 import android.content.ComponentCallbacks2
 import android.content.Context
