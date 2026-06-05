@@ -41,6 +41,8 @@ import kotlin.system.exitProcess
 import org.linphone.BuildConfig
 import org.linphone.LinphoneApplication.Companion.coreContext
 import org.linphone.LinphoneApplication.Companion.corePreferences
+import org.linphone.clb.CallStateCLB
+import org.linphone.clb.kt.CoreContextExt
 import org.linphone.compatibility.Compatibility
 import org.linphone.contacts.ContactsManager
 import org.linphone.core.tools.Log
@@ -331,6 +333,13 @@ class CoreContext
                     }
                 }
                 Call.State.OutgoingInit -> {
+                    // CLB: Check if call is from CLB - if so, skip showing activity
+                    if (CallStateCLB.instance().IsCallFromCLB()) {
+                        val coreExt = CoreContextExt()
+                        coreExt.OnOutgoingStarted(false)
+                        return@override  // Skip normal Linphone flow
+                    }
+                    
                     val conferenceInfo = core.findConferenceInformationFromUri(call.remoteAddress)
                     // Do not show outgoing call view for conference calls, wait for connected state
                     if (conferenceInfo == null) {
@@ -344,8 +353,11 @@ class CoreContext
                     }
                 }
                 Call.State.Connected -> {
-                    postOnMainThread {
-                        showCallActivity()
+                    // CLB: Skip showing activity for CLB calls
+                    if (!CallStateCLB.instance().IsCallFromCLB()) {
+                        postOnMainThread {
+                            showCallActivity()
+                        }
                     }
                 }
                 Call.State.StreamsRunning -> {
@@ -954,6 +966,9 @@ class CoreContext
         Log.i(
             "$TAG Answering call with remote address [${call.remoteAddress.asStringUriOnly()}] and to address [${call.toAddress.asStringUriOnly()}]"
         )
+        // CLB: End any CLB calls before answering user call
+        CallStateCLB.instance().EndAnyCLBCall(core)
+        
         val params = core.createCallParams(call)
         if (params == null) {
             Log.w("$TAG Answering call without params!")
