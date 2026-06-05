@@ -461,8 +461,7 @@ public class AppConfigHelper {
                 BufferedInputStream bis = new BufferedInputStream(in);
 
                 // Read/Skip headers
-                int b = 0;
-                int state = 0;
+                int b, state = 0;
                 while ((b = bis.read()) != -1) {
                     if (state == 0 && b == '\r') state = 1;
                     else if (state == 1 && b == '\n') state = 2;
