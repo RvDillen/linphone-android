@@ -337,8 +337,8 @@ public class LinphonePreferencesCLB {
     }
 
 
-    private String sectionKey = "section";
-    private String entryKey = "entry";
+    private final String sectionKey = "section";
+    private final String entryKey = "entry";
 
     private void processParsing(XmlPullParser parser, Config lpConfig)
             throws IOException, XmlPullParserException {
