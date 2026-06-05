@@ -337,19 +337,18 @@ class CoreContext
                     if (CallStateCLB.instance().IsCallFromCLB()) {
                         val coreExt = CoreContextExt()
                         coreExt.OnOutgoingStarted(false)
-                        return@override  // Skip normal Linphone flow
-                    }
-                    
-                    val conferenceInfo = core.findConferenceInformationFromUri(call.remoteAddress)
-                    // Do not show outgoing call view for conference calls, wait for connected state
-                    if (conferenceInfo == null) {
-                        postOnMainThread {
-                            showCallActivity()
-                        }
                     } else {
-                        Log.i(
-                            "$TAG Call peer address matches known conference, delaying in-call UI until Connected state"
-                        )
+                        val conferenceInfo = core.findConferenceInformationFromUri(call.remoteAddress)
+                        // Do not show outgoing call view for conference calls, wait for connected state
+                        if (conferenceInfo == null) {
+                            postOnMainThread {
+                                showCallActivity()
+                            }
+                        } else {
+                            Log.i(
+                                "$TAG Call peer address matches known conference, delaying in-call UI until Connected state"
+                            )
+                        }
                     }
                 }
                 Call.State.Connected -> {

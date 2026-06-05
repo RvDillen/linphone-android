@@ -29,7 +29,7 @@ import androidx.annotation.UiThread
 import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
-import org.linphone.databinding.ChatConversationUnsafeDisabledDetailsBottomSheetBinding
+import org.linphone.R
 
 @UiThread
 class UnsafeConversationDisabledDetailsDialogFragment(
@@ -62,7 +62,10 @@ class UnsafeConversationDisabledDetailsDialogFragment(
         container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View {
-        val view = ChatConversationUnsafeDisabledDetailsBottomSheetBinding.inflate(layoutInflater)
-        return view.root
+        return inflater.inflate(
+            R.layout.chat_conversation_unsafe_disabled_details_bottom_sheet,
+            container,
+            false
+        )
     }
 }

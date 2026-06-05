@@ -12,7 +12,6 @@ import android.telephony.TelephonyManager;
 import android.widget.Toast;
 
 import org.linphone.R;
-import org.linphone.activities.launcher.LauncherActivity;
 import org.linphone.clb.kt.CoreContextExt;
 import org.linphone.core.Address;
 import org.linphone.core.Call;
@@ -21,6 +20,7 @@ import org.linphone.core.CoreListenerStub;
 import org.linphone.core.Reason;
 import org.linphone.core.tools.Log;
 import org.linphone.mediastream.Version;
+import org.linphone.ui.main.MainActivity;
 
 import static org.linphone.LinphoneApplication.coreContext;
 import static org.linphone.core.Reason.Declined;
@@ -108,7 +108,7 @@ public class CallStateCLB {
         // A11(+): Finish loader activity.
         if (Build.VERSION.SDK_INT > Version.API29_ANDROID_10) {
 
-            Intent intent = new Intent(coreContext.getContext(), LauncherActivity.class);
+            Intent intent = new Intent(coreContext.getContext(), MainActivity.class);
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             intent.addFlags(Intent.FLAG_ACTIVITY_NO_USER_ACTION);
             intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);

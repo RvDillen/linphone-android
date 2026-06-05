@@ -43,6 +43,7 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.app.Person
 import androidx.core.app.RemoteInput
 import androidx.core.app.TaskStackBuilder
+import androidx.core.content.ContextCompat
 import androidx.core.content.LocusIdCompat
 import androidx.navigation.NavDeepLinkBuilder
 import org.linphone.LinphoneApplication.Companion.coreContext
@@ -429,6 +430,20 @@ class NotificationsManager
             )
             dismissChatNotification(chatRoom)
         }
+    }
+
+    // CLB compatibility layer: legacy CLB integrations expect these methods.
+    @MainThread
+    fun startForeground() {
+        if (inCallService != null) return
+
+        val serviceIntent = Intent(Intent.ACTION_MAIN).setClass(context, CoreInCallService::class.java)
+        ContextCompat.startForegroundService(context, serviceIntent)
+    }
+
+    @MainThread
+    fun getService(): CoreInCallService? {
+        return inCallService
     }
 
     val chatMessageListener: ChatMessageListener = object : ChatMessageListenerStub() {
