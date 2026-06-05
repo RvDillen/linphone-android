@@ -35,7 +35,14 @@ import coil3.request.crossfade
 import coil3.svg.SvgDecoder
 import coil3.video.VideoFrameDecoder
 import com.google.android.material.color.DynamicColors
+import java.util.*
+import kotlin.concurrent.schedule
+import org.linphone.clb.AppConfigHelper
+import org.linphone.clb.CallStateCLB
+import org.linphone.clb.LinphonePreferencesCLB
+import org.linphone.clb.RegisterCLB
 import org.linphone.compatibility.Compatibility
+import org.linphone.core.Config
 import org.linphone.core.CoreContext
 import org.linphone.core.CorePreferences
 import org.linphone.core.Factory
@@ -79,10 +86,8 @@ class LinphoneApplication : Application(), SingletonImageLoader.Factory {
             VFS.setup(context)
         }
 
-        val config = Factory.instance().createConfigWithFactory(
-            corePreferences.configPath,
-            corePreferences.factoryConfigPath
-        )
+        // CLB: Create config with CLB customizations
+        val config = CreateConfigCLB(context)
         corePreferences.config = config
 
         val appName = context.getString(R.string.app_name)
@@ -95,6 +100,56 @@ class LinphoneApplication : Application(), SingletonImageLoader.Factory {
 
         coreContext = CoreContext(context)
         coreContext.start()
+
+        // CLB: Always force background-mode to be enabled
+        Log.i("$TAG Force 'background-mode' to 'enabled'.")
+        corePreferences.keepServiceAlive = true
+
+        // CLB: Set provisioning URL if not already configured
+        if (coreContext.core.provisioningUri == null) {
+            val configUrl = "http://config.clb.nl/linphonerc.xml"
+            coreContext.core.setProvisioningUri(configUrl)
+            Log.i("$TAG Provisioning URL is not configured, set to default CLB URL: $configUrl")
+        } else {
+            val configUrl = coreContext.core.provisioningUri
+            Log.i("$TAG Provisioning URL already configured: $configUrl")
+        }
+
+        // CLB: Try to download remote provisioning file and parse the 'app' section
+        if (coreContext.core.provisioningUri != null) {
+            val ach = AppConfigHelper(context, corePreferences)
+            val provisioningPath = coreContext.core.provisioningUri
+
+            val contents = ach.checkRemoteProvisioning(false, coreContext, provisioningPath)
+
+            if (contents != null && contents.length > 0) {
+                Log.i("$TAG Applying [app] section provisioning config...")
+                val remoteConfig = Factory.instance().createConfigWithFactory(
+                    corePreferences.configPath,
+                    corePreferences.factoryConfigPath
+                )
+
+                if (LinphonePreferencesCLB.instance().UpdateFromLinphoneXmlData(contents, remoteConfig)) {
+                    ach.updateShowSettingsToCorePreferences(remoteConfig)
+                }
+            }
+        }
+
+        // CLB: Register CLB account receivers
+        val registerCLB: RegisterCLB = RegisterCLB(context.applicationContext)
+        registerCLB.RegisterReceivers()
+
+        // CLB: Initialize CallStateCLB with delay to ensure core is ready
+        Timer().schedule(2000) {
+            try {
+                Log.i("$TAG Creating CallStateCLB")
+                val instance = CallStateCLB.instance()
+                Log.i("$TAG Restarting CallStateCLB")
+                instance.Restart()
+            } catch (e: Exception) {
+                Log.i("$TAG Can't start CallStateCLB $e")
+            }
+        }
 
         DynamicColors.applyToActivitiesIfAvailable(this)
         wakeLock.release()
@@ -159,5 +214,85 @@ class LinphoneApplication : Application(), SingletonImageLoader.Factory {
             TRIM_MEMORY_COMPLETE -> "Complete"
             else -> level.toString()
         }
+    }
+
+    // CLB: Create Linphone config with CLB customizations (MDM, app section, etc)
+    private fun CreateConfigCLB(context: Context): Config {
+        // Get restrictions data from MDM (AppConfigHelper)
+        val ach = AppConfigHelper(context, corePreferences)
+
+        // Check for MDM restrictions and app config changes
+        android.util.Log.i("[CLB]", "Checking AppConfig data")
+        ach.checkAppConfig()
+
+        // Handle changes in LinphoneRc from MDM
+        var configShouldBeUpdated = false
+        if (ach.linphoneRcHasChanges()) {
+            android.util.Log.i("[CLB]", "Applying AppConfig linphoneRc changes")
+
+            val linphonercData = ach.linphoneRc
+
+            if (LinphonePreferencesCLB.instance().UpdateFromLinphoneRcData(
+                    linphonercData,
+                    corePreferences.configPath
+                )
+            ) {
+                LogConfig("Store AppConfig linphoneRc hash")
+                ach.storeRcHash()
+                configShouldBeUpdated = true
+            }
+        } else {
+            LogConfig("Hashes are equal, no changes... skipping config from bundle.")
+
+            // Verify the 'old' method (i.e. linphonerc file in '/Downloads' folder)
+            LinphonePreferencesCLB.instance().MoveLinphoneRcFromDownloads(
+                context,
+                corePreferences
+            )
+        }
+
+        // Create the base Linphone config
+        android.util.Log.i("[CLB]", "Create Linphone Config")
+        LogConfig("Create Linphone Config")
+        val config = Factory.instance().createConfigWithFactory(
+            corePreferences.configPath,
+            corePreferences.factoryConfigPath
+        )
+
+        // Parse/execute RC XML (app-specific section)
+        if (ach.linphoneRcXmlHasChanges(null)) {
+            LogConfig("Apply AppConfig Linphone Rc XML changes.")
+
+            val linphonercXmlData = ach.linphoneRcXml
+
+            if (LinphonePreferencesCLB.instance().UpdateFromLinphoneXmlData(
+                    linphonercXmlData,
+                    config
+                )
+            ) {
+                LogConfig("Store AppConfig linphoneRc XML hash")
+                ach.storeRcXmlHash()
+                configShouldBeUpdated = true
+            }
+        } else {
+            LogConfig("Hashes are equal. Linphone Rc XML from bundle has no changes.")
+
+            // Try 'old' method (i.e. parse linphonerc.xml file and apply changes)
+            if (LinphonePreferencesCLB.instance().ParseLocalXmlFileConfig(config, corePreferences)) {
+                // If there were any config changes, also update the 'show_settings' value
+                ach.updateShowSettingsToCorePreferences(config)
+            }
+        }
+
+        if (configShouldBeUpdated) {
+            ach.updateShowSettingsToCorePreferences(config)
+        }
+
+        return config
+    }
+
+    private fun LogConfig(text: String) {
+        android.util.Log.i("[AppConfigHelper]", text)
+        Log.i(text)
     }
 }
