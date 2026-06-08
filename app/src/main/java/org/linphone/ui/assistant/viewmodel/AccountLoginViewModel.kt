@@ -128,6 +128,8 @@ open class AccountLoginViewModel
     }
 
     init {
+        // CLBL: DISABLE THIS!!!
+        /*
         coreContext.postOnCoreThread { core ->
             // Prevent user from leaving assistant if no account was configured yet
             showBackButton.postValue(core.accountList.isNotEmpty())
@@ -140,7 +142,7 @@ open class AccountLoginViewModel
                 skipLandingToThirdPartySipAccountEvent.postValue(Event(true))
             }
         }
-
+        */
         showPassword.value = false
         registrationInProgress.value = false
 

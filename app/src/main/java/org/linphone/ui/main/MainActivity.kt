@@ -590,7 +590,8 @@ class MainActivity : GenericActivity() {
                         Log.e("$TAG Can't start activity: $ise")
                     }
                 }
-            } else if (core.accountList.isEmpty()) {
+            /* } else if (core.accountList.isEmpty()) {
+                // CLB: DISABLE THIS!!!
                 Log.w("$TAG No account found, showing Assistant activity")
                 coreContext.postOnMainThread {
                     try {
@@ -599,6 +600,7 @@ class MainActivity : GenericActivity() {
                         Log.e("$TAG Can't start activity: $ise")
                     }
                 }
+             */
             } else {
                 if (intent.hasExtra(ARGUMENTS_CHAT)) {
                     Log.i("$TAG Intent has [Chat] extra")
