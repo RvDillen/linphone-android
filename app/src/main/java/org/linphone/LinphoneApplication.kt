@@ -105,35 +105,8 @@ class LinphoneApplication : Application(), SingletonImageLoader.Factory {
         Log.i("$TAG Force 'background-mode' to 'enabled'.")
         corePreferences.keepServiceAlive = true
 
-        // CLB: Set provisioning URL if not already configured
-        if (coreContext.core.provisioningUri == null) {
-            val configUrl = "http://config.clb.nl/linphonerc.xml"
-            coreContext.core.setProvisioningUri(configUrl)
-            Log.i("$TAG Provisioning URL is not configured, set to default CLB URL: $configUrl")
-        } else {
-            val configUrl = coreContext.core.provisioningUri
-            Log.i("$TAG Provisioning URL already configured: $configUrl")
-        }
-
-        // CLB: Try to download remote provisioning file and parse the 'app' section
-        if (coreContext.core.provisioningUri != null) {
-            val ach = AppConfigHelper(context, corePreferences)
-            val provisioningPath = coreContext.core.provisioningUri
-
-            val contents = ach.checkRemoteProvisioning(false, coreContext, provisioningPath)
-
-            if (contents != null && contents.length > 0) {
-                Log.i("$TAG Applying [app] section provisioning config...")
-                val remoteConfig = Factory.instance().createConfigWithFactory(
-                    corePreferences.configPath,
-                    corePreferences.factoryConfigPath
-                )
-
-                if (LinphonePreferencesCLB.instance().UpdateFromLinphoneXmlData(contents, remoteConfig)) {
-                    ach.updateShowSettingsToCorePreferences(remoteConfig)
-                }
-            }
-        }
+        // CLB: Provisioning uses core; run it only once core initialization is complete.
+        runClbProvisioningWhenCoreReady(context)
 
         // CLB: Register CLB account receivers
         val registerCLB: RegisterCLB = RegisterCLB(context.applicationContext)
@@ -298,5 +271,48 @@ class LinphoneApplication : Application(), SingletonImageLoader.Factory {
     private fun LogConfig(text: String) {
         android.util.Log.i("[AppConfigHelper]", text)
         Log.i(text)
+    }
+
+    private fun runClbProvisioningWhenCoreReady(context: Context, attempt: Int = 0) {
+        if (!coreContext.isReady()) {
+            if (attempt >= 40) {
+                Log.e("$TAG Core is still not ready after ${attempt + 1} attempts, skipping CLB provisioning check at startup")
+                return
+            }
+
+            Timer().schedule(250) {
+                coreContext.postOnMainThread {
+                    runClbProvisioningWhenCoreReady(context, attempt + 1)
+                }
+            }
+            return
+        }
+
+        if (coreContext.core.provisioningUri == null) {
+            val configUrl = "http://config.clb.nl/linphonerc.xml"
+            coreContext.core.setProvisioningUri(configUrl)
+            Log.i("$TAG Provisioning URL is not configured, set to default CLB URL: $configUrl")
+        } else {
+            val configUrl = coreContext.core.provisioningUri
+            Log.i("$TAG Provisioning URL already configured: $configUrl")
+        }
+
+        if (coreContext.core.provisioningUri != null) {
+            val ach = AppConfigHelper(context, corePreferences)
+            val provisioningPath = coreContext.core.provisioningUri
+            val contents = ach.checkRemoteProvisioning(false, coreContext, provisioningPath)
+
+            if (contents != null && contents.length > 0) {
+                Log.i("$TAG Applying [app] section provisioning config...")
+                val remoteConfig = Factory.instance().createConfigWithFactory(
+                    corePreferences.configPath,
+                    corePreferences.factoryConfigPath
+                )
+
+                if (LinphonePreferencesCLB.instance().UpdateFromLinphoneXmlData(contents, remoteConfig)) {
+                    ach.updateShowSettingsToCorePreferences(remoteConfig)
+                }
+            }
+        }
     }
 }
