@@ -652,6 +652,11 @@ class NotificationsManager
     }
 
     @WorkerThread
+    fun displayCallNotification(call: Call, isIncoming: Boolean) {
+        showCallNotification(call, isIncoming)
+    }
+
+    @WorkerThread
     private fun showCallNotification(call: Call, isIncoming: Boolean, friend: Friend? = null) {
         val notifiable = getNotifiableForCall(call)
 

@@ -1,15 +1,16 @@
 package org.linphone.clb;
 
 import android.app.Activity;
+import android.content.pm.PackageManager;
 import android.os.Build;
 import android.provider.Settings;
 import android.util.Log;
 import android.widget.Toast;
 
-import org.linphone.utils.PermissionHelper;
+import androidx.core.app.ActivityCompat;
 
 /**
- * PermissionHelper: Request extra permission needed for CLB implementeation
+ * PermissionHelper: Request extra permission(s) needed for CLB implementation
  */
 public class PermissionHelperCLB {
 
@@ -27,7 +28,8 @@ public class PermissionHelperCLB {
     public void CheckPermissions(Activity context) {
 
         // Check Microphone permission
-        if (!PermissionHelper.Companion.required(context).hasRecordAudioPermission()) {
+        if (ActivityCompat.checkSelfPermission(context, android.Manifest.permission.RECORD_AUDIO)
+                != PackageManager.PERMISSION_GRANTED) {
             Log.i(tag, "Microphone permission not granted");
             Toast.makeText(context, "Linphone: Microphone permission not granted", Toast.LENGTH_LONG).show();
             return;
@@ -51,5 +53,4 @@ public class PermissionHelperCLB {
 
         return false;
     }
-
 }

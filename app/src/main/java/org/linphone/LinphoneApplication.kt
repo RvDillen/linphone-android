@@ -221,6 +221,14 @@ class LinphoneApplication : Application(), SingletonImageLoader.Factory {
         // Get restrictions data from MDM (AppConfigHelper)
         val ach = AppConfigHelper(context, corePreferences)
 
+        // AppConfigHelper reads CLB values through CorePreferences before coreContext exists.
+        // Bootstrap the config now so CorePreferences doesn't fall back to coreContext.core.config.
+        val config = Factory.instance().createConfigWithFactory(
+            corePreferences.configPath,
+            corePreferences.factoryConfigPath
+        )
+        corePreferences.config = config
+
         // Check for MDM restrictions and app config changes
         android.util.Log.i("[CLB]", "Checking AppConfig data")
         ach.checkAppConfig()
@@ -251,13 +259,9 @@ class LinphoneApplication : Application(), SingletonImageLoader.Factory {
             )
         }
 
-        // Create the base Linphone config
+        // Reuse the bootstrapped base Linphone config.
         android.util.Log.i("[CLB]", "Create Linphone Config")
         LogConfig("Create Linphone Config")
-        val config = Factory.instance().createConfigWithFactory(
-            corePreferences.configPath,
-            corePreferences.factoryConfigPath
-        )
 
         // Parse/execute RC XML (app-specific section)
         if (ach.linphoneRcXmlHasChanges(null)) {

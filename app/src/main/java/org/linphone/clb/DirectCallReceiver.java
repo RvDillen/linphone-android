@@ -6,6 +6,8 @@ import android.content.Intent;
 import android.os.Handler;
 
 import org.linphone.clb.kt.CoreContextExt;
+import org.linphone.core.Address;
+import org.linphone.core.Factory;
 import org.linphone.core.tools.Log;
 
 import static org.linphone.LinphoneApplication.coreContext;
@@ -75,7 +77,13 @@ public class DirectCallReceiver extends BroadcastReceiver {
                     @Override
                     public void run() {
                         Log.i("[Manager] Start call to " + addressToCall);
-                        coreContext.startCall(addressToCall);
+                        String sipUri = addressToCall.startsWith("sip:") ? addressToCall : "sip:" + addressToCall;
+                        Address address = Factory.instance().createAddress(sipUri);
+                        if (address != null) {
+                            coreContext.startCall(address, null, false, null);
+                        } else {
+                            Log.e("[Manager] Failed to parse address: " + sipUri);
+                        }
                     }
                 },
                 100);

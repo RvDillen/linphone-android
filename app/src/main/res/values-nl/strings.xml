@@ -130,6 +130,7 @@
     <string name="help_troubleshooting_show_config_file">Configuratie weergeven</string>
     <string name="help_troubleshooting_clear_native_friends_in_database">Geïmporteerde contacten uit het lokale adresboek verwijderen</string>
     <string name="settings_title">Instellingen</string>
+    <string name="settings_blocked">Toegang geweigerd</string>
     <string name="settings_security_title">Beveiliging</string>
     <string name="settings_security_enable_vfs_title">Versleutel alles</string>
     <string name="settings_security_enable_vfs_failure_toast">Inschakelen van het versleutelingsmodule is mislukt!</string>

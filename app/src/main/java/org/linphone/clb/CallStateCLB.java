@@ -21,6 +21,7 @@ import org.linphone.core.Reason;
 import org.linphone.core.tools.Log;
 import org.linphone.mediastream.Version;
 import org.linphone.ui.main.MainActivity;
+import org.linphone.utils.LinphoneUtils;
 
 import static org.linphone.LinphoneApplication.coreContext;
 import static org.linphone.core.Reason.Declined;
@@ -302,7 +303,7 @@ public class CallStateCLB {
                             } else if (state == Call.State.End) {
                                 // Convert Core message for internalization
                                 if (call.getErrorInfo().getReason() == Declined) {
-                                    ShowToast(mContext.getString(R.string.call_error_declined));
+                                    ShowToast(LinphoneUtils.Companion.getCallErrorInfoToast(call));
                                 }
                             }
                         } catch (Exception ex) {
@@ -453,26 +454,7 @@ public class CallStateCLB {
     }
 
     private void DisplayErrorToastFor (Call call) {
-        // Convert Core message for internalization
-        Reason reason = call.getErrorInfo().getReason();
-        switch (reason) {
-            case Declined:
-                ShowToast(mContext.getString(R.string.call_error_declined));
-                break;
-            case NotFound:
-                ShowToast(mContext.getString(R.string.call_error_user_not_found));
-                break;
-            case NotAcceptable:
-                ShowToast(mContext.getString(R.string.call_error_incompatible_media_params));
-                break;
-            case Busy:
-                ShowToast(mContext.getString(R.string.call_error_user_busy));
-                break;
-            default:
-                ShowToast(mContext.getString(R.string.call_error_generic));
-                break;
-
-        }
+        ShowToast(LinphoneUtils.Companion.getCallErrorInfoToast(call));
     }
 
     private void ShowToast(String text) {
