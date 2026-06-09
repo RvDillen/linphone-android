@@ -128,7 +128,7 @@ open class AccountLoginViewModel
     }
 
     init {
-        // CLBL: DISABLE THIS!!!
+        // CLB: Disabled so 'create an account' is not required.
         /*
         coreContext.postOnCoreThread { core ->
             // Prevent user from leaving assistant if no account was configured yet
