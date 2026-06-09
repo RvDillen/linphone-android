@@ -202,6 +202,20 @@ class LinphoneApplication : Application(), SingletonImageLoader.Factory {
         )
         corePreferences.config = config
 
+        // If no provisioning URI has been configured yet, persist the default CLB URL directly
+        // into the config object before the core starts.  Writing via config.setString() avoids
+        // calling core.setProvisioningUri() on a running core (which would immediately trigger the
+        // SDK's own download/apply cycle), while still making the URL visible in the Settings UI.
+        val clbDefaultProvisioningUrl = "http://config.clb.nl/linphonerc.xml"
+            if (config.getString("misc", "remote_provisioning_uri", null).isNullOrEmpty()) {
+                android.util.Log.i(
+                    "[CLB]",
+                    "No provisioning URI configured, setting default: $clbDefaultProvisioningUrl"
+                )
+                config.setString("misc", "config-uri", clbDefaultProvisioningUrl)
+                config.sync()
+            }
+        corePreferences.config = config
         // Check for MDM restrictions and app config changes
         android.util.Log.i("[CLB]", "Checking AppConfig data")
         ach.checkAppConfig()
@@ -288,21 +302,16 @@ class LinphoneApplication : Application(), SingletonImageLoader.Factory {
             return
         }
 
-        if (coreContext.core.provisioningUri == null) {
-            val configUrl = "http://config.clb.nl/linphonerc.xml"
-            coreContext.core.setProvisioningUri(configUrl)
-            Log.i("$TAG Provisioning URL is not configured, set to default CLB URL: $configUrl")
-        } else {
-            val configUrl = coreContext.core.provisioningUri
-            Log.i("$TAG Provisioning URL already configured: $configUrl")
-        }
-
-        if (coreContext.core.provisioningUri != null) {
+        // Use the configured provisioning URI
+        // NOTE: Do NOT call core.setProvisioningUri() here. Calling it on an already-running core
+        // triggers the Linphone SDK's own provisioning download/apply cycle.
+        // The default URL is persisted into the config before the core starts (see CreateConfigCLB).
+        Log.i("$TAG CLB provisioning check, configured URI: ${coreContext.core.provisioningUri}")
+        run {
             val ach = AppConfigHelper(context, corePreferences)
-            val provisioningPath = coreContext.core.provisioningUri
-            val contents = ach.checkRemoteProvisioning(false, coreContext, provisioningPath)
+            val contents = ach.checkRemoteProvisioning(false, coreContext, coreContext.core.provisioningUri)
 
-            if (contents != null && contents.length > 0) {
+            if (contents != null && contents.isNotEmpty()) {
                 Log.i("$TAG Applying [app] section provisioning config...")
                 val remoteConfig = Factory.instance().createConfigWithFactory(
                     corePreferences.configPath,
