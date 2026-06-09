@@ -25,6 +25,7 @@ import androidx.lifecycle.MutableLiveData
 import org.linphone.LinphoneApplication.Companion.coreContext
 import org.linphone.LinphoneApplication.Companion.corePreferences
 import org.linphone.R
+import org.linphone.clb.CallFilter
 import org.linphone.core.Address
 import org.linphone.core.CallLog
 import org.linphone.core.ChatRoom
@@ -329,6 +330,10 @@ class HistoryViewModel
 
         val list = account.getCallLogsForAddress(address)
         for (log in list) {
+            if (CallFilter.isHardwareGeneratedCall(log)) {
+                continue
+            }
+
             val historyModel = CallLogHistoryModel(log)
             history.add(historyModel)
         }
@@ -337,7 +342,7 @@ class HistoryViewModel
         // TODO FIXME: remove workaround later
         if (list.isEmpty()) {
             for (log in coreContext.core.callLogs) {
-                if (log.remoteAddress.weakEqual(address)) {
+                if (log.remoteAddress.weakEqual(address) && !CallFilter.isHardwareGeneratedCall(log)) {
                     val historyModel = CallLogHistoryModel(log)
                     history.add(historyModel)
                 }

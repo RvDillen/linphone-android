@@ -41,6 +41,7 @@ import kotlin.system.exitProcess
 import org.linphone.BuildConfig
 import org.linphone.LinphoneApplication.Companion.coreContext
 import org.linphone.LinphoneApplication.Companion.corePreferences
+import org.linphone.clb.CallFilter
 import org.linphone.clb.CallStateCLB
 import org.linphone.clb.kt.CoreContextExt
 import org.linphone.compatibility.Compatibility
@@ -248,6 +249,17 @@ class CoreContext
             } else if (state == GlobalState.Shutdown) {
                 onCoreStopped()
             }
+        }
+
+        @WorkerThread
+        override fun onCallLogUpdated(core: Core, callLog: CallLog) {
+            if (!CallFilter.isHardwareGeneratedCall(callLog)) {
+                return
+            }
+
+            val identifier = callLog.callId ?: callLog.refKey ?: callLog.toAddress?.asStringUriOnly().orEmpty()
+            Log.w("$TAG Removing CLB hardware-generated call log [$identifier]")
+            core.removeCallLog(callLog)
         }
 
         @WorkerThread
@@ -639,6 +651,7 @@ class CoreContext
     fun onCoreStarted() {
         Log.i("$TAG Core started, updating configuration if required")
         core.videoCodecPriorityPolicy = CodecPriorityPolicy.Auto
+        purgeHardwareGeneratedCallLogs()
 
         val currentVersion = BuildConfig.VERSION_CODE
         val oldVersion = corePreferences.linphoneConfigurationVersion
@@ -680,6 +693,22 @@ class CoreContext
             } else {
                 Log.w("$TAG Keep alive service is enabled but auto start isn't and app is not in foreground, not starting it")
             }
+        }
+    }
+
+    @WorkerThread
+    private fun purgeHardwareGeneratedCallLogs() {
+        val hardwareGeneratedCallLogs = core.callLogs.filter { callLog ->
+            CallFilter.isHardwareGeneratedCall(callLog)
+        }
+
+        if (hardwareGeneratedCallLogs.isEmpty()) {
+            return
+        }
+
+        Log.w("$TAG Removing [${hardwareGeneratedCallLogs.size}] CLB hardware-generated call log(s) from core history")
+        for (callLog in hardwareGeneratedCallLogs) {
+            core.removeCallLog(callLog)
         }
     }
 
