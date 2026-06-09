@@ -143,6 +143,8 @@ open class AccountLoginViewModel
             }
         }
         */
+        // CLB: Always allow leaving assistant through the explicit back button in landing screen.
+        showBackButton.value = true
         showPassword.value = false
         registrationInProgress.value = false
 
