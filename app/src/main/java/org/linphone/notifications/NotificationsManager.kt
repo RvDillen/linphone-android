@@ -194,10 +194,17 @@ class NotificationsManager
             Log.i("$TAG Call state changed: [$currentState]")
             when (currentState) {
                 Call.State.IncomingReceived, Call.State.IncomingEarlyMedia -> {
+                    // CLB: AS-1339 - force incoming call UI in full-screen to avoid kiosk notification issues.
                     Log.i(
-                        "$TAG Showing incoming call notification for [${call.remoteAddress.asStringUriOnly()}]"
+                        "$TAG Incoming call received for [${call.remoteAddress.asStringUriOnly()}], forcing full-screen call UI"
                     )
-                    showCallNotification(call, true)
+                    launchIncomingCallActivity()
+                    if (currentInCallServiceNotificationId == -1) {
+                        Log.i(
+                            "$TAG No current in-call foreground service notification found, using a dummy one"
+                        )
+                        showDummyNotificationForCallService()
+                    }
                 }
                 Call.State.OutgoingInit -> {
                     Log.i(
@@ -535,8 +542,17 @@ class NotificationsManager
                     "$TAG At least one call is running and no foreground Service notification was found, starting it using call [${call.remoteAddress.asStringUriOnly()}]"
                 )
 
-                Log.i("$TAG No notification found for this call, creating one now")
-                showCallNotification(call, LinphoneUtils.isCallIncoming(call.state))
+                if (LinphoneUtils.isCallIncoming(call.state)) {
+                    // CLB: AS-1339 - for incoming calls, keep service alive with dummy notif and display full-screen fragment.
+                    Log.i(
+                        "$TAG Incoming call detected, launching full-screen call UI and using dummy foreground notification"
+                    )
+                    launchIncomingCallActivity()
+                    showDummyNotificationForCallService()
+                } else {
+                    Log.i("$TAG No notification found for this call, creating one now")
+                    showCallNotification(call, false)
+                }
             }
         }
     }
@@ -654,6 +670,20 @@ class NotificationsManager
     @WorkerThread
     fun displayCallNotification(call: Call, isIncoming: Boolean) {
         showCallNotification(call, isIncoming)
+    }
+
+    @WorkerThread
+    private fun launchIncomingCallActivity() {
+        // CLB: AS-1339 - centralize incoming call full-screen launch from notification layer.
+        val intent = Intent(context, CallActivity::class.java).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+            putExtra("IncomingCall", true)
+        }
+        try {
+            context.startActivity(intent)
+        } catch (se: SecurityException) {
+            Log.e("$TAG Failed to start incoming call activity: $se")
+        }
     }
 
     @WorkerThread
