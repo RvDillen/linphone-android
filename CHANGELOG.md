@@ -10,6 +10,104 @@ Group changes to describe their impact on the project, as follows:
     Fixed for any bug fixes.
     Security to invite users to upgrade in case of vulnerabilities.
 
+## [6.0.23] - 2026-02-02
+
+### Fixed
+- Fixed Telecom Manager not used on devices running Android < 13
+
+## [6.0.22] - 2026-01-20
+
+### Changed
+- Close search bar when opening bottom sheet and vice versa
+
+### Fixed
+- Sending a file from another app using Android shortcut not working if conversation was already opened
+- Trying to workaround an issue where ForegroundService notification isn't displayed in the allowed timeframe, causing an Exception
+
+## [6.0.21] - 2025-12-16
+
+### Added
+- Allow linphone-config: scheme URIs in in-app QR code scanner
+
+### Changed
+- Workaround for audio focus & audio manager mode on devices that do not support TelecomManager APIs
+- Set front camera as default after using back camera when scanning a QR code
+- Added back largeHeap flag in AndroidManifest.xml
+
+### Fixed
+- Fixed call recording indicator not showing local record in progress in case UPDATE isn't answered
+- Fixed native addressbook reload when a contact is updated in the OS default app
+- Fixed issue with linphone-config scheme URIs if scheme is followed by "//"
+- Fixed Job & Company contact field not updated if field content was removed
+- Fixed local avatar not displayed when calling ourselves
+- Prevent crashes due to some ActivityNotFound exceptions
+- Prevent crash due to empty clipboard on some devices
+
+## [6.0.20] - 2025-11-21
+
+### Changed
+- Added shrink resources to release config in gradle
+
+### Fixed
+- Remove AuthInfo when configuring a CardDAV friend list if synchronization fails
+- Added missing toast when starting a group call or meeting if there's an issue
+- Fixed crash in RecordingPlayerFragment due to used lateinit property before it's initialized
+
+## [6.0.19] - 2025-10-16
+
+### Added
+- Spanish and Slovakian translations thanks to Weblate contributors
+
+### Changed
+- SIP addresses domain hidden in Suggestions if it matches the currently selected account SIP identity domain
+- Start proximity sensor when an incoming call is answered from the notification (disabling screen when device is near)
+
+### Fixed
+- Black screen when trying to scan a QR Code right after granting CAMERA permission (only happened on some devices)
+- Possible crash due to ConcurrentModificationException
+- Camera preview in conference that was black sometimes after switching layout
+- Possibly wrong screen sharing participant name in conference
+- Presence SUBSCRIBE that was only sent for sip.linphone.org accounts
+- Keyboard suggestions in participant picker textfield
+- Account labelled as Disabled instead of Disconnected when network isn't reachable
+- Suggestions generated avatar if username starts with '+'
+- Two LDAP fields label where swapped
+
+## [6.0.18] - 2025-09-15
+
+### Added
+- Added menu icon next to currently selected account avatar to make the drawer menu easier to understand
+- Added missing dialpad floating action button in the call transfer fragment
+
+### Changed
+- Improved bodyless friendlist presence process when it's received
+
+### Fixed
+- Fixed "End-to-end encrypted call" label while in conference, the call may be end-to-end encrypted but only to the conference server, not to all participants
+- Fixed missing meeting subject when calling the conference SIP URI if the conference info doesn't exist yet
+- Finish CallActivity if no call is found when trying to answer/decline a call from the IncomingCallFragment
+- Prevent empty screen when rotating the device and clicking on the empty part next to the list while in landscape and then rotating the device back to portrait
+
+## [6.0.17] - 2025-09-02
+
+### Changed
+- Portuguese translation updated from Weblate (still not complete)
+
+### Fixed
+- Vibrator not stopped when call is terminated sometimes (SDK fix)
+- Chat conversation not visible sometimes (SDK fix)
+
+## [6.0.16] - 2025-08-25
+
+## Added
+- Access to Help/Troubleshooting pages from Assistant
+
+## Fixed
+- Some Core methods being called from UI thread causing either a crash or a deadlock sometimes
+- Scrolling issue when doing a search in a conversation with only one result
+- Contacts not updated after body less presence notify was received
+- VFS issue due to encrypted.pref file being backed up by Android OS
+
 ## [6.0.15] - 2025-08-11
 
 ### Fixed

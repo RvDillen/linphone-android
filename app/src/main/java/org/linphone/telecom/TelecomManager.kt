@@ -36,6 +36,7 @@ import org.linphone.core.CoreListenerStub
 import org.linphone.core.tools.Log
 import org.linphone.utils.LinphoneUtils
 import androidx.core.net.toUri
+import org.linphone.compatibility.Compatibility
 
 class TelecomManager
     @WorkerThread
@@ -69,19 +70,18 @@ class TelecomManager
         }
     }
 
+    private val hasTelecomFeature = Compatibility.hasTelecomManagerFeature(context)
+
     private var currentlyFollowedCalls: Int = 0
 
     init {
-        val hasTelecomFeature =
-            context.packageManager.hasSystemFeature("android.software.telecom")
         Log.i(
-            "$TAG android.software.telecom feature is [${if (hasTelecomFeature) "available" else "not available"}]"
+            "$TAG Feature is [${if (hasTelecomFeature) "available" else "not available"}]"
         )
-
         try {
             callsManager.registerAppWithTelecom(
                 CallsManager.CAPABILITY_BASELINE or
-                    CallsManager.Companion.CAPABILITY_SUPPORTS_VIDEO_CALLING
+                    CallsManager.CAPABILITY_SUPPORTS_VIDEO_CALLING
             )
             Log.i("$TAG App has been registered with Telecom")
         } catch (e: Exception) {
@@ -119,9 +119,9 @@ class TelecomManager
 
         val isVideo = LinphoneUtils.isVideoEnabled(call)
         val type = if (isVideo) {
-            CallAttributesCompat.Companion.CALL_TYPE_VIDEO_CALL
+            CallAttributesCompat.CALL_TYPE_VIDEO_CALL
         } else {
-            CallAttributesCompat.Companion.CALL_TYPE_AUDIO_CALL
+            CallAttributesCompat.CALL_TYPE_AUDIO_CALL
         }
 
         scope.launch {
@@ -200,13 +200,22 @@ class TelecomManager
     @WorkerThread
     fun onCoreStarted(core: Core) {
         Log.i("$TAG Core has been started")
-        core.addListener(coreListener)
+        if (hasTelecomFeature) {
+            core.addListener(coreListener)
+        } else {
+            Log.w(
+                "$TAG android.software.telecom feature is not available, enable audio focus requests in Linphone SDK"
+            )
+            coreContext.core.config.setBool("audio", "android_disable_audio_focus_requests", false)
+        }
     }
 
     @WorkerThread
     fun onCoreStopped(core: Core) {
         Log.i("$TAG Core is being stopped")
-        core.removeListener(coreListener)
+        if (hasTelecomFeature) {
+            core.removeListener(coreListener)
+        }
     }
 
     @WorkerThread

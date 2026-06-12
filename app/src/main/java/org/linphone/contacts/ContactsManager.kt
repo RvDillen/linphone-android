@@ -100,57 +100,63 @@ class ContactsManager
         override fun onSearchResultsReceived(magicSearch: MagicSearch) {
             reloadRemoteContactsJob?.cancel()
 
+            var queriedSipUri = ""
+            for ((key, value) in magicSearchMap.entries) {
+                if (value == magicSearch) {
+                    queriedSipUri = key
+                }
+            }
+
             val results = magicSearch.lastSearch
-            Log.i("$TAG [${results.size}] magic search results available")
+            Log.i(
+                "$TAG [${results.size}] magic search results available for query upon SIP URI [$queriedSipUri]"
+            )
 
             var found = false
             if (results.isNotEmpty()) {
-                val result = results.first {
-                    it.friend != null
-                }
+                val result = results.first { it.friend != null }
                 if (result != null) {
                     val friend = result.friend!!
                     Log.i("$TAG Found matching friend in source [${result.sourceFlags}]")
-                    found = true
+                    val address = result.address?.asStringUriOnly().orEmpty()
+                    if (address.isEmpty() || (queriedSipUri.isNotEmpty() && queriedSipUri != address)) {
+                        Log.w("$TAG Received friend [${friend.name}] with SIP URI [$address] doesn't match queried SIP URI [$queriedSipUri]")
+                    } else {
+                        found = true
 
-                    // Store friend in app's cache to be re-used in call history, conversations, etc...
-                    val temporaryFriendList = getRemoteContactDirectoriesCacheFriendList()
-                    temporaryFriendList.addFriend(friend)
-                    newContactAdded(friend)
-                    Log.i(
-                        "$TAG Stored discovered friend [${friend.name}] in temporary friend list, for later use"
-                    )
+                        // Store friend in app's cache to be re-used in call history, conversations, etc...
+                        val temporaryFriendList = getRemoteContactDirectoriesCacheFriendList()
+                        temporaryFriendList.addFriend(friend)
+                        newContactAdded(friend)
+                        Log.i(
+                            "$TAG Stored discovered friend [${friend.name}] in temporary friend list, for later use"
+                        )
 
-                    for (listener in listeners) {
-                        listener.onContactFoundInRemoteDirectory(friend)
-                    }
+                        for (listener in listeners) {
+                            listener.onContactFoundInRemoteDirectory(friend)
+                        }
 
-                    reloadRemoteContactsJob = coroutineScope.launch {
-                        delay(DELAY_BEFORE_RELOADING_CONTACTS_AFTER_MAGIC_SEARCH_RESULT)
-                        coreContext.postOnCoreThread {
-                            Log.i("$TAG At least a new SIP address was discovered, reloading contacts")
-                            conferenceAvatarMap.values.forEach(ContactAvatarModel::destroy)
-                            conferenceAvatarMap.clear()
+                        reloadRemoteContactsJob = coroutineScope.launch {
+                            delay(DELAY_BEFORE_RELOADING_CONTACTS_AFTER_MAGIC_SEARCH_RESULT)
+                            coreContext.postOnCoreThread {
+                                Log.i("$TAG At least a new SIP address was discovered, reloading contacts")
+                                conferenceAvatarMap.values.forEach(ContactAvatarModel::destroy)
+                                conferenceAvatarMap.clear()
 
-                            notifyContactsListChanged()
+                                notifyContactsListChanged()
+                            }
                         }
                     }
                 }
             }
 
-            var foundKey = ""
-            for ((key, value) in magicSearchMap.entries) {
-                if (value == magicSearch) {
-                    foundKey = key
-                }
-            }
-            if (foundKey.isNotEmpty()) {
-                magicSearchMap.remove(foundKey)
+            if (queriedSipUri.isNotEmpty()) {
+                magicSearchMap.remove(queriedSipUri)
                 if (!found) {
                     Log.i(
-                        "$TAG SIP URI [$foundKey] wasn't found in remote directories, adding it to unknown list to prevent further queries"
+                        "$TAG SIP URI [$queriedSipUri] wasn't found in remote directories, adding it to unknown list to prevent further queries"
                     )
-                    unknownRemoteContactDirectoriesContactsMap.add(foundKey)
+                    unknownRemoteContactDirectoriesContactsMap.add(queriedSipUri)
                 }
             }
             magicSearch.removeListener(this)
@@ -162,7 +168,26 @@ class ContactsManager
         override fun onPresenceReceived(friendList: FriendList, friends: Array<out Friend?>) {
             if (friendList.isSubscriptionBodyless) {
                 Log.i("$TAG Bodyless friendlist [${friendList.displayName}] presence received")
-                notifyContactsListChanged()
+
+                var atLeastOneFriendAdded = false
+                for (friend in friends) {
+                    if (friend != null) {
+                        val address = friend.address
+                        if (address != null) {
+                            Log.i(
+                                "$TAG Newly discovered SIP Address [${address.asStringUriOnly()}] for friend [${friend.name}] in bodyless list [${friendList.displayName}]"
+                            )
+                            newContactAddedWithSipUri(friend, address)
+                            atLeastOneFriendAdded = true
+                        }
+                    }
+                }
+
+                if (atLeastOneFriendAdded) {
+                    notifyContactsListChanged()
+                } else {
+                    Log.w("$TAG No new friend detected in the received bodyless friendlist, not refreshing contacts in app")
+                }
             }
         }
 
@@ -183,7 +208,7 @@ class ContactsManager
                 friend.addAddress(address)
                 friend.done()
 
-                newContactAddedWithSipUri(friend, sipUri)
+                newContactAddedWithSipUri(friend, address)
             } else {
                 Log.e("$TAG Failed to parse SIP URI [$sipUri] as Address!")
             }
@@ -321,7 +346,8 @@ class ContactsManager
     }
 
     @WorkerThread
-    private fun newContactAddedWithSipUri(friend: Friend, sipUri: String) {
+    private fun newContactAddedWithSipUri(friend: Friend, address: Address) {
+        val sipUri = address.asStringUriOnly()
         if (unknownContactsAvatarsMap.keys.contains(sipUri)) {
             Log.d("$TAG Found SIP URI [$sipUri] in unknownContactsAvatarsMap, removing it")
             val oldModel = unknownContactsAvatarsMap[sipUri]
@@ -332,7 +358,6 @@ class ContactsManager
                 "$TAG Found SIP URI [$sipUri] in knownContactsAvatarsMap, forcing presence update"
             )
             val oldModel = knownContactsAvatarsMap[sipUri]
-            val address = Factory.instance().createAddress(sipUri)
             oldModel?.update(address)
         } else {
             Log.i(
@@ -346,7 +371,7 @@ class ContactsManager
     @WorkerThread
     fun newContactAdded(friend: Friend) {
         for (sipAddress in friend.addresses) {
-            newContactAddedWithSipUri(friend, sipAddress.asStringUriOnly())
+            newContactAddedWithSipUri(friend, sipAddress)
         }
     }
 
