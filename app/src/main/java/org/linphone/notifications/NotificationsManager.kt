@@ -198,13 +198,7 @@ class NotificationsManager
                     Log.i(
                         "$TAG Incoming call received for [${call.remoteAddress.asStringUriOnly()}], forcing full-screen call UI"
                     )
-                    launchIncomingCallActivity()
-                    if (currentInCallServiceNotificationId == -1) {
-                        Log.i(
-                            "$TAG No current in-call foreground service notification found, using a dummy one"
-                        )
-                        showDummyNotificationForCallService()
-                    }
+                    showCallNotification(call, true)
                 }
                 Call.State.OutgoingInit -> {
                     Log.i(
@@ -524,24 +518,20 @@ class NotificationsManager
         Log.i("$TAG Service has been started")
         inCallService = service
 
+        if (waitForInCallServiceForegroundToStopIt) {
+            Log.w("$TAG Service wasn't started as foreground yet, doing it now using a dummy notification")
+            showDummyNotificationForCallService()
+        }
+        if (inCallServiceForegroundNotificationPublished) {
+            stopInCallForegroundService()
+        }
+
         coreContext.postOnCoreThread { core ->
-            if (core.callsNb == 0) {
-                Log.w("$TAG No call anymore, stopping service")
-                if (waitForInCallServiceForegroundToStopIt) {
-                    Log.w("$TAG Service wasn't started as foreground yet, doing it now using a dummy notification")
-                    showDummyNotificationForCallService()
-                }
-                if (inCallServiceForegroundNotificationPublished) {
-                    stopInCallForegroundService()
-                } else {
-                    Log.w("$TAG Foreground service notification wasn't published, shouldn't happen")
-                }
-            } else if (currentInCallServiceNotificationId == -1) {
+            if (core.callsNb >= 1 && currentInCallServiceNotificationId == -1) {
                 val call = core.currentCall ?: core.calls.first()
                 Log.i(
                     "$TAG At least one call is running and no foreground Service notification was found, starting it using call [${call.remoteAddress.asStringUriOnly()}]"
                 )
-
                 if (LinphoneUtils.isCallIncoming(call.state)) {
                     // CLB: AS-1339 - for incoming calls, keep service alive with dummy notif and display full-screen fragment.
                     Log.i(
@@ -550,7 +540,6 @@ class NotificationsManager
                     launchIncomingCallActivity()
                     showDummyNotificationForCallService()
                 } else {
-                    Log.i("$TAG No notification found for this call, creating one now")
                     showCallNotification(call, false)
                 }
             }
@@ -1831,7 +1820,7 @@ class NotificationsManager
 
     @AnyThread
     fun foregroundServiceTypeMaskToString(mask: Int): String {
-        var stringBuilder = StringBuilder()
+        val stringBuilder = StringBuilder()
         val values = hashMapOf(
             "PHONE_CALL" to Compatibility.FOREGROUND_SERVICE_TYPE_PHONE_CALL,
             "MICROPHONE" to Compatibility.FOREGROUND_SERVICE_TYPE_MICROPHONE,

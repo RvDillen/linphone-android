@@ -109,6 +109,8 @@ class SettingsViewModel
 
     val cardDavFriendsLists = MutableLiveData<List<CardDavLdapModel>>()
 
+    val presenceSubscribe = MutableLiveData<Boolean>()
+
     val addLdapServerEvent: MutableLiveData<Event<Boolean>> by lazy {
         MutableLiveData<Event<Boolean>>()
     }
@@ -325,6 +327,8 @@ class SettingsViewModel
                 corePreferences.markConversationAsReadWhenDismissingMessageNotification
             )
 
+            presenceSubscribe.postValue(core.isFriendListSubscriptionEnabled)
+            
             defaultLayout.postValue(core.defaultConferenceLayout.toInt())
 
             autoShowDialpad.postValue(corePreferences.automaticallyShowDialpad)
@@ -591,6 +595,15 @@ class SettingsViewModel
             }
 
             cardDavFriendsLists.postValue(list)
+        }
+    }
+
+    @UiThread
+    fun togglePresenceSubscribe() {
+        val newValue = presenceSubscribe.value == false
+        coreContext.postOnCoreThread { core ->
+            core.isFriendListSubscriptionEnabled = newValue
+            presenceSubscribe.postValue(newValue)
         }
     }
 
@@ -866,7 +879,9 @@ class SettingsViewModel
         if (newValue.isNotEmpty()) {
             try {
                 val delay = newValue.toInt()
-                corePreferences.autoAnswerDelay = delay
+                coreContext.postOnCoreThread {
+                    corePreferences.autoAnswerDelay = delay
+                }
             } catch (nfe: NumberFormatException) {
                 Log.e("$TAG Ignoring new auto answer incoming calls delay as it can't be converted to int: $nfe")
             }
