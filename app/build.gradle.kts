@@ -15,6 +15,9 @@ plugins {
 }
 
 val packageName = "org.linphone"
+val clbPackageName = "nl.clb.linphone"
+val clbTypeMPackageName = "nl.clb.linphone.typem"
+val clbConfigPackageName = "nl.clb.linphone.config"
 val useDifferentPackageNameForDebugBuild = false
 
 val sdkPath = providers.gradleProperty("LinphoneSdkBuildDir").get()
@@ -116,8 +119,36 @@ android {
         variant.outputs
             .map { it as com.android.build.gradle.internal.api.BaseVariantOutputImpl }
             .forEach { output ->
-                output.outputFileName = "linphone-android-${variant.buildType.name}-${project.version}.apk"
+                output.outputFileName = "linphone-android-${variant.flavorName}-${variant.buildType.name}-${project.version}.apk"
             }
+    }
+
+    flavorDimensions += "distribution"
+
+    productFlavors {
+        create("linphone") {
+            dimension = "distribution"
+            applicationId = packageName
+            manifestPlaceholders["appAuthRedirectScheme"] = packageName
+        }
+
+        create("clb") {
+            dimension = "distribution"
+            applicationId = clbPackageName
+            manifestPlaceholders["appAuthRedirectScheme"] = clbPackageName
+        }
+
+        create("clbTypeM") {
+            dimension = "distribution"
+            applicationId = clbTypeMPackageName
+            manifestPlaceholders["appAuthRedirectScheme"] = clbTypeMPackageName
+        }
+
+        create("clbConfig") {
+            dimension = "distribution"
+            applicationId = clbConfigPackageName
+            manifestPlaceholders["appAuthRedirectScheme"] = clbConfigPackageName
+        }
     }
 
     val keystorePropertiesFile = rootProject.file("keystore.properties")
@@ -313,5 +344,14 @@ if (crashlyticsAvailable) {
         tasks.getByName("packageRelease").finalizedBy(
             tasks.getByName("uploadCrashlyticsSymbolFileRelease"),
         )
+    }
+}
+
+afterEvaluate {
+    // google-services.json currently contains only linphone clients.
+    tasks.matching {
+        it.name.matches(Regex("process(Clb|ClbTypeM|ClbConfig).*(GoogleServices)"))
+    }.configureEach {
+        enabled = false
     }
 }
