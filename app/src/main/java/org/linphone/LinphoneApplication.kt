@@ -61,6 +61,7 @@ class LinphoneApplication : Application(), SingletonImageLoader.Factory {
 
         @SuppressLint("StaticFieldLeak")
         lateinit var coreContext: CoreContext
+        private var startedAtFirstLaunch = false
     }
 
     override fun onCreate() {
@@ -288,6 +289,10 @@ class LinphoneApplication : Application(), SingletonImageLoader.Factory {
     }
 
     private fun runClbProvisioningWhenCoreReady(context: Context, attempt: Int = 0) {
+        if (attempt == 0) {
+            startedAtFirstLaunch = corePreferences.firstLaunch
+        }
+
         if (!coreContext.isReady()) {
             if (attempt >= 40) {
                 Log.e("$TAG Core is still not ready after ${attempt + 1} attempts, skipping CLB provisioning check at startup")
@@ -300,6 +305,12 @@ class LinphoneApplication : Application(), SingletonImageLoader.Factory {
                 }
             }
             return
+        }
+
+        // CLB: Make sure media encryption is NOT enforced as default!
+        if (startedAtFirstLaunch) {
+            Log.i("$TAG CLB first-start, disable mandatory media encryption.")
+            coreContext.core.isMediaEncryptionMandatory = false
         }
 
         // Use the configured provisioning URI
