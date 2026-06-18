@@ -66,6 +66,7 @@ import org.linphone.ui.call.viewmodel.CallsViewModel
 import org.linphone.ui.call.viewmodel.CurrentCallViewModel
 import org.linphone.ui.call.viewmodel.SharedCallViewModel
 import org.linphone.ui.main.MainActivity
+import org.linphone.utils.LinphoneUtils
 
 @UiThread
 class CallActivity : GenericActivity() {
@@ -125,6 +126,14 @@ class CallActivity : GenericActivity() {
             true // Force dark mode
         }
         enableEdgeToEdge(style, style)
+
+        // CLB: AS-1339 - Ensure incoming call activity shows on lock screen and wakes device
+        if (intent.extras?.getBoolean("IncomingCall", false) == true) {
+            Log.i("$TAG Incoming call detected, configuring to show on lock screen")
+            setShowWhenLocked(true)
+            setTurnScreenOn(true)
+        }
+
         super.onCreate(savedInstanceState)
 
         binding = DataBindingUtil.setContentView(this, R.layout.call_activity)
@@ -314,6 +323,34 @@ class CallActivity : GenericActivity() {
                 callViewModel.refreshMicrophoneState()
             }
         }
+
+        // CLB: AS-1339 - Handle incoming call intent on first launch
+        if (savedInstanceState == null) {
+            Log.i("$TAG First launch, processing intent")
+            binding.callNavContainer.post {
+                handleCallIntent(intent)
+            }
+        }
+    }
+
+    private fun handleCallIntent(intent: Intent?) {
+        val extras = intent?.extras ?: return
+        Log.i("$TAG handleCallIntent called, extras: $extras")
+
+        if (extras.getBoolean("ActiveCall", false)) {
+            Log.i("$TAG Navigating to active call")
+            navigateToActiveCall(
+                callViewModel.conferenceModel.isCurrentCallInConference.value == false
+            )
+        } else if (extras.getBoolean("IncomingCall", false)) {
+            Log.i("$TAG Navigating to incoming call fragment")
+            val action = IncomingCallFragmentDirections.actionGlobalIncomingCallFragment()
+            try {
+                findNavController(R.id.call_nav_container).navigate(action)
+            } catch (e: Exception) {
+                Log.e("$TAG Failed to navigate to incoming call: $e")
+            }
+        }
     }
 
     override fun onStart() {
@@ -358,6 +395,24 @@ class CallActivity : GenericActivity() {
         if (::callViewModel.isInitialized) {
             callViewModel.pipMode.value = isInPipMode
         }
+
+        coreContext.postOnCoreThread { core ->
+            val incomingCall = core.calls.find { LinphoneUtils.isCallIncoming(it.state) }
+            if (incomingCall != null) {
+                runOnUiThread {
+                    val navController = findNavController(R.id.call_nav_container)
+                    if (navController.currentDestination?.id != R.id.incomingCallFragment) {
+                        Log.i("$TAG Incoming call detected on resume, navigating to incoming call fragment")
+                        val action = IncomingCallFragmentDirections.actionGlobalIncomingCallFragment()
+                        try {
+                            navController.navigate(action)
+                        } catch (e: Exception) {
+                            Log.e("$TAG Failed to navigate to incoming call on resume: $e")
+                        }
+                    }
+                }
+            }
+        }
     }
 
     override fun onPause() {
@@ -382,15 +437,8 @@ class CallActivity : GenericActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-
-        if (intent.extras?.getBoolean("ActiveCall", false) == true) {
-            navigateToActiveCall(
-                callViewModel.conferenceModel.isCurrentCallInConference.value == false
-            )
-        } else if (intent.extras?.getBoolean("IncomingCall", false) == true) {
-            val action = IncomingCallFragmentDirections.actionGlobalIncomingCallFragment()
-            findNavController(R.id.call_nav_container).navigate(action)
-        }
+        setIntent(intent)
+        handleCallIntent(intent)
     }
 
     override fun onUserLeaveHint() {

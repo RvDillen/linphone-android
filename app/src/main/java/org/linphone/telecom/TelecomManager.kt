@@ -59,7 +59,9 @@ class TelecomManager
             state: Call.State?,
             message: String
         ) {
-            if (state == Call.State.IncomingReceived || state == Call.State.OutgoingProgress) {
+            if (state == Call.State.OutgoingProgress ||
+                (call.dir == Call.Dir.Incoming && state == Call.State.Connected)
+            ) {
                 onCallCreated(call)
             }
         }

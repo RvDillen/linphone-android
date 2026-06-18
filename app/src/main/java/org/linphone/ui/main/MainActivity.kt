@@ -217,13 +217,8 @@ class MainActivity : GenericActivity() {
 
         viewModel.askFullScreenIntentPermissionEvent.observe(this) {
             it.consume {
-                if (ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.USE_FULL_SCREEN_INTENT)) {
-                    Log.w("$TAG Asking for USE_FULL_SCREEN_INTENT permission")
-                    fullScreenIntentPermissionLauncher.launch(Manifest.permission.USE_FULL_SCREEN_INTENT)
-                } else {
-                    Log.i("$TAG Permission request for USE_FULL_SCREEN_INTENT will be automatically denied, go to manage app full screen intent android settings instead")
-                    Compatibility.requestFullScreenIntentPermission(this)
-                }
+                Log.i("$TAG Opening manage full screen intent settings")
+                Compatibility.requestFullScreenIntentPermission(this)
             }
         }
 

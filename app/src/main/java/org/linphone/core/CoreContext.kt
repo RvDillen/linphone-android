@@ -847,6 +847,16 @@ class CoreContext
             if (corePreferences.keepServiceAlive && !keepAliveServiceStarted) {
                 startKeepAliveService()
             }
+
+            val incomingCall = core.calls.find { LinphoneUtils.isCallIncoming(it.state) }
+            if (incomingCall != null) {
+                Log.i(
+                    "$TAG App moved to foreground with incoming call [${incomingCall.remoteAddress.asStringUriOnly()}], showing full-screen call UI"
+                )
+                postOnMainThread {
+                    showCallActivity(incomingCall = true)
+                }
+            }
         }
     }
 
@@ -1027,7 +1037,7 @@ class CoreContext
         )
         // CLB: End any CLB calls before answering user call
         CallStateCLB.instance().EndAnyCLBCall(core)
-        
+
         val params = core.createCallParams(call)
         if (params == null) {
             Log.w("$TAG Answering call without params!")
@@ -1079,7 +1089,7 @@ class CoreContext
         // This flag is required to start an Activity from a Service context
         intent.addFlags(
             Intent.FLAG_ACTIVITY_NEW_TASK or
-                Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or
+                Intent.FLAG_ACTIVITY_CLEAR_TOP or
                 Intent.FLAG_ACTIVITY_SINGLE_TOP
         )
         context.startActivity(intent)
