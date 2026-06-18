@@ -5,7 +5,6 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import androidx.core.content.ContextCompat
-import org.linphone.LinphoneApplication
 import org.linphone.LinphoneApplication.Companion.coreContext
 import org.linphone.core.CoreInCallService
 import org.linphone.mediastream.Version
@@ -52,6 +51,6 @@ class CoreContextExt() {
     }
 
     fun IsServiceReady(): Boolean {
-        return LinphoneApplication.coreContext.notificationsManager.getService() != null
+        return coreContext.notificationsManager.getService() != null
     }
 }
