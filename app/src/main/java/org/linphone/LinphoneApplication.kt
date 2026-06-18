@@ -213,7 +213,7 @@ class LinphoneApplication : Application(), SingletonImageLoader.Factory {
                     "[CLB]",
                     "No provisioning URI configured, setting default: $clbDefaultProvisioningUrl"
                 )
-                config.setString("misc", "config-uri", clbDefaultProvisioningUrl)
+                config.setString("misc", "remote_provisioning_uri", clbDefaultProvisioningUrl)
                 config.sync()
             }
         corePreferences.config = config
