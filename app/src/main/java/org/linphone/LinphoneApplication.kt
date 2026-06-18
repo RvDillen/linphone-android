@@ -208,14 +208,16 @@ class LinphoneApplication : Application(), SingletonImageLoader.Factory {
         // calling core.setProvisioningUri() on a running core (which would immediately trigger the
         // SDK's own download/apply cycle), while still making the URL visible in the Settings UI.
         val clbDefaultProvisioningUrl = "http://config.clb.nl/linphonerc.xml"
-            if (config.getString("misc", "remote_provisioning_uri", null).isNullOrEmpty()) {
-                android.util.Log.i(
-                    "[CLB]",
-                    "No provisioning URI configured, setting default: $clbDefaultProvisioningUrl"
-                )
-                config.setString("misc", "remote_provisioning_uri", clbDefaultProvisioningUrl)
-                config.sync()
-            }
+        val settingSection = "misc"
+        val settingKey = "remote_provisioning_uri"
+        if (config.getString(settingSection, settingKey, null).isNullOrEmpty()) {
+            android.util.Log.i(
+                "[CLB]",
+                "No provisioning URI configured, setting default: $clbDefaultProvisioningUrl"
+            )
+            config.setString(settingSection, settingKey, clbDefaultProvisioningUrl)
+            config.sync()
+        }
         corePreferences.config = config
         // Check for MDM restrictions and app config changes
         android.util.Log.i("[CLB]", "Checking AppConfig data")
