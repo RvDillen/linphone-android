@@ -5,6 +5,7 @@ import android.content.RestrictionsManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.security.NetworkSecurityPolicy;
 import android.util.Log;
 
 import org.linphone.core.Config;
@@ -499,13 +500,27 @@ public class AppConfigHelper {
 
         log("Attempting to download provisioning file with HttpUrlConnection (only works from 'config.clb.nl'): " + fileUrl);
 
+        try {
+            URL url = new URL(fileUrl);
+            if ("http".equalsIgnoreCase(url.getProtocol())
+                    && !NetworkSecurityPolicy.getInstance()
+                    .isCleartextTrafficPermitted(url.getHost())) {
+
+                log("Cleartext HTTP traffic is not permitted for host: " + url.getHost());
+                return "";
+            }
+        } catch (Exception ex) {
+            log("Unable to parse URL: " + fileUrl);
+            return "";
+        }
+
         String output = "";
         ExecutorService executor = Executors.newSingleThreadExecutor();
 
         // Download MUST run on an non-ui thread... (Android policy)
         Future<String> future = executor.submit(() -> {
-
             HttpURLConnection connection = null;
+
             try {
                 URL url = new URL(fileUrl);
                 connection = (HttpURLConnection) url.openConnection();
