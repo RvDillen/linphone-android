@@ -418,7 +418,7 @@ public class AppConfigHelper {
 
     public String downloadWithJavaSocket(final String fileUrl) {
         log("Attempting to download provisioningfile with Java Socket: " + fileUrl);
-        if (fileUrl == null) {
+        if (fileUrl == null || fileUrl.isEmpty()) {
             return "";
         }
 
