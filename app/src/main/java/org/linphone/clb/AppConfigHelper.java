@@ -418,6 +418,9 @@ public class AppConfigHelper {
 
     public String downloadWithJavaSocket(final String fileUrl) {
         log("Attempting to download provisioningfile with Java Socket: " + fileUrl);
+        if (fileUrl == null) {
+            return "";
+        }
 
         String downloadUrl = fileUrl;
         if (!downloadUrl.startsWith("http://") && !downloadUrl.startsWith("https://")) {
