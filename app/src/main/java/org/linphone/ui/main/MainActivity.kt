@@ -66,7 +66,6 @@ import org.linphone.databinding.MainActivityBinding
 import org.linphone.ui.GenericActivity
 import org.linphone.ui.assistant.AssistantActivity
 import org.linphone.ui.main.chat.fragment.ConversationsListFragmentDirections
-import org.linphone.ui.main.help.fragment.DebugFragmentDirections
 import org.linphone.utils.PasswordDialogModel
 import org.linphone.ui.main.sso.fragment.SingleSignOnFragmentDirections
 import org.linphone.ui.main.viewmodel.MainViewModel
@@ -251,7 +250,7 @@ class MainActivity : GenericActivity() {
 
         viewModel.clearFilesOrTextPendingSharingEvent.observe(this) {
             it.consume {
-                sharedViewModel.filesToShareFromIntent.value = arrayListOf<String>()
+                sharedViewModel.filesToShareFromIntent.value = arrayListOf()
                 sharedViewModel.textToShareFromIntent.value = ""
             }
         }
@@ -722,8 +721,13 @@ class MainActivity : GenericActivity() {
                     sharedViewModel.showConversationEvent.value = Event(conversationId)
                 }
 
-                val action = DebugFragmentDirections.actionDebugFragmentToConversationsListFragment()
-                findNavController().navigate(action)
+                val action = ConversationsListFragmentDirections.actionGlobalConversationsListFragment()
+                val options = NavOptions.Builder()
+                options.apply {
+                    setPopUpTo(R.id.helpFragment, true)
+                    setLaunchSingleTop(true)
+                }
+                findNavController().navigate(action, options.build())
             } else {
                 val conversationId = parseShortcutIfAny(intent)
                 if (conversationId != null) {
@@ -787,11 +791,11 @@ class MainActivity : GenericActivity() {
     }
 
     private fun handleConfigIntent(uri: String) {
-        val remoteConfigUri = uri.substring("linphone-config:".length)
-        val url = when {
-            remoteConfigUri.startsWith("http://") || remoteConfigUri.startsWith("https://") -> remoteConfigUri
-            remoteConfigUri.startsWith("file://") -> remoteConfigUri
-            else -> "https://$remoteConfigUri"
+        Log.i("$TAG Trying to parse config intent [$uri] as remote provisioning URL")
+        val url = LinphoneUtils.getRemoteProvisioningUrlFromUri(uri)
+        if (url == null) {
+            Log.e("$TAG Couldn't parse URI [$uri] into a valid remote provisioning URL, aborting")
+            return
         }
 
         coreContext.postOnCoreThread { core ->
