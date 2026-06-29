@@ -35,6 +35,7 @@ import org.linphone.core.tools.Log
 import org.linphone.databinding.ChatBubbleIncomingBinding
 import org.linphone.databinding.ChatBubbleOutgoingBinding
 import org.linphone.databinding.ChatConversationEventBinding
+import org.linphone.databinding.ChatConversationE2eEncryptedFirstEventBinding
 import org.linphone.ui.main.chat.model.EventLogModel
 import org.linphone.ui.main.chat.model.EventModel
 import org.linphone.ui.main.chat.model.MessageModel
@@ -81,11 +82,8 @@ class ConversationEventAdapter :
     }
 
     override fun getHeaderViewForPosition(context: Context, position: Int): View {
-        return LayoutInflater.from(context).inflate(
-            R.layout.chat_conversation_e2e_encrypted_first_event,
-            null,
-            false
-        )
+        val binding = ChatConversationE2eEncryptedFirstEventBinding.inflate(LayoutInflater.from(context))
+        return binding.root
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
