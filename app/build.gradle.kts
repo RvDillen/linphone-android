@@ -14,10 +14,13 @@ plugins {
     alias(libs.plugins.crashlytics)
 }
 
+// CLB: Inject CLB Flavours
 val packageName = "org.linphone"
 val clbPackageName = "nl.clb.linphone"
 val clbTypeMPackageName = "nl.clb.linphone.typem"
 val clbConfigPackageName = "nl.clb.linphone.config"
+// CLB: Inject CLB Flavours
+
 val useDifferentPackageNameForDebugBuild = false
 
 val sdkPath = providers.gradleProperty("LinphoneSdkBuildDir").get()
@@ -123,6 +126,7 @@ android {
             }
     }
 
+    // CLB: Inject CLB Flavours
     flavorDimensions += "distribution"
 
     productFlavors {
@@ -150,6 +154,7 @@ android {
             manifestPlaceholders["appAuthRedirectScheme"] = clbConfigPackageName
         }
     }
+    // CLB: Inject CLB Flavours
 
     val keystorePropertiesFile = rootProject.file("keystore.properties")
     val keystoreProperties = Properties()
