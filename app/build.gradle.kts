@@ -102,6 +102,7 @@ android {
         targetSdk = 35
         versionCode = 600023 // 6.00.023
         versionName = "6.0.23"
+        setProperty("archivesBaseName", "$applicationId-$versionName")
 
         manifestPlaceholders["appAuthRedirectScheme"] = packageName
 
@@ -113,10 +114,17 @@ android {
 
     applicationVariants.all {
         val variant = this
+        val flavorOutputName = variant.flavorName.takeIf { it.isNotBlank() } ?: "linphone"
+
+        variant.packageApplicationProvider.get().outputDirectory.set(
+            project.layout.buildDirectory.dir("outputs/apk/$flavorOutputName/${variant.buildType.name}"),
+        )
+
         variant.outputs
             .map { it as com.android.build.gradle.internal.api.BaseVariantOutputImpl }
             .forEach { output ->
-                output.outputFileName = "linphone-android-${variant.buildType.name}-${project.version}.apk"
+                output.outputFileName =
+                    "linphone-android-$flavorOutputName-${variant.buildType.name}_${variant.versionName}.apk"
             }
     }
 
