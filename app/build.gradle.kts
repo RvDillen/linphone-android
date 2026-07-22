@@ -15,7 +15,34 @@ plugins {
 }
 
 val packageName = "org.linphone"
+
+static def getPackageName() {
+    return "nl.clb.linphone"
+}
+
+static def getPackageNameOrg() {
+    return "org.linphone"
+}
+
+static def getPackageNameTypeM() {
+    return "nl.clb.typem.linphone"
+}
+
+static def getPackageNameConfig() {
+    return "nl.clb.linphoneconfig"
+}
+
 val useDifferentPackageNameForDebugBuild = false
+val versionMajor = 6
+val versionMinor = 0
+val versionRelease = 1
+val jenkinsBuildNumber = System.getenv("BUILD_NUMBER")?.toIntOrNull() ?: 0
+val appVersionName = "$versionMajor.$versionMinor.$versionRelease.$jenkinsBuildNumber"
+val appVersionCode =
+    (versionMajor * 1000000) +
+        (versionMinor * 100000) +
+        (versionRelease * 10000) +
+        jenkinsBuildNumber
 
 val sdkPath = providers.gradleProperty("LinphoneSdkBuildDir").get()
 val googleServices = File(projectDir.absolutePath + "/google-services.json")
@@ -35,6 +62,9 @@ var gitBranch = ByteArrayOutputStream()
 var gitVersion = "6.0.23"
 
 task("getGitVersion") {
+    def versionBuild = jenkinsBuildNumber
+    project.version = String.format("%d.%d.%d.%d", versionMajor, versionMinor, versionRelease, versionBuild)
+    /*
     val gitVersionStream = ByteArrayOutputStream()
     val gitCommitsCount = ByteArrayOutputStream()
     val gitCommitHash = ByteArrayOutputStream()
@@ -74,7 +104,9 @@ task("getGitVersion") {
     } catch (e: Exception) {
         println("Git not found [$e], using $gitVersion")
     }
+
     project.version = gitVersion
+    */
 }
 project.tasks.preBuild.dependsOn("getGitVersion")
 
@@ -97,11 +129,11 @@ android {
     compileSdk = 35
 
     defaultConfig {
-        applicationId = packageName
+        applicationId = getPackageName()
         minSdk = 28
         targetSdk = 35
-        versionCode = 600023 // 6.00.023
-        versionName = "6.0.23"
+        versionCode = appVersionCode
+        versionName = appVersionName
         setProperty("archivesBaseName", "$applicationId-$versionName")
 
         manifestPlaceholders["appAuthRedirectScheme"] = packageName
@@ -112,6 +144,67 @@ android {
         }
     }
 
+    productFlavors {
+        clb {
+            dimension "all"
+            applicationId getPackageName()
+        }
+        clbTypeM {
+            dimension "all"
+            applicationId getPackageNameTypeM()
+        }
+        clbConfig {
+            dimension "all"
+            applicationId getPackageNameConfig()
+        }
+        linphone {
+            dimension "all"
+            applicationId getPackageNameOrg()
+        }
+    }
+
+    applicationVariants.all { variant ->
+        variant.outputs.all {
+            outputFileName = "linphone-android-${variant.getFlavorName()}-${variant.buildType.name}_${variant.versionName}.apk"
+        }
+
+        var enableFirebaseService = "false"
+        if (firebaseAvailable) {
+            enableFirebaseService = "true"
+        }
+/*
+    // LINPHONE 5.2 build variant/flavour script
+        // See https://developer.android.com/studio/releases/gradle-plugin#3-6-0-behavior for why extractNativeLibs is set to true in debug flavor
+	    // If this throws errors: ExtractNativeLibs might have to be removed!
+        if (variant.buildType.name == "release" || variant.buildType.name == "releaseWithCrashlytics") {
+            if (variant.getFlavorName() == "clbTypeM") {
+
+                // Special appLabel for typeM build
+                // Verify/Test on API34 device: Is it a 'problem' that the root-package-name is used instead of the actual package name for address_mime_type and file_provider?
+                variant.getMergedFlavor().manifestPlaceholders = [linphone_address_mime_type: "vnd.android.cursor.item/vnd." + getPackageName() + ".provider.sip_address",
+                                                                  linphone_file_provider    : getPackageName() + ".fileprovider",
+                                                                  appLabel                  : "@string/app_name_typem",
+                                                                  firebaseServiceEnabled    : enableFirebaseService,
+                                                                  extractNativeLibs         : "false"]
+            }
+            else {
+                variant.getMergedFlavor().manifestPlaceholders = [linphone_address_mime_type: "vnd.android.cursor.item/vnd." + getPackageName() + ".provider.sip_address",
+                                                                  linphone_file_provider    : getPackageName() + ".fileprovider",
+                                                                  appLabel                  : "@string/app_name",
+                                                                  firebaseServiceEnabled    : enableFirebaseService,
+                                                                  extractNativeLibs         : "false"]
+            }
+        } else {
+            variant.getMergedFlavor().manifestPlaceholders = [linphone_address_mime_type: "vnd.android.cursor.item/vnd." + getPackageName() + ".provider.sip_address",
+                                                              linphone_file_provider    : getPackageName() + ".debug.fileprovider",
+                                                              appLabel                  : "@string/app_name_debug",
+                                                              firebaseServiceEnabled    : enableFirebaseService,
+                                                              extractNativeLibs         : "true" ]
+        }
+    }
+*/
+
+// ORIGINAL 6.0 aplication.variants method
     applicationVariants.all {
         val variant = this
         val flavorOutputName = variant.flavorName.takeIf { it.isNotBlank() } ?: "linphone"
@@ -185,13 +278,13 @@ android {
             isJniDebuggable = true
 
             if (useDifferentPackageNameForDebugBuild) {
-                resValue("string", "file_provider", "$packageName.debug.fileprovider")
+                resValue("string", "file_provider", getPackageName() + ".debug.fileprovider")
             } else {
-                resValue("string", "file_provider", "$packageName.fileprovider")
+                resValue("string", "file_provider", getPackageName() + ".fileprovider")
             }
             resValue("string", "linphone_app_version", gitVersion.trim())
             resValue("string", "linphone_app_branch", gitBranch.toString().trim())
-            resValue("string", "linphone_openid_callback_scheme", packageName)
+            resValue("string", "linphone_openid_callback_scheme", getPackageName())
 
             if (crashlyticsAvailable) {
                 val path = File("$sdkPath/libs-debug/").toString()
@@ -212,10 +305,10 @@ android {
             )
             signingConfig = signingConfigs.getByName("release")
 
-            resValue("string", "file_provider", "$packageName.fileprovider")
+            resValue("string", "file_provider", getPackageName() + ".fileprovider")
             resValue("string", "linphone_app_version", gitVersion.trim())
             resValue("string", "linphone_app_branch", gitBranch.toString().trim())
-            resValue("string", "linphone_openid_callback_scheme", packageName)
+            resValue("string", "linphone_openid_callback_scheme", getPackageName())
 
             if (crashlyticsAvailable) {
                 val path = File("$sdkPath/libs-debug/").toString()
