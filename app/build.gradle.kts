@@ -115,10 +115,12 @@ android {
     applicationVariants.all {
         val variant = this
         val flavorOutputName = variant.flavorName.takeIf { it.isNotBlank() } ?: "linphone"
+        val variantNameCap = variant.name.replaceFirstChar { it.uppercaseChar() }
 
-        variant.packageApplicationProvider.get().outputDirectory.set(
-            project.layout.buildDirectory.dir("outputs/apk/$flavorOutputName/${variant.buildType.name}"),
-        )
+        val defaultApkOutputDir =
+            project.layout.buildDirectory.dir("outputs/apk/${variant.buildType.name}")
+        val flavorApkOutputDir =
+            project.layout.buildDirectory.dir("outputs/apk/$flavorOutputName/${variant.buildType.name}")
 
         variant.outputs
             .map { it as com.android.build.gradle.internal.api.BaseVariantOutputImpl }
@@ -126,6 +128,14 @@ android {
                 output.outputFileName =
                     "linphone-android-$flavorOutputName-${variant.buildType.name}_${variant.versionName}.apk"
             }
+
+        val copyApkOutputsTask = tasks.register<Copy>("copy${variantNameCap}ApkOutputsToFlavorDir") {
+            from(defaultApkOutputDir)
+            into(flavorApkOutputDir)
+        }
+        variant.assembleProvider.configure {
+            finalizedBy(copyApkOutputsTask)
+        }
     }
 
     val keystoreProperties = Properties()
