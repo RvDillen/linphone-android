@@ -335,6 +335,16 @@ configure<org.jlleitschuh.gradle.ktlint.KtlintExtension> {
 }
 project.tasks.preBuild.dependsOn("ktlintFormat")
 
+afterEvaluate {
+    listOf("Release").forEach { buildTypeName ->
+        val assembleTask = tasks.findByName("assemble$buildTypeName")
+        val bundleTask = tasks.findByName("bundle$buildTypeName")
+        if (assembleTask != null && bundleTask != null) {
+            assembleTask.finalizedBy(bundleTask)
+        }
+    }
+}
+
 if (crashlyticsAvailable) {
     afterEvaluate {
         tasks.getByName("assembleDebug").finalizedBy(
