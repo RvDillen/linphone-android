@@ -120,22 +120,40 @@ android {
             }
     }
 
-    val keystorePropertiesFile = rootProject.file("keystore.properties")
     val keystoreProperties = Properties()
-    keystoreProperties.load(FileInputStream(keystorePropertiesFile))
+    val keystorePropertiesFile = rootProject.file("keystore.properties")
+    if (keystorePropertiesFile.exists()) {
+        keystoreProperties.load(FileInputStream(keystorePropertiesFile))
+    }
+
+    fun signingProperty(name: String): String? =
+        providers.gradleProperty(name).orNull ?: keystoreProperties.getProperty(name)
 
     signingConfigs {
         create("release") {
-            val keyStorePath = keystoreProperties["storeFile"] as String
-            val keyStore = project.file(keyStorePath)
-            if (keyStore.exists()) {
-                storeFile = keyStore
-                storePassword = keystoreProperties["storePassword"] as String
-                keyAlias = keystoreProperties["keyAlias"] as String
-                keyPassword = keystoreProperties["keyPassword"] as String
-                println("Signing config release is using keystore [$storeFile]")
+            val keyStorePath = signingProperty("storeFile")
+            val storePasswordValue = signingProperty("storePassword")
+            val keyAliasValue = signingProperty("keyAlias")
+            val keyPasswordValue = signingProperty("keyPassword")
+
+            if (
+                keyStorePath != null &&
+                storePasswordValue != null &&
+                keyAliasValue != null &&
+                keyPasswordValue != null
+            ) {
+                val keyStore = project.file(keyStorePath)
+                if (keyStore.exists()) {
+                    storeFile = keyStore
+                    storePassword = storePasswordValue
+                    keyAlias = keyAliasValue
+                    keyPassword = keyPasswordValue
+                    println("Signing config release is using keystore [$storeFile]")
+                } else {
+                    println("Keystore [$keyStore] doesn't exist!")
+                }
             } else {
-                println("Keystore [$storeFile] doesn't exists!")
+                println("Release signing config properties are missing, APKs will be unsigned")
             }
         }
     }
