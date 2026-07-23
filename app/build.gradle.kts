@@ -92,6 +92,7 @@ android {
         }
     }
 
+    flavorDimensions += "all"
     productFlavors {
         create("clb") {
             dimension = "all"
