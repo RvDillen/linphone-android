@@ -14,24 +14,15 @@ plugins {
     alias(libs.plugins.crashlytics)
 }
 
-val packageName = "org.linphone"
+fun getPackageNameClb(): String { return "nl.clb.linphone" }
 
-static def getPackageName() {
-    return "nl.clb.linphone"
-}
+fun getPackageNameOrg(): String { return "org.linphone" }
 
-static def getPackageNameOrg() {
-    return "org.linphone"
-}
+fun getPackageNameTypeM(): String { return "nl.clb.typem.linphone" }
 
-static def getPackageNameTypeM() {
-    return "nl.clb.typem.linphone"
-}
+fun getPackageNameConfig(): String { return "nl.clb.linphoneconfig" }
 
-static def getPackageNameConfig() {
-    return "nl.clb.linphoneconfig"
-}
-
+var packageName = getPackageNameOrg()
 val useDifferentPackageNameForDebugBuild = false
 val versionMajor = 6
 val versionMinor = 0
@@ -59,54 +50,11 @@ if (firebaseCloudMessagingAvailable) {
 }
 
 var gitBranch = ByteArrayOutputStream()
-var gitVersion = "6.0.23"
+var gitVersion = String.format("%d.%d.%d", versionMajor, versionMinor, versionRelease)
 
 task("getGitVersion") {
-    def versionBuild = jenkinsBuildNumber
+    val versionBuild = jenkinsBuildNumber
     project.version = String.format("%d.%d.%d.%d", versionMajor, versionMinor, versionRelease, versionBuild)
-    /*
-    val gitVersionStream = ByteArrayOutputStream()
-    val gitCommitsCount = ByteArrayOutputStream()
-    val gitCommitHash = ByteArrayOutputStream()
-
-    try {
-        exec {
-            commandLine("git", "describe", "--abbrev=0")
-            standardOutput = gitVersionStream
-        }
-        exec {
-            commandLine(
-                "git",
-                "rev-list",
-                gitVersionStream.toString().trim() + "..HEAD",
-                "--count",
-            )
-            standardOutput = gitCommitsCount
-        }
-        exec {
-            commandLine("git", "rev-parse", "--short", "HEAD")
-            standardOutput = gitCommitHash
-        }
-        exec {
-            commandLine("git", "name-rev", "--name-only", "HEAD")
-            standardOutput = gitBranch
-        }
-
-        gitVersion =
-            if (gitCommitsCount.toString().trim().toInt() == 0) {
-                gitVersionStream.toString().trim()
-            } else {
-                gitVersionStream.toString().trim() + "." +
-                    gitCommitsCount.toString()
-                        .trim() + "+" + gitCommitHash.toString().trim()
-            }
-        println("Git version: $gitVersion")
-    } catch (e: Exception) {
-        println("Git not found [$e], using $gitVersion")
-    }
-
-    project.version = gitVersion
-    */
 }
 project.tasks.preBuild.dependsOn("getGitVersion")
 
@@ -129,7 +77,7 @@ android {
     compileSdk = 35
 
     defaultConfig {
-        applicationId = getPackageName()
+        applicationId = getPackageNameOrg()
         minSdk = 28
         targetSdk = 35
         versionCode = appVersionCode
@@ -144,6 +92,8 @@ android {
         }
     }
 
+    // LINPHONE 5.2 build variant/flavour script
+    /*
     productFlavors {
         clb {
             dimension "all"
@@ -172,8 +122,7 @@ android {
         if (firebaseAvailable) {
             enableFirebaseService = "true"
         }
-/*
-    // LINPHONE 5.2 build variant/flavour script
+
         // See https://developer.android.com/studio/releases/gradle-plugin#3-6-0-behavior for why extractNativeLibs is set to true in debug flavor
 	    // If this throws errors: ExtractNativeLibs might have to be removed!
         if (variant.buildType.name == "release" || variant.buildType.name == "releaseWithCrashlytics") {
@@ -204,9 +153,20 @@ android {
     }
 */
 
-// ORIGINAL 6.0 aplication.variants method
+// ORIGINAL 6.0 application.variants method
     applicationVariants.all {
         val variant = this
+
+        if (variant.flavorName.equals("clbTypeM")) {
+            packageName = getPackageNameTypeM()
+        } else if (variant.flavorName.equals("clbConfig")) {
+            packageName = getPackageNameConfig()
+        } else if (variant.flavorName.equals("linphone")) {
+            packageName = getPackageNameOrg()
+        } else {
+            packageName = getPackageNameClb()
+        }
+
         val flavorOutputName = variant.flavorName.takeIf { it.isNotBlank() } ?: "linphone"
         val variantNameCap = variant.name.replaceFirstChar { it.uppercaseChar() }
 
@@ -277,14 +237,20 @@ android {
             isDebuggable = true
             isJniDebuggable = true
 
+            // Get packageName according to type
             if (useDifferentPackageNameForDebugBuild) {
-                resValue("string", "file_provider", getPackageName() + ".debug.fileprovider")
+                resValue("string", "file_provider", getPackageNameClb() + ".debug.fileprovider")
             } else {
-                resValue("string", "file_provider", getPackageName() + ".fileprovider")
+                resValue("string", "file_provider", getPackageNameClb() + ".fileprovider")
             }
-            resValue("string", "linphone_app_version", gitVersion.trim())
+
+            // CLB: Set custom "debug" appName for easier (visual) identification
+            resValue("string", "appLabel", "@string/app_name_debug")
+
+            resValue("string", "linphone_address_mime_type", "vnd.android.cursor.item/vnd." + getPackageNameClb() + ".provider.sip_address")
+            resValue("string", "linphone_app_version", appVersionName.trim())
             resValue("string", "linphone_app_branch", gitBranch.toString().trim())
-            resValue("string", "linphone_openid_callback_scheme", getPackageName())
+            resValue("string", "linphone_openid_callback_scheme", getPackageNameClb())
 
             if (crashlyticsAvailable) {
                 val path = File("$sdkPath/libs-debug/").toString()
@@ -305,10 +271,19 @@ android {
             )
             signingConfig = signingConfigs.getByName("release")
 
-            resValue("string", "file_provider", getPackageName() + ".fileprovider")
+            // As before, use 'clb package name' for ALL build flavors for file_provider, callback_scheme and mime_type.
+            resValue("string", "file_provider", getPackageNameClb() + ".fileprovider")
+            resValue("string", "linphone_address_mime_type", "vnd.android.cursor.item/vnd." + getPackageNameClb() + ".provider.sip_address")
             resValue("string", "linphone_app_version", gitVersion.trim())
             resValue("string", "linphone_app_branch", gitBranch.toString().trim())
-            resValue("string", "linphone_openid_callback_scheme", getPackageName())
+            resValue("string", "linphone_openid_callback_scheme", getPackageNameClb())
+
+            // CLB: Set 'special' app name for Medical
+            if (packageName.equals(getPackageNameTypeM())) {
+                resValue("string", "appLabel", "@string/app_name_typem")
+            } else {
+                resValue("string", "appLabel", "@string/app_name")
+            }
 
             if (crashlyticsAvailable) {
                 val path = File("$sdkPath/libs-debug/").toString()
