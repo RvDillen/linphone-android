@@ -92,27 +92,25 @@ android {
         }
     }
 
-    // LINPHONE 5.2 build variant/flavour script
-    /*
     productFlavors {
-        clb {
-            dimension "all"
-            applicationId getPackageName()
+        create("clb") {
+            dimension = "all"
+            applicationId = getPackageNameClb()
         }
-        clbTypeM {
-            dimension "all"
-            applicationId getPackageNameTypeM()
+        create("clbTypeM") {
+            dimension = "all"
+            applicationId = getPackageNameTypeM()
         }
-        clbConfig {
-            dimension "all"
-            applicationId getPackageNameConfig()
+        create("clbConfig") {
+            dimension = "all"
+            applicationId = getPackageNameConfig()
         }
-        linphone {
-            dimension "all"
-            applicationId getPackageNameOrg()
+        create("linphone") {
+            dimension = "all"
+            applicationId = getPackageNameOrg()
         }
     }
-
+/*
     applicationVariants.all { variant ->
         variant.outputs.all {
             outputFileName = "linphone-android-${variant.getFlavorName()}-${variant.buildType.name}_${variant.versionName}.apk"
