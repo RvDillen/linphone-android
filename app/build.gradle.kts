@@ -11,7 +11,7 @@ plugins {
     alias(libs.plugins.ktlint)
     alias(libs.plugins.jetbrainsKotlinAndroid)
     alias(libs.plugins.navigation)
-    alias(libs.plugins.crashlytics)
+    alias(libs.plugins.crashlytics) apply false
 }
 
 fun getPackageNameClb(): String { return "nl.clb.linphone" }
@@ -39,14 +39,24 @@ val sdkPath = providers.gradleProperty("LinphoneSdkBuildDir").get()
 val googleServices = File(projectDir.absolutePath + "/google-services.json")
 val linphoneLibs = File("$sdkPath/libs/")
 val linphoneDebugLibs = File("$sdkPath/libs-debug/")
-val firebaseCloudMessagingAvailable = googleServices.exists()
-val crashlyticsAvailable = googleServices.exists() && linphoneLibs.exists() && linphoneDebugLibs.exists()
+val requestedTasks = gradle.startParameter.taskNames.map { it.lowercase() }
+val hasExplicitFlavorTask =
+    requestedTasks.any {
+        it.contains("linphone") || it.contains("clbtypem") || it.contains("clbconfig") || it.contains("clb")
+    }
+val buildsLinphoneFlavor = requestedTasks.any { it.contains("linphone") }
+val enableFirebaseForInvocation =
+    googleServices.exists() &&
+        (requestedTasks.isEmpty() || !hasExplicitFlavorTask || buildsLinphoneFlavor)
+val crashlyticsAvailable =
+    enableFirebaseForInvocation && linphoneLibs.exists() && linphoneDebugLibs.exists()
 
-if (firebaseCloudMessagingAvailable) {
-    println("google-services.json found, enabling CloudMessaging feature")
+if (enableFirebaseForInvocation) {
+    println("google-services.json found, enabling CloudMessaging feature for linphone flavor")
     apply<GoogleServicesPlugin>()
+    apply(plugin = "com.google.firebase.crashlytics")
 } else {
-    println("google-services.json not found, disabling CloudMessaging feature")
+    println("google-services.json not used for this build, disabling CloudMessaging and Crashlytics")
 }
 
 var gitBranch = ByteArrayOutputStream()
@@ -340,9 +350,9 @@ dependencies {
     // To be able to parse native crash tombstone and print them with SDK logs the next time the app will start
     implementation(libs.google.protobuf)
 
-    implementation(platform(libs.google.firebase.bom))
-    implementation(libs.google.firebase.messaging)
-    implementation(libs.google.firebase.crashlytics)
+    add("linphoneImplementation", platform(libs.google.firebase.bom))
+    add("linphoneImplementation", libs.google.firebase.messaging)
+    add("linphoneImplementation", libs.google.firebase.crashlytics)
 
     // https://github.com/coil-kt/coil/blob/main/LICENSE.txt Apache v2.0
     implementation(libs.coil)
