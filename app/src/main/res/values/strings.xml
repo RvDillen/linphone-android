@@ -6,8 +6,6 @@
 
 <resources>
     <string name="app_name" translatable="false">&appName;</string>
-    <!-- CLB alternative appname for debug -->
-    <string name="app_name_debug" translatable="false">Linphone DEBUG</string>
 
     <!-- Not translatable strings -->
     <string name="vertical_separator" translatable="false">|</string>

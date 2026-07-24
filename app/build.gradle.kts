@@ -253,8 +253,7 @@ android {
                 resValue("string", "file_provider", getPackageNameClb() + ".fileprovider")
             }
 
-            // CLB: Set custom "debug" appName for easier (visual) identification
-            resValue("string", "appLabel", "@string/app_name_debug")
+            // CLB: Set custom "debug" appName for easier (visual) identification (handled through xml resources)
 
             resValue("string", "linphone_address_mime_type", "vnd.android.cursor.item/vnd." + getPackageNameClb() + ".provider.sip_address")
             resValue("string", "linphone_app_version", appVersionName.trim())
@@ -287,12 +286,7 @@ android {
             resValue("string", "linphone_app_branch", gitBranch.toString().trim())
             resValue("string", "linphone_openid_callback_scheme", getPackageNameClb())
 
-            // CLB: Set 'special' app name for Medical
-            if (packageName.equals(getPackageNameTypeM())) {
-                resValue("string", "appLabel", "@string/app_name_typem")
-            } else {
-                resValue("string", "appLabel", "@string/app_name")
-            }
+            // CLB: Special app-name is handled with flavor specific resource files (strings.xml)
 
             if (crashlyticsAvailable) {
                 val path = File("$sdkPath/libs-debug/").toString()
