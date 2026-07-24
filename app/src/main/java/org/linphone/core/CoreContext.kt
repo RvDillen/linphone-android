@@ -539,7 +539,8 @@ class CoreContext
 
     private var logcatEnabled: Boolean = corePreferences.printLogsInLogcat
 
-    private var crashlyticsEnabled: Boolean = corePreferences.sendLogsToCrashlytics
+    private val isFirebaseFlavor = BuildConfig.FLAVOR == "linphone"
+    private var crashlyticsEnabled: Boolean = corePreferences.sendLogsToCrashlytics && isFirebaseFlavor
     private var crashlyticsAvailable = true
 
     private val loggingServiceListener = object : LoggingServiceListenerStub() {
@@ -574,7 +575,7 @@ class CoreContext
         Log.i("$TAG Creating Core")
         Looper.prepare()
 
-        if (BuildConfig.CRASHLYTICS_ENABLED) {
+        if (BuildConfig.CRASHLYTICS_ENABLED && isFirebaseFlavor) {
             Log.i("$TAG Crashlytics is enabled, registering logging service listener")
             try {
                 FirebaseCrashlytics.getInstance()
@@ -585,7 +586,7 @@ class CoreContext
                 crashlyticsAvailable = false
             }
         } else {
-            Log.i("$TAG Crashlytics is disabled")
+            Log.i("$TAG Crashlytics is disabled for this build variant")
             crashlyticsAvailable = false
         }
         Log.i("=========================================")

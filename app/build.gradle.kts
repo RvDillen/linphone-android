@@ -344,6 +344,10 @@ dependencies {
     // To be able to parse native crash tombstone and print them with SDK logs the next time the app will start
     implementation(libs.google.protobuf)
 
+    // Keep Crashlytics symbols available to compile shared main sources for non-linphone flavors.
+    compileOnly(platform(libs.google.firebase.bom))
+    compileOnly(libs.google.firebase.crashlytics)
+
     add("linphoneImplementation", platform(libs.google.firebase.bom))
     add("linphoneImplementation", libs.google.firebase.messaging)
     add("linphoneImplementation", libs.google.firebase.crashlytics)
