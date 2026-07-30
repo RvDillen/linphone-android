@@ -130,7 +130,8 @@ open class AccountLoginViewModel
     init {
         coreContext.postOnCoreThread { core ->
             // Prevent user from leaving assistant if no account was configured yet
-            showBackButton.postValue(core.accountList.isNotEmpty())
+            // CLB: Always allow user to SKIP account creation
+            showBackButton.postValue(true)
             hideCreateAccount.postValue(corePreferences.hideAssistantCreateAccount)
             hideScanQrCode.postValue(corePreferences.hideAssistantScanQrCode)
             hideThirdPartyAccount.postValue(corePreferences.hideAssistantThirdPartySipAccount)

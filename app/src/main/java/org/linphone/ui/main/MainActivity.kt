@@ -590,6 +590,8 @@ class MainActivity : GenericActivity() {
                     }
                 }
             } else if (core.accountList.isEmpty()) {
+                // CLB: Only go to account creation on first launch. It is totally fine to NOT have an account.
+                /*
                 Log.w("$TAG No account found, showing Assistant activity")
                 coreContext.postOnMainThread {
                     try {
@@ -598,6 +600,7 @@ class MainActivity : GenericActivity() {
                         Log.e("$TAG Can't start activity: $ise")
                     }
                 }
+                */
             } else {
                 if (intent.hasExtra(ARGUMENTS_CHAT)) {
                     Log.i("$TAG Intent has [Chat] extra")
