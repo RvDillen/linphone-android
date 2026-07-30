@@ -314,10 +314,13 @@ class MainViewModel
 
             computeNonDefaultAccountNotificationsCount()
 
+            // CLB: Having no account is perfectly OK
+            /*
             if (core.accountList.isEmpty()) {
                 Log.w("$TAG No more account configured, going into assistant")
                 lastAccountRemovedEvent.postValue(Event(true))
             }
+            */
         }
 
         @WorkerThread

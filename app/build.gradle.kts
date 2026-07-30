@@ -11,76 +11,60 @@ plugins {
     alias(libs.plugins.ktlint)
     alias(libs.plugins.jetbrainsKotlinAndroid)
     alias(libs.plugins.navigation)
-    alias(libs.plugins.crashlytics)
+    alias(libs.plugins.crashlytics) apply false
 }
 
-// CLB: Inject CLB Flavours
-val packageName = "org.linphone"
-val clbPackageName = "nl.clb.linphone"
-val clbTypeMPackageName = "nl.clb.linphone.typem"
-val clbConfigPackageName = "nl.clb.linphone.config"
-// CLB: Inject CLB Flavours
+fun getPackageNameClb(): String { return "nl.clb.linphone" }
 
+fun getPackageNameOrg(): String { return "org.linphone" }
+
+fun getPackageNameTypeM(): String { return "nl.clb.typem.linphone" }
+
+fun getPackageNameConfig(): String { return "nl.clb.linphoneconfig" }
+
+var packageName = getPackageNameOrg()
 val useDifferentPackageNameForDebugBuild = false
+val versionMajor = 6
+val versionMinor = 0
+val versionRelease = 1
+val jenkinsBuildNumber = System.getenv("BUILD_NUMBER")?.toIntOrNull() ?: 0
+val appVersionName = "$versionMajor.$versionMinor.$versionRelease.$jenkinsBuildNumber"
+val appVersionCode =
+    (versionMajor * 1000000) +
+        (versionMinor * 100000) +
+        (versionRelease * 10000) +
+        jenkinsBuildNumber
 
 val sdkPath = providers.gradleProperty("LinphoneSdkBuildDir").get()
 val googleServices = File(projectDir.absolutePath + "/google-services.json")
 val linphoneLibs = File("$sdkPath/libs/")
 val linphoneDebugLibs = File("$sdkPath/libs-debug/")
-val firebaseCloudMessagingAvailable = googleServices.exists()
-val crashlyticsAvailable = googleServices.exists() && linphoneLibs.exists() && linphoneDebugLibs.exists()
+val requestedTasks = gradle.startParameter.taskNames.map { it.lowercase() }
+val hasExplicitFlavorTask =
+    requestedTasks.any {
+        it.contains("linphone") || it.contains("clbtypem") || it.contains("clbconfig") || it.contains("clb")
+    }
+val buildsLinphoneFlavor = requestedTasks.any { it.contains("linphone") }
+val enableFirebaseForInvocation =
+    googleServices.exists() &&
+        (requestedTasks.isEmpty() || !hasExplicitFlavorTask || buildsLinphoneFlavor)
+val crashlyticsAvailable =
+    enableFirebaseForInvocation && linphoneLibs.exists() && linphoneDebugLibs.exists()
 
-if (firebaseCloudMessagingAvailable) {
-    println("google-services.json found, enabling CloudMessaging feature")
+if (enableFirebaseForInvocation) {
+    println("google-services.json found, enabling CloudMessaging feature for linphone flavor")
     apply<GoogleServicesPlugin>()
+    apply(plugin = "com.google.firebase.crashlytics")
 } else {
-    println("google-services.json not found, disabling CloudMessaging feature")
+    println("google-services.json not used for this build, disabling CloudMessaging and Crashlytics")
 }
 
 var gitBranch = ByteArrayOutputStream()
-var gitVersion = "6.0.23"
+var gitVersion = String.format("%d.%d.%d", versionMajor, versionMinor, versionRelease)
 
 task("getGitVersion") {
-    val gitVersionStream = ByteArrayOutputStream()
-    val gitCommitsCount = ByteArrayOutputStream()
-    val gitCommitHash = ByteArrayOutputStream()
-
-    try {
-        exec {
-            commandLine("git", "describe", "--abbrev=0")
-            standardOutput = gitVersionStream
-        }
-        exec {
-            commandLine(
-                "git",
-                "rev-list",
-                gitVersionStream.toString().trim() + "..HEAD",
-                "--count",
-            )
-            standardOutput = gitCommitsCount
-        }
-        exec {
-            commandLine("git", "rev-parse", "--short", "HEAD")
-            standardOutput = gitCommitHash
-        }
-        exec {
-            commandLine("git", "name-rev", "--name-only", "HEAD")
-            standardOutput = gitBranch
-        }
-
-        gitVersion =
-            if (gitCommitsCount.toString().trim().toInt() == 0) {
-                gitVersionStream.toString().trim()
-            } else {
-                gitVersionStream.toString().trim() + "." +
-                    gitCommitsCount.toString()
-                        .trim() + "+" + gitCommitHash.toString().trim()
-            }
-        println("Git version: $gitVersion")
-    } catch (e: Exception) {
-        println("Git not found [$e], using $gitVersion")
-    }
-    project.version = gitVersion
+    val versionBuild = jenkinsBuildNumber
+    project.version = String.format("%d.%d.%d.%d", versionMajor, versionMinor, versionRelease, versionBuild)
 }
 project.tasks.preBuild.dependsOn("getGitVersion")
 
@@ -103,11 +87,12 @@ android {
     compileSdk = 35
 
     defaultConfig {
-        applicationId = packageName
+        applicationId = getPackageNameOrg()
         minSdk = 28
         targetSdk = 35
-        versionCode = 600023 // 6.00.023
-        versionName = "6.0.23"
+        versionCode = appVersionCode
+        versionName = appVersionName
+        setProperty("archivesBaseName", "$applicationId-$versionName")
 
         manifestPlaceholders["appAuthRedirectScheme"] = packageName
 
@@ -117,13 +102,101 @@ android {
         }
     }
 
+    flavorDimensions += "all"
+    productFlavors {
+        create("clb") {
+            dimension = "all"
+            applicationId = getPackageNameClb()
+        }
+        create("clbTypeM") {
+            dimension = "all"
+            applicationId = getPackageNameTypeM()
+        }
+        create("clbConfig") {
+            dimension = "all"
+            applicationId = getPackageNameConfig()
+        }
+        create("linphone") {
+            dimension = "all"
+            applicationId = getPackageNameOrg()
+        }
+    }
+/*
+    applicationVariants.all { variant ->
+        variant.outputs.all {
+            outputFileName = "linphone-android-${variant.getFlavorName()}-${variant.buildType.name}_${variant.versionName}.apk"
+        }
+
+        var enableFirebaseService = "false"
+        if (firebaseAvailable) {
+            enableFirebaseService = "true"
+        }
+
+        // See https://developer.android.com/studio/releases/gradle-plugin#3-6-0-behavior for why extractNativeLibs is set to true in debug flavor
+	    // If this throws errors: ExtractNativeLibs might have to be removed!
+        if (variant.buildType.name == "release" || variant.buildType.name == "releaseWithCrashlytics") {
+            if (variant.getFlavorName() == "clbTypeM") {
+
+                // Special appLabel for typeM build
+                // Verify/Test on API34 device: Is it a 'problem' that the root-package-name is used instead of the actual package name for address_mime_type and file_provider?
+                variant.getMergedFlavor().manifestPlaceholders = [linphone_address_mime_type: "vnd.android.cursor.item/vnd." + getPackageName() + ".provider.sip_address",
+                                                                  linphone_file_provider    : getPackageName() + ".fileprovider",
+                                                                  appLabel                  : "@string/app_name_typem",
+                                                                  firebaseServiceEnabled    : enableFirebaseService,
+                                                                  extractNativeLibs         : "false"]
+            }
+            else {
+                variant.getMergedFlavor().manifestPlaceholders = [linphone_address_mime_type: "vnd.android.cursor.item/vnd." + getPackageName() + ".provider.sip_address",
+                                                                  linphone_file_provider    : getPackageName() + ".fileprovider",
+                                                                  appLabel                  : "@string/app_name",
+                                                                  firebaseServiceEnabled    : enableFirebaseService,
+                                                                  extractNativeLibs         : "false"]
+            }
+        } else {
+            variant.getMergedFlavor().manifestPlaceholders = [linphone_address_mime_type: "vnd.android.cursor.item/vnd." + getPackageName() + ".provider.sip_address",
+                                                              linphone_file_provider    : getPackageName() + ".debug.fileprovider",
+                                                              appLabel                  : "@string/app_name_debug",
+                                                              firebaseServiceEnabled    : enableFirebaseService,
+                                                              extractNativeLibs         : "true" ]
+        }
+    }
+*/
+
+// ORIGINAL 6.0 application.variants method
     applicationVariants.all {
         val variant = this
+
+        if (variant.flavorName.equals("clbTypeM")) {
+            packageName = getPackageNameTypeM()
+        } else if (variant.flavorName.equals("clbConfig")) {
+            packageName = getPackageNameConfig()
+        } else if (variant.flavorName.equals("linphone")) {
+            packageName = getPackageNameOrg()
+        } else {
+            packageName = getPackageNameClb()
+        }
+
+        val flavorOutputName = variant.flavorName.takeIf { it.isNotBlank() } ?: "linphone"
+        val variantNameCap = variant.name.replaceFirstChar { it.uppercaseChar() }
+
+        val defaultApkOutputDir =
+            project.layout.buildDirectory.dir("outputs/apk/${variant.buildType.name}")
+        val flavorApkOutputDir =
+            project.layout.buildDirectory.dir("outputs/apk/$flavorOutputName/${variant.buildType.name}")
+
         variant.outputs
             .map { it as com.android.build.gradle.internal.api.BaseVariantOutputImpl }
             .forEach { output ->
                 output.outputFileName = "linphone-android-${variant.flavorName}-${variant.buildType.name}-${project.version}.apk"
             }
+
+        val copyApkOutputsTask = tasks.register<Copy>("copy${variantNameCap}ApkOutputsToFlavorDir") {
+            from(defaultApkOutputDir)
+            into(flavorApkOutputDir)
+        }
+        variant.assembleProvider.configure {
+            finalizedBy(copyApkOutputsTask)
+        }
     }
 
     // CLB: Inject CLB Flavours
@@ -158,20 +231,39 @@ android {
 
     val keystorePropertiesFile = rootProject.file("keystore.properties")
     val keystoreProperties = Properties()
-    keystoreProperties.load(FileInputStream(keystorePropertiesFile))
+    val keystorePropertiesFile = rootProject.file("keystore.properties")
+    if (keystorePropertiesFile.exists()) {
+        keystoreProperties.load(FileInputStream(keystorePropertiesFile))
+    }
+
+    fun signingProperty(name: String): String? =
+        providers.gradleProperty(name).orNull ?: keystoreProperties.getProperty(name)
 
     signingConfigs {
         create("release") {
-            val keyStorePath = keystoreProperties["storeFile"] as String
-            val keyStore = project.file(keyStorePath)
-            if (keyStore.exists()) {
-                storeFile = keyStore
-                storePassword = keystoreProperties["storePassword"] as String
-                keyAlias = keystoreProperties["keyAlias"] as String
-                keyPassword = keystoreProperties["keyPassword"] as String
-                println("Signing config release is using keystore [$storeFile]")
+            val keyStorePath = signingProperty("storeFile")
+            val storePasswordValue = signingProperty("storePassword")
+            val keyAliasValue = signingProperty("keyAlias")
+            val keyPasswordValue = signingProperty("keyPassword")
+
+            if (
+                keyStorePath != null &&
+                storePasswordValue != null &&
+                keyAliasValue != null &&
+                keyPasswordValue != null
+            ) {
+                val keyStore = project.file(keyStorePath)
+                if (keyStore.exists()) {
+                    storeFile = keyStore
+                    storePassword = storePasswordValue
+                    keyAlias = keyAliasValue
+                    keyPassword = keyPasswordValue
+                    println("Signing config release is using keystore [$storeFile]")
+                } else {
+                    println("Keystore [$keyStore] doesn't exist!")
+                }
             } else {
-                println("Keystore [$storeFile] doesn't exists!")
+                println("Release signing config properties are missing, APKs will be unsigned")
             }
         }
     }
@@ -184,14 +276,19 @@ android {
             isDebuggable = true
             isJniDebuggable = true
 
+            // Get packageName according to type
             if (useDifferentPackageNameForDebugBuild) {
-                resValue("string", "file_provider", "$packageName.debug.fileprovider")
+                resValue("string", "file_provider", getPackageNameClb() + ".debug.fileprovider")
             } else {
-                resValue("string", "file_provider", "$packageName.fileprovider")
+                resValue("string", "file_provider", getPackageNameClb() + ".fileprovider")
             }
-            resValue("string", "linphone_app_version", gitVersion.trim())
+
+            // CLB: Set custom "debug" appName for easier (visual) identification (handled through xml resources)
+
+            resValue("string", "linphone_address_mime_type", "vnd.android.cursor.item/vnd." + getPackageNameClb() + ".provider.sip_address")
+            resValue("string", "linphone_app_version", appVersionName.trim())
             resValue("string", "linphone_app_branch", gitBranch.toString().trim())
-            resValue("string", "linphone_openid_callback_scheme", packageName)
+            resValue("string", "linphone_openid_callback_scheme", getPackageNameClb())
 
             if (crashlyticsAvailable) {
                 val path = File("$sdkPath/libs-debug/").toString()
@@ -212,10 +309,14 @@ android {
             )
             signingConfig = signingConfigs.getByName("release")
 
-            resValue("string", "file_provider", "$packageName.fileprovider")
+            // As before, use 'clb package name' for ALL build flavors for file_provider, callback_scheme and mime_type.
+            resValue("string", "file_provider", getPackageNameClb() + ".fileprovider")
+            resValue("string", "linphone_address_mime_type", "vnd.android.cursor.item/vnd." + getPackageNameClb() + ".provider.sip_address")
             resValue("string", "linphone_app_version", gitVersion.trim())
             resValue("string", "linphone_app_branch", gitBranch.toString().trim())
-            resValue("string", "linphone_openid_callback_scheme", packageName)
+            resValue("string", "linphone_openid_callback_scheme", getPackageNameClb())
+
+            // CLB: Special app-name is handled with flavor specific resource files (strings.xml)
 
             if (crashlyticsAvailable) {
                 val path = File("$sdkPath/libs-debug/").toString()
@@ -273,9 +374,13 @@ dependencies {
     // To be able to parse native crash tombstone and print them with SDK logs the next time the app will start
     implementation(libs.google.protobuf)
 
-    implementation(platform(libs.google.firebase.bom))
-    implementation(libs.google.firebase.messaging)
-    implementation(libs.google.firebase.crashlytics)
+    // Keep Crashlytics symbols available to compile shared main sources for non-linphone flavors.
+    compileOnly(platform(libs.google.firebase.bom))
+    compileOnly(libs.google.firebase.crashlytics)
+
+    add("linphoneImplementation", platform(libs.google.firebase.bom))
+    add("linphoneImplementation", libs.google.firebase.messaging)
+    add("linphoneImplementation", libs.google.firebase.crashlytics)
 
     // https://github.com/coil-kt/coil/blob/main/LICENSE.txt Apache v2.0
     implementation(libs.coil)
@@ -334,6 +439,16 @@ configure<org.jlleitschuh.gradle.ktlint.KtlintExtension> {
     )
 }
 project.tasks.preBuild.dependsOn("ktlintFormat")
+
+afterEvaluate {
+    listOf("Release").forEach { buildTypeName ->
+        val assembleTask = tasks.findByName("assemble$buildTypeName")
+        val bundleTask = tasks.findByName("bundle$buildTypeName")
+        if (assembleTask != null && bundleTask != null) {
+            assembleTask.finalizedBy(bundleTask)
+        }
+    }
+}
 
 if (crashlyticsAvailable) {
     afterEvaluate {

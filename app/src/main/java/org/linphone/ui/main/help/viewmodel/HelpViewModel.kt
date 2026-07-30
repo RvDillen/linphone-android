@@ -23,7 +23,6 @@ import androidx.annotation.UiThread
 import androidx.annotation.WorkerThread
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.viewModelScope
-import com.google.firebase.FirebaseApp
 import kotlinx.coroutines.launch
 import org.linphone.BuildConfig
 import org.linphone.LinphoneApplication.Companion.coreContext
@@ -135,6 +134,19 @@ class HelpViewModel
         }
     }
 
+    private fun resolveFirebaseProjectId(): String {
+        return try {
+            val firebaseAppClass = Class.forName("com.google.firebase.FirebaseApp")
+            val firebaseOptionsClass = Class.forName("com.google.firebase.FirebaseOptions")
+            val firebaseAppInstance = firebaseAppClass.getMethod("getInstance").invoke(null)
+            val options = firebaseAppClass.getMethod("getOptions").invoke(firebaseAppInstance)
+            firebaseOptionsClass.getMethod("getProjectId").invoke(options) as? String ?: "unknown"
+        } catch (e: Throwable) {
+            Log.e("$TAG Failed to get FirebaseApp instance: $e")
+            "unknown"
+        }
+    }
+
     init {
         val currentVersion = BuildConfig.VERSION_NAME
         version.value = currentVersion
@@ -148,12 +160,7 @@ class HelpViewModel
         sdkVersion.value = coreContext.sdkVersion
         logsUploadInProgress.value = false
 
-        try {
-            firebaseProjectId.value = FirebaseApp.getInstance().options.projectId
-        } catch (e: Exception) {
-            Log.e("$TAG Failed to get FirebaseApp instance: $e")
-            firebaseProjectId.value = "unknown"
-        }
+        firebaseProjectId.value = resolveFirebaseProjectId()
 
         coreContext.postOnCoreThread { core ->
             core.addListener(coreListener)

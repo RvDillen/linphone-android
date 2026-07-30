@@ -5,5 +5,5 @@
 ]>
 
 <resources>
-    <string name="app_name" translatable="false">&appName; Config CLB</string>
+    <string name="app_name" translatable="false">&appName; CLB (debug)</string>
 </resources>
