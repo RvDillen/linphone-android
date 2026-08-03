@@ -59,6 +59,8 @@ class TelecomManager
             state: Call.State?,
             message: String
         ) {
+            // CLB: Improved call handling -> trigger UI update when an incoming call connects.
+            // Needed for full-screen incoming call UI.
             if (state == Call.State.OutgoingProgress ||
                 (call.dir == Call.Dir.Incoming && state == Call.State.Connected)
             ) {

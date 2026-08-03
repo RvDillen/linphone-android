@@ -102,6 +102,7 @@ android {
         }
     }
 
+// CLB: Inject CLB Flavours
     flavorDimensions += "all"
     productFlavors {
         create("clb") {
@@ -163,6 +164,7 @@ android {
 */
 
 // ORIGINAL 6.0 application.variants method
+/*
     applicationVariants.all {
         val variant = this
 
@@ -227,9 +229,9 @@ android {
             manifestPlaceholders["appAuthRedirectScheme"] = clbConfigPackageName
         }
     }
-    // CLB: Inject CLB Flavours
 
-    val keystorePropertiesFile = rootProject.file("keystore.properties")
+*/
+
     val keystoreProperties = Properties()
     val keystorePropertiesFile = rootProject.file("keystore.properties")
     if (keystorePropertiesFile.exists()) {
@@ -284,7 +286,6 @@ android {
             }
 
             // CLB: Set custom "debug" appName for easier (visual) identification (handled through xml resources)
-
             resValue("string", "linphone_address_mime_type", "vnd.android.cursor.item/vnd." + getPackageNameClb() + ".provider.sip_address")
             resValue("string", "linphone_app_version", appVersionName.trim())
             resValue("string", "linphone_app_branch", gitBranch.toString().trim())

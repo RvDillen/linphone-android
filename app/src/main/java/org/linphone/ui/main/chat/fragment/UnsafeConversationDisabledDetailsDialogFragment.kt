@@ -62,7 +62,7 @@ class UnsafeConversationDisabledDetailsDialogFragment(
         container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View {
-        val view = ChatConversationUnsafeDisabledDetailsBottomSheetBinding.inflate(inflater)
+        val view = ChatConversationUnsafeDisabledDetailsBottomSheetBinding.inflate(layoutInflater)
         return view.root
     }
 }

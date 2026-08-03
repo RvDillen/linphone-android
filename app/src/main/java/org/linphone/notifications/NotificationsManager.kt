@@ -33,7 +33,6 @@ import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.media.AudioAttributes
 import android.media.MediaPlayer
-import android.media.RingtoneManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -1814,18 +1813,10 @@ class NotificationsManager
     private fun createIncomingCallNotificationChannelWithoutRingtone() {
         val id = context.getString(R.string.notification_channel_without_ringtone_incoming_call_id)
         val name = context.getString(R.string.notification_channel_incoming_call_name)
-        val ringtoneUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
-        val ringtoneAudioAttributes = AudioAttributes.Builder()
-            .setUsage(AudioAttributes.USAGE_NOTIFICATION_RINGTONE)
-            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-            .build()
 
         val channel = NotificationChannel(id, name, NotificationManager.IMPORTANCE_HIGH).apply {
             description = name
             lockscreenVisibility = Notification.VISIBILITY_PUBLIC
-            enableLights(true)
-            enableVibration(true)
-            setSound(ringtoneUri, ringtoneAudioAttributes)
             setShowBadge(false)
         }
         notificationManager.createNotificationChannel(channel)
