@@ -321,6 +321,8 @@ class CoreContext
             )
             when (currentState) {
                 Call.State.IncomingReceived -> {
+                    // CLB: Force to full screen activity instead of screen-overlay.
+                    // Overlay is blocked by some kiosk modes.
                     postOnMainThread {
                         showCallActivity(incomingCall = true)
                     }

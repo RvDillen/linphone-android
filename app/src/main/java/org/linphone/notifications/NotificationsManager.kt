@@ -1459,6 +1459,7 @@ class NotificationsManager
             return
         }
 
+        // CLB: Always use the full-screen pending intent version.
         val pendingIntent = notification.fullScreenIntent
         val newNotification = createCallNotification(
             call,
