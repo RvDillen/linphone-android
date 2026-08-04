@@ -21,6 +21,7 @@ package org.linphone.notifications
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.app.ActivityOptions
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -33,7 +34,10 @@ import android.graphics.Bitmap
 import android.media.AudioAttributes
 import android.media.MediaPlayer
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import androidx.annotation.AnyThread
 import androidx.annotation.MainThread
 import androidx.annotation.WorkerThread
@@ -43,6 +47,7 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.app.Person
 import androidx.core.app.RemoteInput
 import androidx.core.app.TaskStackBuilder
+import androidx.core.content.ContextCompat
 import androidx.core.content.LocusIdCompat
 import androidx.navigation.NavDeepLinkBuilder
 import org.linphone.LinphoneApplication.Companion.coreContext
@@ -127,6 +132,7 @@ class NotificationsManager
 
     private var currentlyDisplayedChatRoomId: String = ""
     private var currentlyDisplayedIncomingCallFragment: Boolean = false
+    private var lastIncomingUiLaunchAttemptAt: Long = 0L
 
     private lateinit var mediaPlayer: MediaPlayer
 
@@ -193,10 +199,16 @@ class NotificationsManager
             Log.i("$TAG Call state changed: [$currentState]")
             when (currentState) {
                 Call.State.IncomingReceived, Call.State.IncomingEarlyMedia -> {
+                    // CLB: AS-1339 - force incoming call UI in full-screen to avoid kiosk notification issues.
                     Log.i(
-                        "$TAG Showing incoming call notification for [${call.remoteAddress.asStringUriOnly()}]"
+                        "$TAG Incoming call received for [${call.remoteAddress.asStringUriOnly()}], forcing full-screen call UI"
                     )
-                    showCallNotification(call, true)
+                    coreContext.postOnMainThread {
+                        coreContext.showCallActivity(incomingCall = true)
+                    }
+                    forceIncomingCallUi("call state changed")
+                    // CLB: Do NOT show notification when navigating to full-screen fragment.
+                    // showCallNotification(call, true)
                 }
                 Call.State.OutgoingInit -> {
                     Log.i(
@@ -431,6 +443,20 @@ class NotificationsManager
         }
     }
 
+    // CLB compatibility layer: legacy CLB integrations expect these methods.
+    @MainThread
+    fun startForeground() {
+        if (inCallService != null) return
+
+        val serviceIntent = Intent(Intent.ACTION_MAIN).setClass(context, CoreInCallService::class.java)
+        ContextCompat.startForegroundService(context, serviceIntent)
+    }
+
+    @MainThread
+    fun getService(): CoreInCallService? {
+        return inCallService
+    }
+
     val chatMessageListener: ChatMessageListener = object : ChatMessageListenerStub() {
         @WorkerThread
         override fun onMsgStateChanged(message: ChatMessage, state: ChatMessage.State) {
@@ -516,7 +542,16 @@ class NotificationsManager
                 Log.i(
                     "$TAG At least one call is running and no foreground Service notification was found, starting it using call [${call.remoteAddress.asStringUriOnly()}]"
                 )
-                showCallNotification(call, LinphoneUtils.isCallIncoming(call.state))
+                if (LinphoneUtils.isCallIncoming(call.state)) {
+                    // CLB: AS-1339 - for incoming calls, keep service alive with dummy notif and display full-screen fragment.
+                    Log.i(
+                        "$TAG Incoming call detected, launching full-screen call UI and using dummy foreground notification"
+                    )
+                    launchIncomingCallActivity()
+                    showDummyNotificationForCallService()
+                } else {
+                    showCallNotification(call, false)
+                }
             }
         }
     }
@@ -561,6 +596,13 @@ class NotificationsManager
                 if (oldChannel != null) {
                     Log.i("$TAG Deleting notification channel ID [$oldId]")
                     notificationManager.deleteNotificationChannel(oldId)
+                }
+
+                val incomingId = context.getString(R.string.notification_channel_without_ringtone_incoming_call_id)
+                val incomingChannel = notificationManager.getNotificationChannel(incomingId)
+                if (incomingChannel != null) {
+                    Log.i("$TAG Recreating incoming call notification channel ID [$incomingId] to apply latest full-screen behavior")
+                    notificationManager.deleteNotificationChannel(incomingId)
                 }
             } catch (e: Exception) {
                 Log.e("$TAG Failed to check if deprecated incoming call notification channel exists: $e")
@@ -632,38 +674,138 @@ class NotificationsManager
     }
 
     @WorkerThread
+    fun displayCallNotification(call: Call, isIncoming: Boolean) {
+        showCallNotification(call, isIncoming)
+    }
+
+    @MainThread
+    private fun launchIncomingCallActivity() {
+        // CLB: AS-1339 - centralize incoming call full-screen launch from notification layer.
+        val intent = Intent(context, CallActivity::class.java).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+            putExtra("IncomingCall", true)
+        }
+        try {
+            Log.i("$TAG Launching incoming call activity")
+            context.startActivity(intent)
+        } catch (se: SecurityException) {
+            Log.e("$TAG Failed to start incoming call activity: $se")
+        }
+    }
+
+    @WorkerThread
+    private fun sendIncomingCallPendingIntent(pendingIntent: PendingIntent) {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                val options = ActivityOptions.makeBasic().apply {
+                    setPendingIntentBackgroundActivityStartMode(
+                        ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED
+                    )
+                }
+                pendingIntent.send(
+                    context,
+                    0,
+                    null,
+                    null,
+                    null,
+                    null,
+                    options.toBundle()
+                )
+            } else {
+                pendingIntent.send()
+            }
+        } catch (e: PendingIntent.CanceledException) {
+            Log.e("$TAG Failed to send incoming call full-screen pending intent: $e")
+        }
+    }
+
+    @WorkerThread
+    private fun forceIncomingCallUi(reason: String) {
+        val now = System.currentTimeMillis()
+        if (now - lastIncomingUiLaunchAttemptAt < 1500L) {
+            Log.i("$TAG Skipping duplicate incoming call UI force request [$reason]")
+            return
+        }
+        lastIncomingUiLaunchAttemptAt = now
+
+        val delays = longArrayOf(0L, 500L, 1500L)
+        Handler(Looper.getMainLooper()).post {
+            delays.forEach { delay ->
+                Handler(Looper.getMainLooper()).postDelayed({
+                    if (!currentlyDisplayedIncomingCallFragment) {
+                        Log.i("$TAG Forcing incoming call UI (delay=${delay}ms, reason=$reason)")
+                        launchIncomingCallActivity()
+                    }
+                }, delay)
+            }
+        }
+    }
+
+    @WorkerThread
     private fun showCallNotification(call: Call, isIncoming: Boolean, friend: Friend? = null) {
         val notifiable = getNotifiableForCall(call)
 
         val callNotificationIntent = Intent(context, CallActivity::class.java)
-        callNotificationIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        callNotificationIntent.addFlags(
+            Intent.FLAG_ACTIVITY_NEW_TASK or
+                Intent.FLAG_ACTIVITY_SINGLE_TOP or
+                Intent.FLAG_ACTIVITY_CLEAR_TOP
+        )
         if (isIncoming) {
             callNotificationIntent.putExtra("IncomingCall", true)
         } else {
             callNotificationIntent.putExtra("ActiveCall", true)
         }
 
+        val requestCode = if (isIncoming) INCOMING_CALL_ID else notifiable.notificationId
         val pendingIntent = PendingIntent.getActivity(
             context,
-            0,
+            requestCode,
             callNotificationIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
+
+        val fullScreenPendingIntent = if (isIncoming) {
+            val fullScreenIntent = Intent(context, CallActivity::class.java).apply {
+                addFlags(
+                    Intent.FLAG_ACTIVITY_NEW_TASK or
+                        Intent.FLAG_ACTIVITY_SINGLE_TOP or
+                        Intent.FLAG_ACTIVITY_CLEAR_TOP
+                )
+                putExtra("IncomingCall", true)
+                action = "org.linphone.INCOMING_CALL_FULLSCREEN.${call.callLog.startDate}"
+            }
+            PendingIntent.getActivity(
+                context,
+                INCOMING_CALL_ID + 1,
+                fullScreenIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+        } else {
+            null
+        }
 
         val notification = createCallNotification(
             call,
             notifiable,
             pendingIntent,
+            fullScreenPendingIntent,
             isIncoming,
             friend
         )
         if (isIncoming) {
             currentlyRingingCallRemoteAddress = call.remoteAddress
+            notify(INCOMING_CALL_ID, notification)
+
             if (currentInCallServiceNotificationId == -1) {
-                Log.i("$TAG No current in-call foreground service notification found, using this one")
-                showIncomingCallForegroundServiceNotification(notification)
-            } else {
-                notify(INCOMING_CALL_ID, notification)
+                Log.i("$TAG No current in-call foreground service notification found, starting service with dummy notification and keeping incoming call notification separate")
+                showDummyNotificationForCallService()
+            }
+
+            if (!currentlyDisplayedIncomingCallFragment) {
+                Log.i("$TAG Incoming call fragment is not visible yet, forcing incoming call activity through pending intent")
+                sendIncomingCallPendingIntent(fullScreenPendingIntent ?: pendingIntent)
+                forceIncomingCallUi("incoming notification published")
             }
         } else {
             if (currentInCallServiceNotificationId == -1) {
@@ -757,13 +899,9 @@ class NotificationsManager
     @WorkerThread
     private fun startInCallForegroundService(call: Call) {
         if (LinphoneUtils.isCallIncoming(call.state)) {
-            val notification = notificationsMap[INCOMING_CALL_ID]
-            if (notification != null) {
-                showIncomingCallForegroundServiceNotification(notification)
-            } else {
-                Log.w(
-                    "$TAG Failed to find notification for incoming call with ID [$INCOMING_CALL_ID]"
-                )
+            if (currentInCallServiceNotificationId == -1) {
+                Log.i("$TAG Incoming call is active, ensuring foreground service uses dummy notification")
+                showDummyNotificationForCallService()
             }
             return
         }
@@ -1192,6 +1330,7 @@ class NotificationsManager
         call: Call,
         notifiable: Notifiable,
         pendingIntent: PendingIntent?,
+        fullScreenPendingIntent: PendingIntent?,
         isIncoming: Boolean,
         friend: Friend? = null
     ): Notification {
@@ -1273,7 +1412,7 @@ class NotificationsManager
             }
             setColor(context.resources.getColor(R.color.gray_600, context.theme))
             setColorized(true)
-            setOnlyAlertOnce(true)
+            setOnlyAlertOnce(!isIncoming)
             setSmallIcon(smallIcon)
             setCategory(NotificationCompat.CATEGORY_CALL)
             setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
@@ -1286,7 +1425,7 @@ class NotificationsManager
             setAutoCancel(false)
             setOngoing(true)
             setContentIntent(pendingIntent)
-            setFullScreenIntent(pendingIntent, true)
+            setFullScreenIntent(fullScreenPendingIntent ?: pendingIntent, true)
         }
 
         return builder.build()
@@ -1320,10 +1459,12 @@ class NotificationsManager
             return
         }
 
+        // CLB: Always use the full-screen pending intent version.
         val pendingIntent = notification.fullScreenIntent
         val newNotification = createCallNotification(
             call,
             notifiable,
+            pendingIntent,
             pendingIntent,
             isIncoming,
             friend

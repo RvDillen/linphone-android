@@ -38,6 +38,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.linphone.LinphoneApplication.Companion.coreContext
 import org.linphone.R
+import org.linphone.clb.ClbSettingsBlockChecker
 import org.linphone.core.Account
 import org.linphone.core.tools.Log
 import org.linphone.databinding.AccountPopupMenuBinding
@@ -79,6 +80,11 @@ class DrawerMenuFragment : GenericMainFragment() {
         observeToastEvents(viewModel)
 
         binding.setSettingsClickedListener {
+            // CLB: Block drawer settings access when settings are blocked by CLB policy.
+            if (ClbSettingsBlockChecker.AreSettingsBlocked(requireContext())) {
+                return@setSettingsClickedListener
+            }
+
             val navController = (requireActivity() as MainActivity).findNavController()
             navController.navigate(R.id.action_global_settingsFragment)
             (requireActivity() as MainActivity).closeDrawerMenu()
@@ -110,6 +116,11 @@ class DrawerMenuFragment : GenericMainFragment() {
 
         viewModel.startAssistantEvent.observe(viewLifecycleOwner) {
             it.consume {
+                // CLB: Block assistant/account-add entry when settings are blocked by CLB policy.
+                if (ClbSettingsBlockChecker.AreSettingsBlocked(requireContext())) {
+                    return@consume
+                }
+
                 startActivity(Intent(requireActivity(), AssistantActivity::class.java))
                 (requireActivity() as MainActivity).closeDrawerMenu()
             }
@@ -200,6 +211,12 @@ class DrawerMenuFragment : GenericMainFragment() {
         )
 
         popupView.setManageProfileClickListener {
+            // CLB: Block account profile/settings when settings are blocked by CLB policy.
+            if (ClbSettingsBlockChecker.AreSettingsBlocked(requireContext())) {
+                popupWindow.dismiss()
+                return@setManageProfileClickListener
+            }
+
             val navController = (requireActivity() as MainActivity).findNavController()
             val identity = account.params.identityAddress?.asStringUriOnly().orEmpty()
             val action = AccountProfileFragmentDirections.actionGlobalAccountProfileFragment(

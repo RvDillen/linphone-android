@@ -217,13 +217,8 @@ class MainActivity : GenericActivity() {
 
         viewModel.askFullScreenIntentPermissionEvent.observe(this) {
             it.consume {
-                if (ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.USE_FULL_SCREEN_INTENT)) {
-                    Log.w("$TAG Asking for USE_FULL_SCREEN_INTENT permission")
-                    fullScreenIntentPermissionLauncher.launch(Manifest.permission.USE_FULL_SCREEN_INTENT)
-                } else {
-                    Log.i("$TAG Permission request for USE_FULL_SCREEN_INTENT will be automatically denied, go to manage app full screen intent android settings instead")
-                    Compatibility.requestFullScreenIntentPermission(this)
-                }
+                Log.i("$TAG Opening manage full screen intent settings")
+                Compatibility.requestFullScreenIntentPermission(this)
             }
         }
 
@@ -589,9 +584,8 @@ class MainActivity : GenericActivity() {
                         Log.e("$TAG Can't start activity: $ise")
                     }
                 }
-            } else if (core.accountList.isEmpty()) {
-                // CLB: Only go to account creation on first launch. It is totally fine to NOT have an account.
-                /*
+            /* } else if (core.accountList.isEmpty()) {
+                // CLB: DISABLE THIS!!!
                 Log.w("$TAG No account found, showing Assistant activity")
                 coreContext.postOnMainThread {
                     try {
@@ -600,7 +594,7 @@ class MainActivity : GenericActivity() {
                         Log.e("$TAG Can't start activity: $ise")
                     }
                 }
-                */
+             */
             } else {
                 if (intent.hasExtra(ARGUMENTS_CHAT)) {
                     Log.i("$TAG Intent has [Chat] extra")

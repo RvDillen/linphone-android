@@ -68,6 +68,28 @@ class CorePreferences
             config.setBool("app", "first_6.0_launch", value)
         }
 
+    // CLB-specific preferences used by Java classes under org.linphone.clb.
+    @get:WorkerThread @set:WorkerThread
+    var linphoneRcHash: String
+        get() = config.getString("app", "linphone_rc_hash", "").orEmpty()
+        set(value) {
+            config.setString("app", "linphone_rc_hash", value)
+        }
+
+    @get:WorkerThread @set:WorkerThread
+    var linphoneRcXmlHash: String
+        get() = config.getString("app", "linphone_rc_xml_hash", "").orEmpty()
+        set(value) {
+            config.setString("app", "linphone_rc_xml_hash", value)
+        }
+
+    @get:WorkerThread @set:WorkerThread
+    var blockSettingsByPin: Int
+        get() = config.getInt("app", "block_settings_by_pin", 0)
+        set(value) {
+            config.setInt("app", "block_settings_by_pin", value)
+        }
+
     @get:WorkerThread @set:WorkerThread
     var linphoneConfigurationVersion: Int
         get() = config.getInt("app", "config_version", 52005)

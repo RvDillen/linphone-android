@@ -23,6 +23,7 @@ import androidx.annotation.UiThread
 import androidx.annotation.WorkerThread
 import androidx.lifecycle.MutableLiveData
 import org.linphone.LinphoneApplication.Companion.coreContext
+import org.linphone.clb.CallFilter
 import org.linphone.contacts.ContactsManager
 import org.linphone.core.CallLog
 import org.linphone.core.Core
@@ -154,6 +155,10 @@ class HistoryListViewModel
         }
 
         for (callLog in logs) {
+            if (CallFilter.isHardwareGeneratedCall(callLog)) {
+                continue
+            }
+
             val model = CallLogModel(callLog)
             if (isCallLogMatchingFilter(model, filter)) {
                 list.add(model)

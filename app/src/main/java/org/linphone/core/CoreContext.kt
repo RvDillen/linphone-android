@@ -43,6 +43,9 @@ import kotlin.system.exitProcess
 import org.linphone.BuildConfig
 import org.linphone.LinphoneApplication.Companion.coreContext
 import org.linphone.LinphoneApplication.Companion.corePreferences
+import org.linphone.clb.CallFilter
+import org.linphone.clb.CallStateCLB
+import org.linphone.clb.kt.CoreContextExt
 import org.linphone.compatibility.Compatibility
 import org.linphone.contacts.ContactsManager
 import org.linphone.core.tools.Log
@@ -253,6 +256,17 @@ class CoreContext
         }
 
         @WorkerThread
+        override fun onCallLogUpdated(core: Core, callLog: CallLog) {
+            if (!CallFilter.isHardwareGeneratedCall(callLog)) {
+                return
+            }
+
+            val identifier = callLog.callId ?: callLog.refKey ?: callLog.toAddress?.asStringUriOnly().orEmpty()
+            Log.w("$TAG Removing CLB hardware-generated call log [$identifier]")
+            core.removeCallLog(callLog)
+        }
+
+        @WorkerThread
         override fun onConfiguringStatus(
             core: Core,
             status: ConfiguringState?,
@@ -307,6 +321,12 @@ class CoreContext
             )
             when (currentState) {
                 Call.State.IncomingReceived -> {
+                    // CLB: Force to full screen activity instead of screen-overlay.
+                    // Overlay is blocked by some kiosk modes.
+                    postOnMainThread {
+                        showCallActivity(incomingCall = true)
+                    }
+
                     if (corePreferences.autoAnswerEnabled) {
                         val autoAnswerDelay = corePreferences.autoAnswerDelay
                         if (autoAnswerDelay == 0) {
@@ -335,21 +355,30 @@ class CoreContext
                     }
                 }
                 Call.State.OutgoingInit -> {
-                    val conferenceInfo = core.findConferenceInformationFromUri(call.remoteAddress)
-                    // Do not show outgoing call view for conference calls, wait for connected state
-                    if (conferenceInfo == null) {
-                        postOnMainThread {
-                            showCallActivity()
-                        }
+                    // CLB: Check if call is from CLB - if so, skip showing activity
+                    if (CallStateCLB.instance().IsCallFromCLB()) {
+                        val coreExt = CoreContextExt()
+                        coreExt.OnOutgoingStarted(false)
                     } else {
-                        Log.i(
-                            "$TAG Call peer address matches known conference, delaying in-call UI until Connected state"
-                        )
+                        val conferenceInfo = core.findConferenceInformationFromUri(call.remoteAddress)
+                        // Do not show outgoing call view for conference calls, wait for connected state
+                        if (conferenceInfo == null) {
+                            postOnMainThread {
+                                showCallActivity()
+                            }
+                        } else {
+                            Log.i(
+                                "$TAG Call peer address matches known conference, delaying in-call UI until Connected state"
+                            )
+                        }
                     }
                 }
                 Call.State.Connected -> {
-                    postOnMainThread {
-                        showCallActivity()
+                    // CLB: Skip showing activity for CLB calls
+                    if (!CallStateCLB.instance().IsCallFromCLB()) {
+                        postOnMainThread {
+                            showCallActivity()
+                        }
                     }
                 }
                 Call.State.StreamsRunning -> {
@@ -646,6 +675,7 @@ class CoreContext
     fun onCoreStarted() {
         Log.i("$TAG Core started, updating configuration if required")
         core.videoCodecPriorityPolicy = CodecPriorityPolicy.Auto
+        purgeHardwareGeneratedCallLogs()
 
         val currentVersion = BuildConfig.VERSION_CODE
         val oldVersion = corePreferences.linphoneConfigurationVersion
@@ -697,6 +727,22 @@ class CoreContext
                 PowerManager.PROXIMITY_SCREEN_OFF_WAKE_LOCK,
                 "${context.packageName};proximity_sensor"
             )
+        }
+    }
+
+    @WorkerThread
+    private fun purgeHardwareGeneratedCallLogs() {
+        val hardwareGeneratedCallLogs = core.callLogs.filter { callLog ->
+            CallFilter.isHardwareGeneratedCall(callLog)
+        }
+
+        if (hardwareGeneratedCallLogs.isEmpty()) {
+            return
+        }
+
+        Log.w("$TAG Removing [${hardwareGeneratedCallLogs.size}] CLB hardware-generated call log(s) from core history")
+        for (callLog in hardwareGeneratedCallLogs) {
+            core.removeCallLog(callLog)
         }
     }
 
@@ -803,6 +849,16 @@ class CoreContext
 
             if (corePreferences.keepServiceAlive && !keepAliveServiceStarted) {
                 startKeepAliveService()
+            }
+
+            val incomingCall = core.calls.find { LinphoneUtils.isCallIncoming(it.state) }
+            if (incomingCall != null) {
+                Log.i(
+                    "$TAG App moved to foreground with incoming call [${incomingCall.remoteAddress.asStringUriOnly()}], showing full-screen call UI"
+                )
+                postOnMainThread {
+                    showCallActivity(incomingCall = true)
+                }
             }
         }
     }
@@ -982,6 +1038,9 @@ class CoreContext
         Log.i(
             "$TAG Answering call with remote address [${call.remoteAddress.asStringUriOnly()}] and to address [${call.toAddress.asStringUriOnly()}]"
         )
+        // CLB: End any CLB calls before answering user call
+        CallStateCLB.instance().EndAnyCLBCall(core)
+
         val params = core.createCallParams(call)
         if (params == null) {
             Log.w("$TAG Answering call without params!")
@@ -1024,12 +1083,17 @@ class CoreContext
     }
 
     @UiThread
-    fun showCallActivity() {
-        Log.i("$TAG Starting Call activity")
+    fun showCallActivity(incomingCall: Boolean = false) {
+        Log.i("$TAG Starting Call activity${if (incomingCall) " for incoming call" else ""}")
         val intent = Intent(context, CallActivity::class.java)
+        if (incomingCall) {
+            intent.putExtra("IncomingCall", true)
+        }
         // This flag is required to start an Activity from a Service context
         intent.addFlags(
-            Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
+            Intent.FLAG_ACTIVITY_NEW_TASK or
+                Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                Intent.FLAG_ACTIVITY_SINGLE_TOP
         )
         context.startActivity(intent)
     }

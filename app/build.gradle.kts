@@ -102,6 +102,7 @@ android {
         }
     }
 
+// CLB: Inject CLB Flavours
     flavorDimensions += "all"
     productFlavors {
         create("clb") {
@@ -163,6 +164,7 @@ android {
 */
 
 // ORIGINAL 6.0 application.variants method
+/*
     applicationVariants.all {
         val variant = this
 
@@ -187,8 +189,7 @@ android {
         variant.outputs
             .map { it as com.android.build.gradle.internal.api.BaseVariantOutputImpl }
             .forEach { output ->
-                output.outputFileName =
-                    "linphone-android-$flavorOutputName-${variant.buildType.name}_${variant.versionName}.apk"
+                output.outputFileName = "linphone-android-${variant.flavorName}-${variant.buildType.name}-${project.version}.apk"
             }
 
         val copyApkOutputsTask = tasks.register<Copy>("copy${variantNameCap}ApkOutputsToFlavorDir") {
@@ -199,6 +200,37 @@ android {
             finalizedBy(copyApkOutputsTask)
         }
     }
+
+    // CLB: Inject CLB Flavours
+    flavorDimensions += "distribution"
+
+    productFlavors {
+        create("linphone") {
+            dimension = "distribution"
+            applicationId = packageName
+            manifestPlaceholders["appAuthRedirectScheme"] = packageName
+        }
+
+        create("clb") {
+            dimension = "distribution"
+            applicationId = clbPackageName
+            manifestPlaceholders["appAuthRedirectScheme"] = clbPackageName
+        }
+
+        create("clbTypeM") {
+            dimension = "distribution"
+            applicationId = clbTypeMPackageName
+            manifestPlaceholders["appAuthRedirectScheme"] = clbTypeMPackageName
+        }
+
+        create("clbConfig") {
+            dimension = "distribution"
+            applicationId = clbConfigPackageName
+            manifestPlaceholders["appAuthRedirectScheme"] = clbConfigPackageName
+        }
+    }
+
+*/
 
     val keystoreProperties = Properties()
     val keystorePropertiesFile = rootProject.file("keystore.properties")
@@ -254,7 +286,6 @@ android {
             }
 
             // CLB: Set custom "debug" appName for easier (visual) identification (handled through xml resources)
-
             resValue("string", "linphone_address_mime_type", "vnd.android.cursor.item/vnd." + getPackageNameClb() + ".provider.sip_address")
             resValue("string", "linphone_app_version", appVersionName.trim())
             resValue("string", "linphone_app_branch", gitBranch.toString().trim())
@@ -434,5 +465,14 @@ if (crashlyticsAvailable) {
         tasks.getByName("packageRelease").finalizedBy(
             tasks.getByName("uploadCrashlyticsSymbolFileRelease"),
         )
+    }
+}
+
+afterEvaluate {
+    // google-services.json currently contains only linphone clients.
+    tasks.matching {
+        it.name.matches(Regex("process(Clb|ClbTypeM|ClbConfig).*(GoogleServices)"))
+    }.configureEach {
+        enabled = false
     }
 }

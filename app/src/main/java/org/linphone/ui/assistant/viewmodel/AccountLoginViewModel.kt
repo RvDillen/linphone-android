@@ -128,6 +128,8 @@ open class AccountLoginViewModel
     }
 
     init {
+        // CLB: Disabled so 'create an account' is not required.
+        /*
         coreContext.postOnCoreThread { core ->
             // Prevent user from leaving assistant if no account was configured yet
             // CLB: Always allow user to SKIP account creation
@@ -141,7 +143,9 @@ open class AccountLoginViewModel
                 skipLandingToThirdPartySipAccountEvent.postValue(Event(true))
             }
         }
-
+        */
+        // CLB: Always allow leaving assistant through the explicit back button in landing screen.
+        showBackButton.value = true
         showPassword.value = false
         registrationInProgress.value = false
 
