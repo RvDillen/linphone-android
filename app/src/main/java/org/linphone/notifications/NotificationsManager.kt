@@ -877,7 +877,7 @@ class NotificationsManager
                     service,
                     INCOMING_CALL_ID,
                     notification,
-                    Compatibility.FOREGROUND_SERVICE_TYPE_PHONE_CALL
+                    Compatibility.FOREGROUND_SERVICE_TYPE_PHONE_CALL or Compatibility.FOREGROUND_SERVICE_TYPE_MICROPHONE
                 )
                 notificationsMap[INCOMING_CALL_ID] = notification
                 currentInCallServiceNotificationId = INCOMING_CALL_ID
@@ -952,7 +952,7 @@ class NotificationsManager
             return
         }
 
-        var mask = Compatibility.FOREGROUND_SERVICE_TYPE_PHONE_CALL
+        var mask = Compatibility.FOREGROUND_SERVICE_TYPE_PHONE_CALL or Compatibility.FOREGROUND_SERVICE_TYPE_MICROPHONE
         val callState = call.state
         if (!LinphoneUtils.isCallIncoming(callState) && !LinphoneUtils.isCallOutgoing(callState) && !LinphoneUtils.isCallEnding(
                 callState
@@ -1045,7 +1045,7 @@ class NotificationsManager
                     service,
                     DUMMY_NOTIF_ID,
                     notification,
-                    Compatibility.FOREGROUND_SERVICE_TYPE_PHONE_CALL
+                    Compatibility.FOREGROUND_SERVICE_TYPE_PHONE_CALL or Compatibility.FOREGROUND_SERVICE_TYPE_MICROPHONE
                 )
                 notificationsMap[INCOMING_CALL_ID] = notification
                 currentInCallServiceNotificationId = DUMMY_NOTIF_ID
