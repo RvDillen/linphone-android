@@ -1780,14 +1780,24 @@ class NotificationsManager
                 .setContentIntent(pendingIntent)
             val notification = builder.build()
 
+            // CLB: Include MICROPHONE type so CLB background calls can access the mic without showing UI.
+            val hasMicPermission = ActivityCompat.checkSelfPermission(
+                context,
+                Manifest.permission.RECORD_AUDIO
+            ) == PackageManager.PERMISSION_GRANTED
+            val fgsType = if (hasMicPermission) {
+                Compatibility.FOREGROUND_SERVICE_TYPE_SPECIAL_USE or Compatibility.FOREGROUND_SERVICE_TYPE_MICROPHONE
+            } else {
+                Compatibility.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
+            }
             Log.i(
-                "$TAG Keep alive for third party accounts Service found, starting it as foreground using notification ID [$KEEP_ALIVE_FOR_THIRD_PARTY_ACCOUNTS_ID] with type [SPECIAL_USE]"
+                "$TAG Keep alive for third party accounts Service found, starting it as foreground using notification ID [$KEEP_ALIVE_FOR_THIRD_PARTY_ACCOUNTS_ID] with type [SPECIAL_USE${if (hasMicPermission) "|MICROPHONE" else ""}]"
             )
             Compatibility.startServiceForeground(
                 service,
                 KEEP_ALIVE_FOR_THIRD_PARTY_ACCOUNTS_ID,
                 notification,
-                Compatibility.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
+                fgsType
             )
             currentKeepAliveThirdPartyAccountsForegroundServiceNotificationId = KEEP_ALIVE_FOR_THIRD_PARTY_ACCOUNTS_ID
         } else {
