@@ -873,6 +873,7 @@ class NotificationsManager
                 Log.i(
                     "$TAG Service found, starting it as foreground using notification ID [$INCOMING_CALL_ID] with type PHONE_CALL"
                 )
+                // CLB: Always use 'TYPE_MICROPHONE' so the mic always works when Linphone is in the background
                 Compatibility.startServiceForeground(
                     service,
                     INCOMING_CALL_ID,
@@ -951,7 +952,7 @@ class NotificationsManager
             Log.w("$TAG Core Foreground Service hasn't started yet...")
             return
         }
-
+        // CLB: Always use 'TYPE_MICROPHONE' so the mic always works when Linphone is in the background
         var mask = Compatibility.FOREGROUND_SERVICE_TYPE_PHONE_CALL or Compatibility.FOREGROUND_SERVICE_TYPE_MICROPHONE
         val callState = call.state
         if (!LinphoneUtils.isCallIncoming(callState) && !LinphoneUtils.isCallOutgoing(callState) && !LinphoneUtils.isCallEnding(
@@ -1041,6 +1042,7 @@ class NotificationsManager
                 Log.i(
                     "$TAG Service found, starting it as foreground using dummy notification ID [$DUMMY_NOTIF_ID]"
                 )
+                // CLB: Always use 'TYPE_MICROPHONE' so the mic always works when Linphone is in the background
                 Compatibility.startServiceForeground(
                     service,
                     DUMMY_NOTIF_ID,
