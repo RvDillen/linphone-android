@@ -99,12 +99,12 @@ class LinphoneApplication : Application(), SingletonImageLoader.Factory {
         Log.i("$TAG Report Core preferences initialized")
         Compatibility.setupAppStartupListener(context)
 
-        coreContext = CoreContext(context)
-        coreContext.start()
-
-        // CLB: Always force background-mode to be enabled
+        // CLB: Always force background-mode to be enabled before the core thread starts.
         Log.i("$TAG Force 'background-mode' to 'enabled'.")
         corePreferences.keepServiceAlive = true
+
+        coreContext = CoreContext(context)
+        coreContext.start()
 
         // CLB: Provisioning uses core; run it only once core initialization is complete.
         runClbProvisioningWhenCoreReady(context)
