@@ -29,7 +29,7 @@ pipeline {
                 withCredentials([usernamePassword(credentialsId: 'sign_android', usernameVariable: 'USERNAME', passwordVariable: 'PASSWORD'),
                                 file(credentialsId: 'releasefile_old', variable: 'KEYSTORE_VAR'),
                                 file(credentialsId: 'upload_jks', variable: 'KEYSTORE_UPLOAD')]) {
-                    bat "gradlew assembleClbRelease assembleClbTypeMRelease -PkeyPassword=${PASSWORD} -PstorePassword=${PASSWORD} -PkeyAlias=${USERNAME} -PstoreFile=${KEYSTORE_VAR}"
+                    bat "gradlew assembleClbRelease assembleClbTypeMRelease assembleLinphoneRelease -PkeyPassword=${PASSWORD} -PstorePassword=${PASSWORD} -PkeyAlias=${USERNAME} -PstoreFile=${KEYSTORE_VAR}"
                     bat "gradlew bundleClbRelease bundleClbTypeMRelease bundleClbConfigRelease -PkeyPassword=${PASSWORD} -PstorePassword=${PASSWORD} -PkeyAlias=${USERNAME} -PstoreFile=${KEYSTORE_UPLOAD}"
                 }
             }

@@ -1,3 +1,5 @@
+import com.android.build.api.artifact.SingleArtifact
+import com.android.build.api.variant.impl.VariantOutputImpl
 import com.android.build.gradle.internal.tasks.factory.dependsOn
 import com.google.firebase.crashlytics.buildtools.gradle.CrashlyticsExtension
 import com.google.gms.googleservices.GoogleServicesPlugin
@@ -92,7 +94,6 @@ android {
         targetSdk = 35
         versionCode = appVersionCode
         versionName = appVersionName
-        setProperty("archivesBaseName", "$applicationId-$versionName")
 
         manifestPlaceholders["appAuthRedirectScheme"] = packageName
 
@@ -346,6 +347,46 @@ android {
 
     lint {
         abortOnError = false
+    }
+}
+
+// CLB: Name APK/AAB outputs after the real per-variant applicationId, since flavors override it
+androidComponents {
+    onVariants { variant ->
+        val variantNameCap = variant.name.replaceFirstChar { it.uppercaseChar() }
+        val outputBaseName = variant.applicationId.map { appId -> "$appId-$appVersionName-${variant.name}" }
+
+        variant.outputs.forEach { output ->
+            (output as VariantOutputImpl).outputFileName.set(outputBaseName.map { "$it.apk" })
+        }
+
+        val bundleFile = variant.artifacts.get(SingleArtifact.BUNDLE)
+        val renameBundleTask =
+            tasks.register<Copy>("rename${variantNameCap}Bundle") {
+                from(bundleFile)
+                into(bundleFile.map { it.asFile.parentFile })
+                rename { outputBaseName.get() + ".aab" }
+                // Copy leaves the original behind; delete it so only the renamed file remains
+                doLast { bundleFile.get().asFile.delete() }
+            }
+        val bundleTaskName = "bundle$variantNameCap"
+        project.afterEvaluate {
+            // Other AGP tasks (IDE listing files) also write into the bundle output dir;
+            // order explicitly to satisfy Gradle's overlapping-output validation.
+            renameBundleTask.configure {
+                mustRunAfter(
+                    tasks.matching {
+                        it.name == "produce${variantNameCap}BundleIdeListingFile" ||
+                            it.name == "create${variantNameCap}BundleListingFileRedirect"
+                    },
+                )
+            }
+            if (tasks.names.contains(bundleTaskName)) {
+                tasks.named(bundleTaskName).configure {
+                    finalizedBy(renameBundleTask)
+                }
+            }
+        }
     }
 }
 
