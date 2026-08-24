@@ -31,9 +31,10 @@ val versionMinor = 0
 val versionRelease = 1
 val jenkinsBuildNumber = System.getenv("BUILD_NUMBER")?.toIntOrNull() ?: 0
 val appVersionName = "$versionMajor.$versionMinor.$versionRelease.$jenkinsBuildNumber"
+// Matches 5.2.xclb formula: major(1 digit) + minor(2 digits) + release(2 digits) + build(4 digits)
 val appVersionCode =
-    (versionMajor * 1000000) +
-        (versionMinor * 100000) +
+    (versionMajor * 100000000) +
+        (versionMinor * 1000000) +
         (versionRelease * 10000) +
         jenkinsBuildNumber
 
