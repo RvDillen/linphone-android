@@ -100,6 +100,9 @@ class CallActivity : GenericActivity() {
     ) { isGranted ->
         if (isGranted) {
             Log.i("$TAG RECORD_AUDIO permission has been granted, un-muting microphone")
+            coreContext.postOnCoreThread { core ->
+                core.reloadSoundDevices()
+            }
             callViewModel.toggleMuteMicrophone()
         } else {
             Log.e("$TAG RECORD_AUDIO permission has been denied")

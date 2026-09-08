@@ -36,6 +36,7 @@ import android.provider.Settings.SettingNotFoundException
 import androidx.annotation.AnyThread
 import androidx.annotation.UiThread
 import androidx.annotation.WorkerThread
+import androidx.core.content.ContextCompat
 import androidx.core.text.isDigitsOnly
 import androidx.lifecycle.MutableLiveData
 import com.google.firebase.crashlytics.FirebaseCrashlytics
@@ -840,6 +841,9 @@ class CoreContext
     @UiThread
     fun onForeground() {
         postOnCoreThread {
+            Log.i("$TAG App is in foreground, notifying Core")
+            core.enterForeground()
+
             // We can't rely on defaultAccount?.params?.isPublishEnabled
             // as it will be modified by the SDK when changing the presence status
             if (corePreferences.publishPresence) {
@@ -863,9 +867,27 @@ class CoreContext
         }
     }
 
+    @AnyThread
+    fun ensureKeepAliveServiceStarted() {
+        postOnCoreThread {
+            if (!corePreferences.keepServiceAlive) return@postOnCoreThread
+
+            if (keepAliveServiceStarted) {
+                postOnMainThread {
+                    notificationsManager.refreshKeepAliveServiceForegroundNotification()
+                }
+            } else {
+                startKeepAliveService()
+            }
+        }
+    }
+
     @UiThread
     fun onBackground() {
         postOnCoreThread {
+            Log.i("$TAG App is in background, notifying Core")
+            core.enterBackground()
+
             // We can't rely on defaultAccount?.params?.isPublishEnabled
             // as it will be modified by the SDK when changing the presence status
             if (corePreferences.publishPresence) {
@@ -873,6 +895,18 @@ class CoreContext
                 // We don't use ConsolidatedPresence.Busy but Offline to do an unsubscribe,
                 // Flexisip will handle the Busy status depending on other devices
                 core.consolidatedPresence = ConsolidatedPresence.Offline
+            }
+
+            if (corePreferences.keepServiceAlive) {
+                if (keepAliveServiceStarted) {
+                    Log.i("$TAG App moved to background, refreshing keep-alive foreground service notification")
+                    postOnMainThread {
+                        notificationsManager.refreshKeepAliveServiceForegroundNotification()
+                    }
+                } else {
+                    Log.i("$TAG App moved to background, starting keep-alive foreground service")
+                    startKeepAliveService()
+                }
             }
         }
     }
@@ -1110,7 +1144,7 @@ class CoreContext
         )
         Log.i("$TAG Starting Keep alive for third party accounts Service")
         try {
-            context.startService(serviceIntent)
+            ContextCompat.startForegroundService(context, serviceIntent)
             keepAliveServiceStarted = true
         } catch (e: Exception) {
             Log.e("$TAG Failed to start keep alive service: $e")

@@ -203,6 +203,9 @@ open class ConversationFragment : SlidingPaneChildFragment() {
     ) { isGranted ->
         if (isGranted) {
             Log.i("$TAG RECORD_AUDIO permission has been granted, starting voice message recording")
+            coreContext.postOnCoreThread { core ->
+                core.reloadSoundDevices()
+            }
             sendMessageViewModel.startVoiceMessageRecording()
         } else {
             Log.e("$TAG RECORD_AUDIO permission has been denied")
