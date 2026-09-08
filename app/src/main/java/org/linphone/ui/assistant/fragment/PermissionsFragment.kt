@@ -56,6 +56,12 @@ class PermissionsFragment : GenericFragment() {
             val isGranted = it.value
             if (isGranted) {
                 Log.i("Permission [$permissionName] is now granted")
+                if (permissionName == Manifest.permission.RECORD_AUDIO) {
+                    Log.i("$TAG RECORD_AUDIO permission has been granted, reloading sound devices")
+                    coreContext.postOnCoreThread { core ->
+                        core.reloadSoundDevices()
+                    }
+                }
             } else {
                 Log.i("Permission [$permissionName] has been denied")
                 allGranted = false

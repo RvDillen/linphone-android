@@ -31,6 +31,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
+import android.graphics.PixelFormat
 import android.media.AudioAttributes
 import android.media.MediaPlayer
 import android.net.Uri
@@ -38,6 +39,10 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.provider.Settings
+import android.view.Gravity
+import android.view.View
+import android.view.WindowManager
 import androidx.annotation.AnyThread
 import androidx.annotation.MainThread
 import androidx.annotation.WorkerThread
@@ -107,6 +112,8 @@ class NotificationsManager
         private const val DUMMY_NOTIF_ID = 3
         private const val KEEP_ALIVE_FOR_THIRD_PARTY_ACCOUNTS_ID = 5
         private const val MISSED_CALL_ID = 10
+
+        private const val MODE_BACKGROUND_ACTIVITY_START_ALLOW_ALWAYS = 3
     }
 
     private var currentInCallServiceNotificationId = -1
@@ -199,16 +206,21 @@ class NotificationsManager
             Log.i("$TAG Call state changed: [$currentState]")
             when (currentState) {
                 Call.State.IncomingReceived, Call.State.IncomingEarlyMedia -> {
-                    // CLB: AS-1339 - force incoming call UI in full-screen to avoid kiosk notification issues.
                     Log.i(
-                        "$TAG Incoming call received for [${call.remoteAddress.asStringUriOnly()}], forcing full-screen call UI"
+                        "$TAG Incoming call received for [${call.remoteAddress.asStringUriOnly()}], showing full-screen incoming call notification"
                     )
-                    coreContext.postOnMainThread {
-                        coreContext.showCallActivity(incomingCall = true)
+                    if (shouldLaunchIncomingCallActivityWithoutNotification()) {
+                        Log.i("$TAG Overlay permission granted, launching incoming call activity without heads-up notification")
+                        currentlyRingingCallRemoteAddress = call.remoteAddress
+                        if (currentInCallServiceNotificationId == -1) {
+                            showDummyNotificationForCallService()
+                        }
+                        coreContext.postOnMainThread {
+                            launchIncomingCallActivity()
+                        }
+                    } else {
+                        showCallNotification(call, true)
                     }
-                    forceIncomingCallUi("call state changed")
-                    // CLB: Do NOT show notification when navigating to full-screen fragment.
-                    // showCallNotification(call, true)
                 }
                 Call.State.OutgoingInit -> {
                     Log.i(
@@ -449,6 +461,7 @@ class NotificationsManager
         if (inCallService != null) return
 
         val serviceIntent = Intent(Intent.ACTION_MAIN).setClass(context, CoreInCallService::class.java)
+        serviceIntent.putExtra("StartForeground", true)
         ContextCompat.startForegroundService(context, serviceIntent)
     }
 
@@ -524,9 +537,14 @@ class NotificationsManager
     }
 
     @MainThread
-    fun onInCallServiceStarted(service: CoreInCallService) {
+    fun onInCallServiceStarted(service: CoreInCallService, startForeground: Boolean = false) {
         Log.i("$TAG Service has been started")
         inCallService = service
+
+        if (startForeground && currentInCallServiceNotificationId == -1) {
+            Log.i("$TAG Service was explicitly started as foreground, using dummy notification")
+            showDummyNotificationForCallService()
+        }
 
         if (waitForInCallServiceForegroundToStopIt) {
             Log.w("$TAG Service wasn't started as foreground yet, doing it now using a dummy notification")
@@ -575,6 +593,17 @@ class NotificationsManager
         Log.i("$TAG Keep app alive for third party accounts Service has been destroyed")
         stopKeepAliveServiceForeground()
         keepAliveService = null
+    }
+
+    @MainThread
+    fun refreshKeepAliveServiceForegroundNotification() {
+        if (keepAliveService == null) {
+            Log.w("$TAG Can't refresh keep alive foreground Service notification, no Service was found")
+            return
+        }
+
+        Log.i("$TAG Refreshing keep alive foreground Service notification")
+        startKeepAliveServiceForeground()
     }
 
     @MainThread
@@ -685,6 +714,21 @@ class NotificationsManager
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
             putExtra("IncomingCall", true)
         }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM && Settings.canDrawOverlays(context)) {
+            launchIncomingCallActivityWithTransientOverlay(intent)
+            return
+        }
+
+        startIncomingCallActivity(intent)
+    }
+
+    private fun shouldLaunchIncomingCallActivityWithoutNotification(): Boolean {
+        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM && Settings.canDrawOverlays(context)
+    }
+
+    @MainThread
+    private fun startIncomingCallActivity(intent: Intent) {
         try {
             Log.i("$TAG Launching incoming call activity")
             context.startActivity(intent)
@@ -693,10 +737,78 @@ class NotificationsManager
         }
     }
 
+    @SuppressLint("NewApi")
+    @MainThread
+    private fun launchIncomingCallActivityWithTransientOverlay(intent: Intent) {
+        val windowManager = context.getSystemService(WindowManager::class.java)
+        val overlayView = View(context)
+        val params = WindowManager.LayoutParams(
+            1,
+            1,
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
+                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = Gravity.TOP or Gravity.START
+        }
+
+        try {
+            Log.i("$TAG Adding transient overlay to allow incoming call activity launch")
+            windowManager.addView(overlayView, params)
+            Handler(Looper.getMainLooper()).postDelayed({
+                startIncomingCallActivity(intent)
+            }, 100L)
+            Handler(Looper.getMainLooper()).postDelayed({
+                try {
+                    windowManager.removeViewImmediate(overlayView)
+                    Log.i("$TAG Transient incoming call launch overlay removed")
+                } catch (e: Exception) {
+                    Log.e("$TAG Failed to remove transient incoming call launch overlay: $e")
+                }
+            }, 2000L)
+        } catch (e: Exception) {
+            Log.e("$TAG Failed to add transient incoming call launch overlay: $e")
+            startIncomingCallActivity(intent)
+        }
+    }
+
+    @SuppressLint("NewApi")
+    private fun getCallActivityPendingIntent(requestCode: Int, intent: Intent): PendingIntent {
+        val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+            val options = ActivityOptions.makeBasic().apply {
+                setPendingIntentCreatorBackgroundActivityStartMode(
+                    MODE_BACKGROUND_ACTIVITY_START_ALLOW_ALWAYS
+                )
+            }
+            PendingIntent.getActivity(context, requestCode, intent, flags, options.toBundle())
+        } else {
+            PendingIntent.getActivity(context, requestCode, intent, flags)
+        }
+    }
+
+    @SuppressLint("NewApi")
     @WorkerThread
     private fun sendIncomingCallPendingIntent(pendingIntent: PendingIntent) {
         try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+                val options = ActivityOptions.makeBasic().apply {
+                    setPendingIntentBackgroundActivityStartMode(
+                        MODE_BACKGROUND_ACTIVITY_START_ALLOW_ALWAYS
+                    )
+                }
+                pendingIntent.send(
+                    context,
+                    0,
+                    null,
+                    null,
+                    null,
+                    null,
+                    options.toBundle()
+                )
+            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
                 val options = ActivityOptions.makeBasic().apply {
                     setPendingIntentBackgroundActivityStartMode(
                         ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED
@@ -758,12 +870,7 @@ class NotificationsManager
         }
 
         val requestCode = if (isIncoming) INCOMING_CALL_ID else notifiable.notificationId
-        val pendingIntent = PendingIntent.getActivity(
-            context,
-            requestCode,
-            callNotificationIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
+        val pendingIntent = getCallActivityPendingIntent(requestCode, callNotificationIntent)
 
         val fullScreenPendingIntent = if (isIncoming) {
             val fullScreenIntent = Intent(context, CallActivity::class.java).apply {
@@ -775,12 +882,7 @@ class NotificationsManager
                 putExtra("IncomingCall", true)
                 action = "org.linphone.INCOMING_CALL_FULLSCREEN.${call.callLog.startDate}"
             }
-            PendingIntent.getActivity(
-                context,
-                INCOMING_CALL_ID + 1,
-                fullScreenIntent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
+            getCallActivityPendingIntent(INCOMING_CALL_ID + 1, fullScreenIntent)
         } else {
             null
         }
@@ -1744,8 +1846,10 @@ class NotificationsManager
 
         val channelId = context.getString(R.string.notification_channel_service_id)
         val channel = notificationManager.getNotificationChannel(channelId)
-        val importance = channel?.importance ?: NotificationManagerCompat.IMPORTANCE_NONE
-        if (importance == NotificationManagerCompat.IMPORTANCE_NONE) {
+        if (channel == null) {
+            Log.w("$TAG Keep alive foreground Service channel doesn't exist yet, creating it now")
+            createThirdPartyAccountKeepAliveServiceChannel()
+        } else if (channel.importance == NotificationManagerCompat.IMPORTANCE_NONE) {
             Log.e(
                 "$TAG Keep alive for third party accounts Service channel has been disabled, can't start foreground service!"
             )

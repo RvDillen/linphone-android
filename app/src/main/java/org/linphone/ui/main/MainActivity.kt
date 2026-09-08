@@ -60,6 +60,7 @@ import kotlinx.coroutines.withContext
 import org.linphone.LinphoneApplication.Companion.coreContext
 import org.linphone.LinphoneApplication.Companion.corePreferences
 import org.linphone.R
+import org.linphone.clb.PermissionHelperCLB
 import org.linphone.compatibility.Compatibility
 import org.linphone.core.tools.Log
 import org.linphone.databinding.MainActivityBinding
@@ -120,6 +121,7 @@ class MainActivity : GenericActivity() {
         if (isGranted) {
             Log.i("$TAG POST_NOTIFICATIONS permission has been granted")
             viewModel.updateMissingPermissionAlert()
+            coreContext.ensureKeepAliveServiceStarted()
         } else {
             Log.w("$TAG POST_NOTIFICATIONS permission has been denied!")
         }
@@ -181,6 +183,8 @@ class MainActivity : GenericActivity() {
         while (!coreContext.isReady()) {
             Thread.sleep(50)
         }
+
+        PermissionHelperCLB.instance().CheckPermissions(this)
 
         viewModel = run {
             ViewModelProvider(this)[MainViewModel::class.java]

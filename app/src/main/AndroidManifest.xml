@@ -18,6 +18,8 @@
 
     <!-- Needed for full screen intent in incoming call notifications -->
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+    <!-- Needed by CLB kiosk integrations to bring the incoming call Activity to front -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <!-- To vibrate while receiving an incoming call -->
     <uses-permission android:name="android.permission.VIBRATE" />
 

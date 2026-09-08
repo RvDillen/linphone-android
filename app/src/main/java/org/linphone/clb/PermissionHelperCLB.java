@@ -1,7 +1,10 @@
 package org.linphone.clb;
 
 import android.app.Activity;
+import android.content.ActivityNotFoundException;
+import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.net.Uri;
 import android.os.Build;
 import android.provider.Settings;
 import android.util.Log;
@@ -32,13 +35,13 @@ public class PermissionHelperCLB {
                 != PackageManager.PERMISSION_GRANTED) {
             Log.i(tag, "Microphone permission not granted");
             Toast.makeText(context, "Linphone: Microphone permission not granted", Toast.LENGTH_LONG).show();
-            return;
         }
 
         // Check Overlay Permission
         if (! CheckOverlayPermission(context)){
             Log.i(tag, "Overlay permission not granted");
             Toast.makeText(context, "Linphone: Overlay permission not granted", Toast.LENGTH_LONG).show();
+            RequestOverlayPermission(context);
         }
     }
 
@@ -52,5 +55,24 @@ public class PermissionHelperCLB {
         }
 
         return false;
+    }
+
+    public void RequestOverlayPermission(Activity context) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
+            return;
+        }
+
+        Intent intent = new Intent(
+                Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                Uri.parse("package:" + context.getPackageName())
+        );
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+
+        try {
+            Log.i(tag, "Request overlay permission");
+            context.startActivity(intent);
+        } catch (ActivityNotFoundException e) {
+            Log.e(tag, "Failed to open overlay permission settings", e);
+        }
     }
 }

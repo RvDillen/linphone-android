@@ -39,7 +39,8 @@ class CoreInCallService : CoreService() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         Log.i("$TAG onStartCommand")
-        coreContext.notificationsManager.onInCallServiceStarted(this)
+        val startForeground = intent?.getBooleanExtra("StartForeground", false) == true
+        coreContext.notificationsManager.onInCallServiceStarted(this, startForeground)
 
         return super.onStartCommand(intent, flags, startId)
     }
