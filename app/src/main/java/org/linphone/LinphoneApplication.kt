@@ -38,7 +38,6 @@ import com.google.android.material.color.DynamicColors
 import java.util.*
 import kotlin.concurrent.schedule
 import org.linphone.clb.AppConfigHelper
-import org.linphone.clb.CallStateCLB
 import org.linphone.clb.LinphonePreferencesCLB
 import org.linphone.clb.RegisterCLB
 import org.linphone.compatibility.Compatibility
@@ -113,17 +112,8 @@ class LinphoneApplication : Application(), SingletonImageLoader.Factory {
         val registerCLB: RegisterCLB = RegisterCLB(context.applicationContext)
         registerCLB.RegisterReceivers()
 
-        // CLB: Initialize CallStateCLB with delay to ensure core is ready
-        Timer().schedule(2000) {
-            try {
-                Log.i("$TAG Creating CallStateCLB")
-                val instance = CallStateCLB.instance()
-                Log.i("$TAG Restarting CallStateCLB")
-                instance.Restart()
-            } catch (e: Exception) {
-                Log.i("$TAG Can't start CallStateCLB $e")
-            }
-        }
+        // CLB: CallStateCLB is now initialized from CoreContext.onCoreStarted(), once the
+        // Core is guaranteed to exist.
 
         DynamicColors.applyToActivitiesIfAvailable(this)
         wakeLock.release()

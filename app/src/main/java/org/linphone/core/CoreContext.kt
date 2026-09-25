@@ -711,6 +711,14 @@ class CoreContext
         notificationsManager.onCoreStarted(core, oldVersion < 600000) // Re-create channels when migrating from a non 6.0 version
         Log.i("$TAG Started contacts, telecom & notifications managers")
 
+        // CLB: Core/listener are guaranteed to exist here. This prevents 'Restart' to run before Core was created
+        // and silently fail to register the call-state listener (no SIPSTATE broadcast ever sent).
+        try {
+            CallStateCLB.instance().Restart()
+        } catch (e: Exception) {
+            Log.e("$TAG Can't start CallStateCLB: $e")
+        }
+
         if (corePreferences.keepServiceAlive) {
             if (activityMonitor.isInForeground() || corePreferences.autoStart) {
                 Log.i("$TAG Keep alive service is enabled and either app is in foreground or auto start is enabled, starting it")
