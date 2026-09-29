@@ -199,7 +199,7 @@ class LinphoneApplication : Application(), SingletonImageLoader.Factory {
         // SDK's own download/apply cycle), while still making the URL visible in the Settings UI.
         val clbDefaultProvisioningUrl = "http://config.clb.nl/linphonerc.xml"
         val settingSection = "misc"
-        val settingKey = "remote_provisioning_uri"
+        val settingKey = "config-uri"
         if (config.getString(settingSection, settingKey, null).isNullOrEmpty()) {
             android.util.Log.i(
                 "[CLB]",
