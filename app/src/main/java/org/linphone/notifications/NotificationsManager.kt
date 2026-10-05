@@ -596,14 +596,14 @@ class NotificationsManager
     }
 
     @MainThread
-    fun refreshKeepAliveServiceForegroundNotification() {
+    fun refreshKeepAliveServiceForegroundNotification(notifyOnly: Boolean = false) {
         if (keepAliveService == null) {
             Log.w("$TAG Can't refresh keep alive foreground Service notification, no Service was found")
             return
         }
 
-        Log.i("$TAG Refreshing keep alive foreground Service notification")
-        startKeepAliveServiceForeground()
+        Log.i("$TAG Refreshing keep alive foreground Service notification (notify only: $notifyOnly)")
+        startKeepAliveServiceForeground(notifyOnly)
     }
 
     @MainThread
@@ -1840,8 +1840,9 @@ class NotificationsManager
                 .build()
     }
 
+    @SuppressLint("MissingPermission")
     @MainThread
-    private fun startKeepAliveServiceForeground() {
+    private fun startKeepAliveServiceForeground(notifyOnly: Boolean = false) {
         Log.i(
             "$TAG Trying to start keep alive for third party accounts foreground Service using call notification"
         )
@@ -1883,6 +1884,14 @@ class NotificationsManager
                 .setShowWhen(false)
                 .setContentIntent(pendingIntent)
             val notification = builder.build()
+
+            // Android 14+ denies startForeground() with MICROPHONE type from background, so only re-post the notification
+            if (notifyOnly) {
+                if (Compatibility.isPostNotificationsPermissionGranted(context)) {
+                    notificationManager.notify(KEEP_ALIVE_FOR_THIRD_PARTY_ACCOUNTS_ID, notification)
+                }
+                return
+            }
 
             // CLB: Include MICROPHONE type so CLB background calls can access the mic without showing UI.
             val hasMicPermission = ActivityCompat.checkSelfPermission(

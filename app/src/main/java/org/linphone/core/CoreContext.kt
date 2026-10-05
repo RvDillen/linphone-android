@@ -859,8 +859,15 @@ class CoreContext
                 core.consolidatedPresence = ConsolidatedPresence.Online
             }
 
-            if (corePreferences.keepServiceAlive && !keepAliveServiceStarted) {
-                startKeepAliveService()
+            if (corePreferences.keepServiceAlive) {
+                if (keepAliveServiceStarted) {
+                    // Re-acquire MICROPHONE foreground service type while the app is visible
+                    postOnMainThread {
+                        notificationsManager.refreshKeepAliveServiceForegroundNotification()
+                    }
+                } else {
+                    startKeepAliveService()
+                }
             }
 
             val incomingCall = core.calls.find { LinphoneUtils.isCallIncoming(it.state) }
@@ -909,7 +916,9 @@ class CoreContext
                 if (keepAliveServiceStarted) {
                     Log.i("$TAG App moved to background, refreshing keep-alive foreground service notification")
                     postOnMainThread {
-                        notificationsManager.refreshKeepAliveServiceForegroundNotification()
+                        notificationsManager.refreshKeepAliveServiceForegroundNotification(
+                            notifyOnly = true
+                        )
                     }
                 } else {
                     Log.i("$TAG App moved to background, starting keep-alive foreground service")
