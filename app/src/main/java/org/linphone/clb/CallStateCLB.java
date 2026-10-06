@@ -11,13 +11,11 @@ import android.telephony.TelephonyCallback;
 import android.telephony.TelephonyManager;
 import android.widget.Toast;
 
-import org.linphone.R;
 import org.linphone.clb.kt.CoreContextExt;
 import org.linphone.core.Address;
 import org.linphone.core.Call;
 import org.linphone.core.Core;
 import org.linphone.core.CoreListenerStub;
-import org.linphone.core.Reason;
 import org.linphone.core.tools.Log;
 import org.linphone.mediastream.Version;
 import org.linphone.ui.main.MainActivity;
@@ -59,7 +57,7 @@ public class CallStateCLB {
         return instance;
     }
 
-    public boolean IsCallFromCLB() {
+    public boolean IsCLBSessionCall() {
         return (callUri != null);
     }
 
@@ -294,7 +292,7 @@ public class CallStateCLB {
                             // NotifySipState (formerly in mLinphoneManager (Linphone 4.2)
                             NotifySipStateStateChanged(core, call, state, message);
 
-                            if (IsCallFromCLB() == false)
+                            if (IsCLBSessionCall() == false)
                                 return;
 
                             // CLB call => Notify Errors with Toast
@@ -316,6 +314,16 @@ public class CallStateCLB {
         mCore.addListener(mListener);
     }
 
+    private boolean IsCLBSessionCall(String address, String clbCallUri) {
+        // Original code:
+        // boolean originalIsClb = (callUriAll != null && !callUriAll.isEmpty() && address.contains(callUriAll));
+
+        var lowerAddress = address.toLowerCase();
+        var lowerClbCallUri = clbCallUri != null ? clbCallUri.toLowerCase() : null;
+
+        return (lowerClbCallUri != null && !lowerClbCallUri.isEmpty() && lowerAddress.contains(lowerClbCallUri));
+    }
+
     public void NotifySipStateStateChanged(
             final Core core,
             final Call call,
@@ -327,6 +335,7 @@ public class CallStateCLB {
         boolean A10Min = Build.VERSION.SDK_INT <= Version.API29_ANDROID_10;
 
         Log.i("[Manager] Call state is [", state, "]" + " address: " + address);
+
         if (state == Call.State.IncomingReceived
                 && !call.equals(core.getCurrentCall()) && (A10Min || (callUriAll != null && address.contains(callUriAll)))) {
             if (call.getReplacedCall() != null) {
@@ -341,14 +350,43 @@ public class CallStateCLB {
                 && !getCallGsmON() && (A10Min || (callUriAll != null && address.contains(callUriAll)))) {
             newCallState = "ringing";
         } else if (state == Call.State.End || state == Call.State.Error) {
-            if (core.getCallsNb() == 0) {
+            Call activeClbCall = FindActiveCLBCall(core, call, callUriAll, A10Min);
+            if (activeClbCall != null) {
+                address = GetAddressString(activeClbCall);
+                Call.State activeState = activeClbCall.getState();
+                newCallState = activeState == Call.State.OutgoingInit
+                        || activeState == Call.State.OutgoingProgress
+                        || activeState == Call.State.OutgoingRinging
+                        || activeState == Call.State.IncomingReceived
+                        || activeState == Call.State.IncomingEarlyMedia
+                        || activeState == Call.State.OutgoingEarlyMedia
+                        ? "ringing"
+                        : "connected";
+
+                if (activeState == Call.State.Paused) {
+                    Handler mHandler = new Handler();
+                    mHandler.postDelayed(
+                            new Runnable() {
+                                @Override
+                                public void run() {
+                                    if (activeClbCall.getState() == Call.State.Paused) {
+                                        Log.i("[Manager] Resuming surviving CLB call");
+                                        activeClbCall.resume();
+                                        new CoreContextExt().OnOutgoingStarted(true);
+                                    }
+                                }
+                            },
+                            400);
+                }
+            } else if (core.getCallsNb() == 0) {
                 newCallState = "idle";
                 callUriAll = null;
             } else {
                 newCallState = "idle";
+
                 // CLB: Still first call in pause mode => Activate .
                 Call[] calls = core.getCalls();
-                boolean originalIsClb = (callUriAll != null && !callUriAll.isEmpty() && address.contains(callUriAll));
+                boolean originalIsClb = IsCLBSessionCall(address, callUriAll); // (callUriAll != null && !callUriAll.isEmpty() && address.contains(callUriAll));
                 if (calls != null && calls.length > 0) {
                     Call call1 = calls[0];
                     String address1 = GetAddressString(call1);
@@ -371,12 +409,13 @@ public class CallStateCLB {
                                     }
                                 },
                                 400);
-                        if(!originalIsClb && (A10Min || (callUriAll != null && address1.contains(callUriAll)))) {
+
+                        if (!originalIsClb && (A10Min || IsCLBSessionCall(address1, callUriAll))) {
                             newCallState = "connected";
                             address = address1;
                         }
                     } else if ((call1State == Call.State.End || call1State == Call.State.Error) && calls.length > 1) {
-                        boolean call1IsClb = (callUriAll != null && !callUriAll.isEmpty() && address1.contains(callUriAll));
+                        boolean call1IsClb = IsCLBSessionCall(address1, callUriAll);
                         Call call2 = calls[1];
                         Call.State call2State = call2.getState();
                         String address2 = GetAddressString(call2);
@@ -399,17 +438,17 @@ public class CallStateCLB {
                                         }
                                     },
                                     400);
-                            if(!originalIsClb && !call1IsClb && (A10Min || (callUriAll != null && address2.contains(callUriAll)))) {
+                            if(!originalIsClb && !call1IsClb && (A10Min || IsCLBSessionCall(address2, callUriAll))) {
                                 newCallState = "connected";
                                 address = address2;
                             }
-                        } else if (callUriAll != null && address2.contains(callUriAll) && call2State == Call.State.StreamsRunning) {
+                        } else if (IsCLBSessionCall(address2, callUriAll) && call2State == Call.State.StreamsRunning) {
                             newCallState = "connected";
                             address = address2;
                         } else {
                         }
                     }
-                    else if(callUriAll != null && address1.contains(callUriAll) && call1State == Call.State.StreamsRunning) {
+                    else if(IsCLBSessionCall(address1, callUriAll) && call1State == Call.State.StreamsRunning) {
                         newCallState = "connected"; // Happens when an incoming sip call is ignored.
                         address = address1;
                     }
@@ -422,12 +461,12 @@ public class CallStateCLB {
             }
         } else if (state == Call.State.UpdatedByRemote) {
             // If the correspondent proposes video while audio call
-        } else if (state == Call.State.OutgoingInit && (A10Min || (callUriAll != null && address.contains(callUriAll)))) {
+        } else if (state == Call.State.OutgoingInit && (A10Min || IsCLBSessionCall(address, callUriAll))) {
             newCallState = "ringing";
-        } else if (state == Call.State.StreamsRunning && (A10Min || (callUriAll != null && address.contains(callUriAll)))) {
+        } else if (state == Call.State.StreamsRunning && (A10Min || IsCLBSessionCall(address, callUriAll))) {
             newCallState = "connected";
-        } else if (state == Call.State.Paused && callUriAll != null && address.contains(callUriAll)) {
-            Log.i("[Manager] end call, cause a CLB call with pause is not allowed.");
+        } else if (state == Call.State.Paused && IsCLBSessionCall(address, callUriAll)) {
+            Log.i("[Manager] end call, because a CLB call with pause is not allowed.");
             call.terminate();
         }
         Log.i("[Manager] state: " + state + " clb: " + newCallState);
@@ -441,6 +480,37 @@ public class CallStateCLB {
             intentMessage.putExtra("address", address);
             mContext.sendBroadcast(intentMessage);
         }
+    }
+
+    private Call FindActiveCLBCall(Core core, Call endedCall, String clbCallUri, boolean anyCallIsCLB) {
+        Call currentCall = core.getCurrentCall();
+        if (IsActiveCLBCall(currentCall, endedCall, clbCallUri, anyCallIsCLB)) {
+            return currentCall;
+        }
+
+        Call[] calls = core.getCalls();
+        if (calls != null) {
+            for (Call candidate : calls) {
+                if (IsActiveCLBCall(candidate, endedCall, clbCallUri, anyCallIsCLB)) {
+                    return candidate;
+                }
+            }
+        }
+        return null;
+    }
+
+    private boolean IsActiveCLBCall(Call candidate, Call endedCall, String clbCallUri, boolean anyCallIsCLB) {
+        if (candidate == null || candidate == endedCall) return false;
+
+        Call.State candidateState = candidate.getState();
+        if (candidateState == Call.State.Idle
+                || candidateState == Call.State.End
+                || candidateState == Call.State.Error
+                || candidateState == Call.State.Released) {
+            return false;
+        }
+
+        return anyCallIsCLB || IsCLBSessionCall(GetAddressString(candidate), clbCallUri);
     }
 
     private String GetAddressString(Call call) {
@@ -469,11 +539,11 @@ public class CallStateCLB {
         for (int i = 0; i < calls.length; i++) {
             Call call = calls[i];
             String address = GetAddressString(call);
-            boolean originalIsClb = (callUriAll != null && !callUriAll.isEmpty() && address.contains(callUriAll));
+            boolean originalIsClb = (callUriAll != null && !callUriAll.isEmpty() && address.toLowerCase().contains(callUriAll.toLowerCase()));
             Call.State call1State = call.getState();
-            if(originalIsClb) {
-                Log.i("[Manager] call " + i + " state: " + call1State + " address: " + address);
-                Log.i("[Manager] end call before answering new call, cause a CLB call with pause is not allowed.");
+            if (originalIsClb) {
+                Log.i("[Manager] Call (" + i + ") state: " + call1State + ", address: " + address);
+                Log.i("[Manager] End call before answering new call, because a CLB call with pause is not allowed.");
                 call.terminate();
                 return;
             }

@@ -260,7 +260,6 @@ class TelecomCallControlCallback(
                     continue
                 }
 
-                var success = false
                 scope.launch {
                     Log.i("$TAG Requesting audio endpoint change to [${endpoint.name}] with type [${endpointTypeToString(endpoint.type)}]")
                     endpointUpdateRequestFromLinphone = true
@@ -278,16 +277,23 @@ class TelecomCallControlCallback(
 
                     if (result is CallControlResult.Error) {
                         Log.e("$TAG Failed to change endpoint audio device, error [$result]")
+                        endpointUpdateRequestFromLinphone = false
+                        coreContext.postOnCoreThread {
+                            if (!AudioUtils.applyAudioRouteChangeInLinphone(call, routes)) {
+                                Log.e("$TAG Failed to apply audio route directly in Linphone after Telecom request failed")
+                            }
+                        }
                     } else {
                         Log.i(
                             "$TAG It took [$attempts] attempt(s) to change endpoint audio device..."
                         )
                         currentEndpoint = endpoint.type
-                        success = true
                     }
                 }
 
-                return success
+                // The endpoint request is asynchronous; report that Telecom accepted it.
+                // Falling back here would change Linphone's route while Telecom is still switching.
+                return true
             }
         }
 

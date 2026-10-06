@@ -98,7 +98,7 @@ class AudioUtils {
                     Log.w("$TAG Failed to change audio endpoint to [$types] for call ID [$callId]")
                     applyAudioRouteChange(currentCall, types, output, skipTelecom = true)
                 } else {
-                    Log.i("$TAG It seems audio endpoint update using Telecom Manager was successful")
+                    Log.i("$TAG Telecom Manager accepted the audio endpoint update request")
                     return
                 }
             } else {

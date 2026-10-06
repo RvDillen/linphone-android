@@ -357,7 +357,7 @@ class CoreContext
                 }
                 Call.State.OutgoingInit -> {
                     // CLB: Check if call is from CLB - if so, skip showing activity
-                    if (CallStateCLB.instance().IsCallFromCLB()) {
+                    if (CallStateCLB.instance().IsCLBSessionCall()) {
                         val coreExt = CoreContextExt()
                         coreExt.OnOutgoingStarted(false)
                     } else {
@@ -376,7 +376,7 @@ class CoreContext
                 }
                 Call.State.Connected -> {
                     // CLB: Skip showing activity for CLB calls
-                    if (!CallStateCLB.instance().IsCallFromCLB()) {
+                    if (!CallStateCLB.instance().IsCLBSessionCall()) {
                         postOnMainThread {
                             showCallActivity()
                         }
