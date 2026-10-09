@@ -3,14 +3,9 @@ package org.linphone.clb;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
-import android.os.Handler;
 
 import org.linphone.clb.kt.CoreContextExt;
-import org.linphone.core.Address;
-import org.linphone.core.Factory;
 import org.linphone.core.tools.Log;
-
-import static org.linphone.LinphoneApplication.coreContext;
 
 // import org.linphone.mediastream.Version;
 
@@ -25,9 +20,6 @@ import static org.linphone.LinphoneApplication.coreContext;
 
 public class DirectCallReceiver extends BroadcastReceiver {
     private String addressToCall;
-
-    private Handler mHandler;
-    private ServiceWaitThread mServiceThread;
 
     @Override
     public void onReceive(Context context, Intent intent) {
@@ -52,62 +44,8 @@ public class DirectCallReceiver extends BroadcastReceiver {
         Log.i( "[Manager] DirectCallReceiver for: " + addressToCall + " short: " + CallStateCLB.instance().GetCallUriAll());
 
 
-        mHandler = new Handler();
         CoreContextExt coreExt = new CoreContextExt();
-
-        if (coreExt.IsServiceReady()) {
-            coreExt.OnOutgoingStarted(false);
-            onServiceReady();
-        } else {
-            Log.i("[Manager] Start linphone as foreground");
-
-            // start linphone as foreground service
-            coreExt.StartCoreService(context);
-            coreExt.OnOutgoingStarted(false);
-
-            mServiceThread = new ServiceWaitThread();
-            mServiceThread.start();
-
-        }
-    }
-
-    protected void onServiceReady() {
-        mHandler.postDelayed(
-                new Runnable() {
-                    @Override
-                    public void run() {
-                        Log.i("[Manager] Start call to " + addressToCall);
-                        String sipUri = addressToCall.startsWith("sip:") ? addressToCall : "sip:" + addressToCall;
-                        Address address = Factory.instance().createAddress(sipUri);
-                        if (address != null) {
-                            coreContext.startCall(address, null, false, null);
-                        } else {
-                            Log.e("[Manager] Failed to parse address: " + sipUri);
-                        }
-                    }
-                },
-                100);
-    }
-
-    private class ServiceWaitThread extends Thread {
-        public void run() {
-
-            CoreContextExt coreExt = new CoreContextExt();
-            while (!coreExt.IsServiceReady()) {
-                try {
-                    sleep(30);
-                } catch (InterruptedException e) {
-                    throw new RuntimeException("[Manager] waiting thread sleep() has been interrupted");
-                }
-            }
-            mHandler.post(
-                    new Runnable() {
-                        @Override
-                        public void run() {
-                            onServiceReady();
-                        }
-                    });
-            mServiceThread = null;
-        }
+    // CLB: Use lifecycle-gated startup instead of polling a short-lived in-call service.
+        coreExt.RequestOutgoingCall(context, addressToCall);
     }
 }

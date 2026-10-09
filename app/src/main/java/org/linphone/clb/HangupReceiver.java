@@ -6,6 +6,7 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.util.Log;
 
+import org.linphone.clb.kt.CoreContextExt;
 import org.linphone.core.Address;
 import org.linphone.core.Call;
 import org.linphone.core.Core;
@@ -41,24 +42,27 @@ public class HangupReceiver extends BroadcastReceiver {
         }
 
         CallStateCLB.instance().RegisterHangUpTime();
+        // CLB: Cancel pending startup so a hangup cannot be followed by a delayed outgoing call.
+        CoreContextExt.cancelPendingOutgoingCall();
 
-        // Sip Found, try hangup this number
-        if (uriExtra != null) {
-            TerminatePhoneCall(uriExtra);
-            return;
-        }
+        final String requestedUri = uriExtra;
+        // CLB: Keep call lookup, state inspection and termination on the Core Thread to avoid ANRs.
+        coreContext.postOnCoreThread(core -> {
+            if (requestedUri != null) {
+                TerminatePhoneCall(requestedUri);
+            } else {
+                Call currentCall = core.getCurrentCall();
 
-        // Default hangup behaviour (no uri or terminate uri failed)
-        Core lc = coreContext.getCore();
-        Call currentCall = lc.getCurrentCall();
-
-        if (currentCall != null) {
-            currentCall.terminate();
-        } else if (lc.isInConference()) {
-            lc.terminateConference();
-        } else {
-            lc.terminateAllCalls();
-        }
+                if (currentCall != null) {
+                    currentCall.terminate();
+                } else if (core.isInConference()) {
+                    core.terminateConference();
+                } else {
+                    core.terminateAllCalls();
+                }
+            }
+            return kotlin.Unit.INSTANCE;
+        });
     }
 
     private String FormatUri(String uri) {

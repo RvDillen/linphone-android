@@ -23,6 +23,8 @@ import android.content.Intent
 import android.os.IBinder
 import androidx.annotation.MainThread
 import org.linphone.LinphoneApplication.Companion.coreContext
+import org.linphone.clb.kt.CoreContextExt
+import org.linphone.core.tools.AndroidPlatformHelper
 import org.linphone.core.tools.Log
 import org.linphone.core.tools.service.CoreService
 
@@ -33,8 +35,20 @@ class CoreInCallService : CoreService() {
     }
 
     override fun onCreate() {
+        // CLB: Promote pending startup before the SDK installs its no-call foreground cleanup.
+        if (CoreContextExt.hasClbStartupHold()) {
+            coreContext.notificationsManager.onInCallServiceStarted(this, true)
+        }
         super.onCreate()
         Log.i("$TAG Created")
+    }
+
+    fun markClbForegroundReady() {
+        // CLB: Synchronize SDK foreground state so its 500 ms no-call cleanup is not scheduled.
+        mIsInForegroundMode = true
+        if (AndroidPlatformHelper.isReady()) {
+            AndroidPlatformHelper.instance().setServiceRunningAsForeground(true)
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {

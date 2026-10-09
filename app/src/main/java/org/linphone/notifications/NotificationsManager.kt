@@ -58,6 +58,7 @@ import androidx.navigation.NavDeepLinkBuilder
 import org.linphone.LinphoneApplication.Companion.coreContext
 import org.linphone.LinphoneApplication.Companion.corePreferences
 import org.linphone.R
+import org.linphone.clb.kt.CoreContextExt
 import org.linphone.compatibility.Compatibility
 import org.linphone.contacts.AvatarGenerator
 import org.linphone.contacts.ContactsManager.ContactsListener
@@ -541,6 +542,19 @@ class NotificationsManager
         Log.i("$TAG Service has been started")
         inCallService = service
 
+        // CLB: Preserve the startup hold and dispatch only after foreground promotion succeeds.
+        if (CoreContextExt.hasClbStartupHold()) {
+            waitForInCallServiceForegroundToStopIt = false
+            if (currentInCallServiceNotificationId == -1 && !showDummyNotificationForCallService()) {
+                CoreContextExt.cancelPendingOutgoingCall()
+                service.stopSelf()
+                return
+            }
+            service.markClbForegroundReady()
+            CoreContextExt.onClbServiceReady()
+            return
+        }
+
         if (startForeground && currentInCallServiceNotificationId == -1) {
             Log.i("$TAG Service was explicitly started as foreground, using dummy notification")
             showDummyNotificationForCallService()
@@ -550,7 +564,8 @@ class NotificationsManager
             Log.w("$TAG Service wasn't started as foreground yet, doing it now using a dummy notification")
             showDummyNotificationForCallService()
         }
-        if (inCallServiceForegroundNotificationPublished) {
+        // CLB: A published notification alone must not stop the service before an outgoing call starts.
+        if (waitForInCallServiceForegroundToStopIt && inCallServiceForegroundNotificationPublished) {
             stopInCallForegroundService()
         }
 
@@ -1114,7 +1129,7 @@ class NotificationsManager
     }
 
     @AnyThread
-    private fun showDummyNotificationForCallService() {
+    private fun showDummyNotificationForCallService(): Boolean {
         val service = inCallService
         if (service != null) {
             val channelId = context.getString(R.string.notification_channel_call_id)
@@ -1145,22 +1160,48 @@ class NotificationsManager
                     "$TAG Service found, starting it as foreground using dummy notification ID [$DUMMY_NOTIF_ID]"
                 )
                 // CLB: Always use 'TYPE_MICROPHONE' so the mic always works when Linphone is in the background
-                Compatibility.startServiceForeground(
-                    service,
-                    DUMMY_NOTIF_ID,
-                    notification,
-                    Compatibility.FOREGROUND_SERVICE_TYPE_PHONE_CALL or Compatibility.FOREGROUND_SERVICE_TYPE_MICROPHONE
-                )
+                if (CoreContextExt.hasClbStartupHold()) {
+                    // CLB: Detect promotion failures directly; the compatibility wrapper swallows exceptions.
+                    try {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                            service.startForeground(
+                                DUMMY_NOTIF_ID,
+                                notification,
+                                Compatibility.FOREGROUND_SERVICE_TYPE_PHONE_CALL or Compatibility.FOREGROUND_SERVICE_TYPE_MICROPHONE
+                            )
+                        } else {
+                            service.startForeground(DUMMY_NOTIF_ID, notification)
+                        }
+                    } catch (exception: RuntimeException) {
+                        Log.e("$TAG CLB foreground promotion failed: $exception")
+                        return false
+                    }
+                } else {
+                    Compatibility.startServiceForeground(
+                        service,
+                        DUMMY_NOTIF_ID,
+                        notification,
+                        Compatibility.FOREGROUND_SERVICE_TYPE_PHONE_CALL or Compatibility.FOREGROUND_SERVICE_TYPE_MICROPHONE
+                    )
+                }
                 notificationsMap[INCOMING_CALL_ID] = notification
                 currentInCallServiceNotificationId = DUMMY_NOTIF_ID
                 inCallServiceForegroundNotificationPublished = true
                 Log.i("$TAG Dummy notification with ID [$DUMMY_NOTIF_ID] has been used to start service as foreground")
+                return true
             } else {
                 Log.e("$TAG POST_NOTIFICATIONS permission isn't granted, don't start foreground service!")
             }
         } else {
             Log.w("$TAG Core Foreground Service hasn't started yet...")
         }
+        return false
+    }
+
+    @AnyThread
+    fun stopClbStartupService() {
+        // CLB: Allow expired or failed startup requests to release their service and notification.
+        stopInCallForegroundService()
     }
 
     @AnyThread

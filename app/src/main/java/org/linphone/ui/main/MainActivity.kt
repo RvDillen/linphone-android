@@ -61,6 +61,7 @@ import org.linphone.LinphoneApplication.Companion.coreContext
 import org.linphone.LinphoneApplication.Companion.corePreferences
 import org.linphone.R
 import org.linphone.clb.PermissionHelperCLB
+import org.linphone.clb.kt.CoreContextExt
 import org.linphone.compatibility.Compatibility
 import org.linphone.core.tools.Log
 import org.linphone.databinding.MainActivityBinding
@@ -102,6 +103,21 @@ class MainActivity : GenericActivity() {
     private var currentlyDisplayedAuthDialog: Dialog? = null
 
     private var navigatedToDefaultFragment = false
+
+    // CLB: Resume pending startup after microphone permission is granted, never from a paused activity.
+    private var clbMicrophonePermissionRequested = false
+    private var clbActivityResumed = false
+
+    private val clbMicrophonePermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        clbMicrophonePermissionRequested = false
+        if (!isGranted) {
+            CoreContextExt.cancelPendingOutgoingCall()
+        } else if (clbActivityResumed) {
+            CoreContextExt.onMainActivityResumed(this)
+        }
+    }
 
     private val destinationListener = object : NavController.OnDestinationChangedListener {
         override fun onDestinationChanged(
@@ -392,6 +408,9 @@ class MainActivity : GenericActivity() {
     }
 
     override fun onPause() {
+        // CLB: Revoke foreground eligibility before any pending microphone service startup.
+        clbActivityResumed = false
+        CoreContextExt.onMainActivityPaused()
         viewModel.enableAccountMonitoring(false)
 
         currentlyDisplayedAuthDialog?.dismiss()
@@ -426,16 +445,33 @@ class MainActivity : GenericActivity() {
     override fun onResume() {
         super.onResume()
 
+        // CLB: A resumed activity supplies the while-in-use eligibility required by microphone FGS startup.
+        clbActivityResumed = true
+        resumeClbOutgoingCall()
         viewModel.enableAccountMonitoring(true)
         viewModel.checkForNewAccount()
         viewModel.updateNetworkReachability()
         viewModel.updateMissingPermissionAlert()
     }
 
+    private fun resumeClbOutgoingCall() {
+        // CLB: Request missing microphone permission before releasing the pending outgoing request.
+        CoreContextExt.onMainActivityResumed(this)
+        if (CoreContextExt.hasPendingOutgoingCall() &&
+            checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED &&
+            !clbMicrophonePermissionRequested
+        ) {
+            clbMicrophonePermissionRequested = true
+            clbMicrophonePermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        }
+    }
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         Log.d("$TAG Handling new intent")
         handleIntent(intent)
+        // CLB: An already-resumed activity may receive a new request without another onResume callback.
+        if (clbActivityResumed) resumeClbOutgoingCall()
     }
 
     @SuppressLint("RtlHardcoded")
