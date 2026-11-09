@@ -221,7 +221,6 @@
                     <androidx.appcompat.widget.AppCompatTextView
                         style="@style/tertiary_button_label_style"
                         android:id="@+id/check_for_update"
-                        android:onClick="@{() -> viewModel.checkForUpdate()}"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:background="@drawable/tertiary_button_background"
@@ -233,7 +232,7 @@
                         android:text="@string/help_about_check_for_update"
                         android:maxLines="1"
                         android:ellipsize="end"
-                        android:visibility="@{viewModel.checkUpdateAvailable ? View.VISIBLE : View.GONE}"
+                        android:visibility="gone"
                         tools:ignore="MissingConstraints" />
 
                     <androidx.constraintlayout.helper.widget.Flow
