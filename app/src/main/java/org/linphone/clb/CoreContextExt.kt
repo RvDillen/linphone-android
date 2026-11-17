@@ -10,10 +10,12 @@ import android.os.Looper
 import android.os.SystemClock
 import androidx.core.content.ContextCompat
 import org.linphone.LinphoneApplication.Companion.coreContext
+import org.linphone.core.Address
+import org.linphone.core.Core
 import org.linphone.core.CoreInCallService
-import org.linphone.core.Factory
 import org.linphone.core.tools.Log
 import org.linphone.ui.main.MainActivity
+import org.linphone.utils.LinphoneUtils
 
 class CoreContextExt() {
     // CLB: Coordinate one pending request with a bounded two-second service startup hold.
@@ -86,12 +88,15 @@ class CoreContextExt() {
             // CLB: Core and Call operations must share the Core Thread to prevent lock-inversion ANRs.
             coreContext.postOnCoreThread { core ->
                 if (generation != requestGeneration || !hasClbStartupHold()) return@postOnCoreThread
-                val sipUri = if (requestedAddress.startsWith("sip:")) requestedAddress else "sip:$requestedAddress"
-                val address = Factory.instance().createAddress(sipUri)
-                if (address != null && core.calls.none { it.remoteAddress.asStringUriOnly().equals(sipUri, true) }) {
-                    Log.i("[Manager] Start call to $requestedAddress")
+                // CLB: Build the address as Linphone 5.2 did (CoreContext.startCall(String)), so the account domain is added
+                // to a uri without host (e.g. 'sip:4007;?clbsessionid=...' => 'sip:4007@<domain>?clbsessionid=...').
+                // Factory.createAddress() takes '4007' as host instead, causing 'DNS resolution failed for 4007' (SD-3524).
+                val address = interpretClbAddress(core, requestedAddress)
+                if (address != null && core.calls.none { it.remoteAddress.weakEqual(address) }) {
+                    Log.i("[Manager] Start call to $requestedAddress (${address.asStringUriOnly()})")
                     coreContext.startCall(address, null, false, null)
                 }
+                // CLB: End of 5.2 address handling
                 val callStarted = core.callsNb > 0
                 startupHandler.post {
                     if (generation == requestGeneration) {
@@ -101,6 +106,24 @@ class CoreContextExt() {
                 }
             }
         }
+
+        // CLB: Restored from Linphone 5.2 CoreContext.startCall(String) - do NOT replace by Factory.createAddress().
+        // Split off the parameters at the first ';', interpret the user part (adds the default account domain when the host
+        // is missing, and prevents a duplicate host), then append the parameters again.
+        private fun interpretClbAddress(core: Core, requestedAddress: String): Address? {
+            val parts = requestedAddress.trim().removePrefix("sip:").split(";", limit = 2)
+
+            var address = core.interpretUrl(parts[0], LinphoneUtils.applyInternationalPrefix())
+            if (address != null && parts.size > 1) {
+                address = core.interpretUrl(address.asStringUriOnly() + ";" + parts[1], false)
+            }
+
+            if (address == null) {
+                Log.e("[Manager] Failed to parse address: $requestedAddress")
+            }
+            return address
+        }
+        // CLB: End of address handling restored from Linphone 5.2
 
         private fun stopUnusedService() {
             // CLB: Release failed startup services without stopping an active or newer call request.
