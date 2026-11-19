@@ -108,14 +108,26 @@ class CoreContextExt() {
         }
 
         // CLB: Restored from Linphone 5.2 CoreContext.startCall(String) - do NOT replace by Factory.createAddress().
-        // Split off the parameters at the first ';', interpret the user part (adds the default account domain when the host
-        // is missing, and prevents a duplicate host), then append the parameters again.
+        // Split off the headers at the first '?' and the parameters at the first ';', interpret the user part (adds the
+        // default account domain when the host is missing, and prevents a duplicate host), then append the parameters and
+        // headers again. Empty parameters and headers without a value are dropped, so a uri such as 'sip:300;?CLBinfo'
+        // becomes 'sip:300@<domain>' instead of the unparsable '...;?CLBinfo' (an empty 'CLBinfo:' header makes the PBX
+        // reject the call with 503).
         private fun interpretClbAddress(core: Core, requestedAddress: String): Address? {
-            val parts = requestedAddress.trim().removePrefix("sip:").split(";", limit = 2)
+            val uriAndHeaders = requestedAddress.trim().removePrefix("sip:").split("?", limit = 2)
+            val userAndParams = uriAndHeaders[0].split(";")
 
-            var address = core.interpretUrl(parts[0], LinphoneUtils.applyInternationalPrefix())
-            if (address != null && parts.size > 1) {
-                address = core.interpretUrl(address.asStringUriOnly() + ";" + parts[1], false)
+            val params = userAndParams.drop(1).filter { it.isNotBlank() }
+            val headers = uriAndHeaders.getOrNull(1)
+                ?.split("&")
+                ?.filter { it.substringAfter("=", "").isNotBlank() }
+                .orEmpty()
+
+            var address = core.interpretUrl(userAndParams[0], LinphoneUtils.applyInternationalPrefix())
+            if (address != null && (params.isNotEmpty() || headers.isNotEmpty())) {
+                val suffix = params.joinToString("") { ";$it" } +
+                    (if (headers.isNotEmpty()) headers.joinToString("&", prefix = "?") else "")
+                address = core.interpretUrl(address.asStringUriOnly() + suffix, false)
             }
 
             if (address == null) {
